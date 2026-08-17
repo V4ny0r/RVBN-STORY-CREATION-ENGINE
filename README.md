@@ -33,11 +33,23 @@ Every book gets its own social-media style page, second in the menu:
 - **Every chapter as one scrollable feed.** Click a chapter to open a full editor inline and type straight into the page. Add a chapter anywhere with the dividers between posts, reorder, duplicate or delete without leaving the feed.
 - **Story parts.** Tag each chapter — Setup, Inciting Incident, Midpoint, Climax, **The Conclusion**, Epilogue and fourteen more — and it gets a coloured stripe and badge. Switch on *Group by story part* to stack the feed under headings and see the shape of the whole book.
 - **Paragraph markers.** Put the cursor in any paragraph and press *Tag paragraph* to mark the exact line where the story turns. Every mark is listed in the **Story Map** beside the feed and jumps you straight there.
-- **Six tabs**: Chapters · About This Book (series, comps, POV, tense, setting, themes, warnings, pitch, synopsis, production plan, plus a completeness checklist) · Cast · World & Lore · Gallery (every picture in the project, gathered automatically) · Notes.
+- **Six tabs you can reorder** — drag any tab to move it: Chapters · About This Book (series, comps, POV, tense, setting, themes, warnings, pitch, synopsis, production plan, plus a completeness checklist) · Cast · World & Lore · Gallery · Notes.
+- **A real photo album.** Add photos or GIFs, give each a title, description and tags, and click one for a full-screen viewer with the details beside the picture (or underneath — your choice). Every image used elsewhere in the book is gathered underneath, one click from being copied into the album. Any photo can be made the book's cover or profile picture.
 
 ### Making it yours
 
-- **Twelve ready-made themes** (TRON Grid, Ares Red, Vaporwave, Ink Noir, Old Parchment, Deep Sea, Sakura Dusk, Retro Terminal, Blood Moon, Arctic Signal, Candy Pop, Bone & Ash), then fine-tune accents, panel colour and transparency, heading and body fonts, corner style and glow.
+**Twenty-one whole-app style templates**, grouped by vibe, in *Settings & Appearance*. Each one changes colours, fonts, corner shape, card treatment, background style, spacing and even whether labels are capitalised — without moving a single control. A page with a banner still has its banner.
+
+| Group | Styles |
+| --- | --- |
+| Technology | TRON Grid · Ares Red · Retro Terminal · Vaporwave |
+| Everyday | Social Dark · Social Light · Nordic Minimal · Mono Slate |
+| Gradient | Aurora Gradient · Sunset Drift · Lagoon |
+| Literary | Manuscript · Midnight Ink · Cosy Library · Ink Noir · Typewriter |
+| Mood | Deep Forest · Sakura Dusk · Blood Moon · Candy Pop · Arctic Signal |
+
+Six of them are full light modes. Beyond the presets, *Fine-Tune Colours & Fonts* exposes every knob: five colours, light/dark, card transparency, glow, corner shape, card style, background style, spacing, outline tint, capitalisation, and separate fonts for headings, your prose and the interface.
+
 - **Background pictures and GIFs** behind the whole app, with fill mode, blur and dimming.
 - Apply any look to **just one page, one whole book, or everything** — page beats book beats global.
 - **Banners are resizable in pixels everywhere**, with a live vertical reframe slider, opacity, blur and scrim.
