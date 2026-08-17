@@ -6,11 +6,29 @@ creation suite in a single self-contained HTML file.
 ## Running it
 
 Open `index.html` in any modern browser. There is no build step, no install, no server.
-Everything you write is stored locally in the browser (IndexedDB, with a localStorage
-fallback) and autosaves every 5 seconds.
+## Never losing your work
 
-> Because storage is local, clearing site data or using a private window will discard your
-> work. Use **Export & Data → Export Entire Vault** for a portable JSON backup.
+Open **Storage & Backups** and press **Choose where to save**. Pick any file on your
+computer — Documents, Dropbox, OneDrive, a USB stick. From then on the app writes
+*everything* into that one file automatically as you work: books, chapters, cast,
+pictures, settings, even your menu layout.
+
+Move that file to another machine, open the app there, press **Open an existing vault
+file**, and you are exactly where you left off — no accounts, no sync service, no install.
+
+Underneath it there are three more layers:
+
+- **Write-ahead saves** in IndexedDB, so a power cut mid-write can never corrupt anything.
+  On the next launch the newest complete copy wins and the app tells you it recovered.
+- **A rolling snapshot history** you can browse and roll back to. Naming a snapshot keeps
+  it forever; automatic ones are recycled.
+- **A crash flush** on tab close, tab hide and app blur, so the last sentence you typed
+  survives even a killed tab.
+
+Backups carry a checksum and are verified before anything is restored.
+
+> Saving straight into a file needs Chrome, Edge, Opera or Brave. Firefox and Safari do not
+> support it yet — there, use **Download a full backup**, which produces exactly the same file.
 
 ## What's inside
 
@@ -56,6 +74,28 @@ Six of them are full light modes. Beyond the presets, *Fine-Tune Colours & Fonts
 - **Drag your own menu**: press *Arrange Menu* to drag pages between groups, reorder groups, rename them, add your own, or reset.
 - **Dashboard slideshow**: your own images, GIFs or video with six transitions (fade, slide, zoom, flip, blur, Ken Burns), adjustable timing and height. Pull pictures straight from anywhere else in the book.
 
+### Finishing the book
+
+**Book Designer** typesets what you have written onto real pages and shows them to you as
+you adjust the design. Eight templates — Classic Trade, Modern Literary, Fantasy Epic,
+Cosy Mystery, Manuscript Submission, Large Print, Pocket Paperback, Typewriter Draft —
+plus full control of trim size, margins, typeface, size, leading, indents, drop caps,
+chapter openings, running heads and page numbers. The preview and the exported PDF are
+produced by the same code, so what you see is what prints. While drafting, the open-book
+button in any editor toolbar shows just that chapter as live pages that reflow as you type.
+
+### Getting unstuck and generating ideas
+
+**Idea Lab** holds twenty-one brainstorming tools — What-If Machine, Twist Machine,
+Premise Mixer, Character Seeds, Obstacle Escalator, Ending Options, Plot Hole Hunter and
+more — each of which reads your actual book before generating anything. Any idea can be
+bookmarked, sent to your notes, turned into a beat, or made into a chapter.
+
+The **Story Advisor** looks at what exists, what is tagged and how long it is, then tells
+you the next sensible thing to write. Finish a prologue and it explains what Chapter One
+has to do; tag a midpoint and it points you at the all-is-lost moment. It appears beside
+your chapter feed, on the dashboard and in the Idea Lab.
+
 ### Never wondering what a page is for
 
 Every page opens with a plain-English guide: one sentence on what the page is, a numbered *step by step*, and a *good to know* list. Modals and complex fields carry their own explanations. Hide them all with the **?** button in the top bar, bring them back the same way.
@@ -70,6 +110,9 @@ Every page opens with a plain-English guide: one sentence on what the page is, a
 | **Cast System** | Four-tier character matrix with full dossiers, a draggable relationship node map (plus matrix and list views), and a dialogue sandbox for talking to your characters in their own voice. |
 | **Workspaces** | Twelve genre dossiers, a comic studio with ten panel layouts and script export, and a children's-book studio with age-tier layouts and exportable AI art prompts. |
 | **Vault** | Draggable moodboard canvas, external reference library, and six in-depth masterclass craft lessons. |
+| **Book Designer** | Your book typeset on real pages — eight print templates, trim sizes, margins, drop caps, running heads, page numbers — previewed live and exported as a proper PDF. |
+| **Idea Lab** | Twenty-one brainstorming tools that read your book first, plus a Story Advisor that works out what you should write next. |
+| **Storage** | Vault file on your own disk, write-ahead saves, snapshot history, verified backups. |
 | **Export** | JSON backup/restore, clean HTML book, Markdown manuscript, printable manuscript, full story bible, cast sheet, comic script and children's dummy book. |
 
 ## AI providers

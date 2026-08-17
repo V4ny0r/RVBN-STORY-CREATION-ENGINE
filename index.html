@@ -993,6 +993,47 @@ label.fld > .hint{ margin-top:3px; }
   #btnSaveNow{ display:none; }
 }
 
+
+/* -------------------------- book designer preview ------------------------ */
+.dsn-preview{ background:var(--void); border:1px solid var(--line); padding:22px; overflow:auto; max-height:calc(100vh - 190px); }
+.dsn-sheet{ display:flex; flex-wrap:wrap; gap:16px; justify-content:center; align-items:flex-start; }
+.dsn-sheet .bk-page{ box-shadow:0 14px 40px rgba(0,0,0,.55); flex:0 0 auto; }
+.dsn-sheet:not(.spread) .bk-page{ margin:0 auto; }
+.dsn-sheet.spread{ gap:2px 10px; }
+.light-mode .dsn-sheet .bk-page{ box-shadow:0 10px 28px rgba(0,0,0,.22); }
+#pageSim{ padding:12px; }
+@media(max-width:900px){ .dsn-preview{ padding:10px; } }
+
+
+/* ----------------------------- idea lab ---------------------------------- */
+.idea-row{ display:flex; gap:10px; align-items:flex-start; padding:10px 12px; border:1px solid var(--line-soft);
+  background:color-mix(in srgb, var(--accent) 3%, transparent); margin-bottom:6px; border-radius:var(--radius); transition:.14s; }
+.idea-row:hover{ border-color:var(--line-hard); background:color-mix(in srgb, var(--accent) 8%, transparent); }
+.idea-text{ flex:1; min-width:0; font-size:14px; line-height:1.6; color:var(--txt); }
+.advice{ border:1px solid var(--line); border-left:3px solid var(--accent); background:var(--bg-panel);
+  padding:13px 15px; margin-bottom:10px; border-radius:var(--radius); }
+.advice.primary{ border-left-color:var(--c-lime); box-shadow:0 0 22px color-mix(in srgb, var(--c-lime) 12%, transparent); }
+.advice-t{ font-family:var(--font-display); font-size:15px; letter-spacing:.7px; color:var(--txt); margin-bottom:6px; }
+.advice-w{ font-size:13.5px; line-height:1.65; color:var(--txt-dim); }
+.advice-w em{ color:var(--accent-3,var(--accent)); font-style:normal; }
+
+
+/* ---------------------------- cover showcase ----------------------------- */
+.cover-showcase{ display:flex; justify-content:center; }
+.cover-showcase .cover-preview{ width:100%; max-width:340px; }
+.cover-showcase.spine-shot{ align-items:stretch; }
+.spine-big{ width:76px; min-height:440px; display:grid; place-items:center; border:1px solid var(--line); box-shadow:0 14px 40px rgba(0,0,0,.5); }
+.spine-big span{ writing-mode:vertical-rl; transform:rotate(180deg); font-family:var(--font-display); font-size:13px;
+  letter-spacing:3px; color:#eafcff; white-space:nowrap; padding:18px 0; }
+.wrap3d{ display:flex; align-items:stretch; justify-content:center; gap:0; max-width:940px; margin:0 auto; perspective:1600px; }
+.wrap3d > div{ flex:1 1 0; min-width:0; }
+.wrap3d .w3-spine{ flex:0 0 56px; display:grid; place-items:center; border-top:1px solid var(--line); border-bottom:1px solid var(--line); }
+.wrap3d .w3-spine span{ writing-mode:vertical-rl; transform:rotate(180deg); font-family:var(--font-display); font-size:12px;
+  letter-spacing:3px; color:#eafcff; white-space:nowrap; padding:14px 0; }
+.wrap3d .w3-front{ box-shadow:14px 0 40px rgba(0,0,0,.5); z-index:2; }
+@media(max-width:820px){ .wrap3d{ flex-direction:column; } .wrap3d .w3-spine{ flex:0 0 44px; }
+  .wrap3d .w3-spine span{ writing-mode:horizontal-tb; transform:none; padding:0; } }
+
 </style>
 </head>
 <body>
@@ -1804,7 +1845,9 @@ function newBook(title) {
     },
     lore: [],
     gallery: [],
+    ideas: [],
     slideshow: { slides: [], interval: 5, transition: 'fade', h: 320, autoplay: true, showCaptions: true },
+    design: null,         /* how the printed book is typeset */
     theme: null,          /* book-wide look override */
     pageThemes: {}        /* per-page look overrides */
   };
@@ -2527,6 +2570,7 @@ const VIEW_META = {
   prologue:   { t: 'Prologue Master Editor',   e: 'MANUSCRIPT / 03',         d: 'Long-form editor with attached visual moodboard.', i: 'flame' },
   chapters:   { t: 'Draft Chapter Workspace',  e: 'MANUSCRIPT / 04',         d: 'Focused one-chapter-at-a-time writing desk.', i: 'files' },
   outline:    { t: 'Story Breakdown Hub',      e: 'ARCHITECTURE',            d: 'Guided story builder and multi-act beat sheets.', i: 'git-branch' },
+  ideas:      { t: 'Idea Lab',                 e: 'BRAINSTORM',              d: 'Twenty-one brainstorming tools that already know your story.', i: 'sparkles' },
   copilot:    { t: 'AI Writing Co-Pilot',      e: 'UNSTUCK ENGINE',          d: 'Plot brancher, sensory enhancer and clich\u00e9 scanner.', i: 'brain' },
   characters: { t: 'Character Matrix',         e: 'CAST SYSTEM',             d: 'Tiered dossiers for every soul in the story.', i: 'users' },
   network:    { t: 'Relationship Network',     e: 'CAST SYSTEM',             d: 'Node map of allies, rivals, family and secret ties.', i: 'network' },
@@ -2537,6 +2581,7 @@ const VIEW_META = {
   research:   { t: 'Research & Lore Vault',    e: 'VAULT',                   d: 'Moodboard canvas and external reference library.', i: 'pin' },
   masterclass:{ t: 'Masterclass Writing Library', e: 'VAULT',                d: 'Interactive craft tutorials from the archive.', i: 'graduation-cap' },
   settings:   { t: 'Settings & Appearance',    e: 'SYSTEM',                  d: 'How the app looks, AI providers, storage and privacy.', i: 'settings-2' },
+  designer:   { t: 'Book Designer',            e: 'MANUSCRIPT / 05',         d: 'Typeset your book on real pages and save it as a professional PDF.', i: 'book-open' },
   storage:    { t: 'Storage & Backups',        e: 'SYSTEM',                  d: 'Where your work is saved, snapshots you can roll back to, and full backups.', i: 'database' },
   exportv:    { t: 'Export & Data Management', e: 'SYSTEM',                  d: 'Backups, manuscripts and portable formats.', i: 'download' }
 };
@@ -2551,8 +2596,10 @@ const NAV_ITEMS = {
   title:      { i: 'type', t: 'Title & Dedication' },
   prologue:   { i: 'flame', t: 'Prologue Master' },
   chapters:   { i: 'files', t: 'Draft Chapters', badge: () => (currentBook() || { chapters: [] }).chapters.length },
+  designer:   { i: 'book-open', t: 'Book Designer & PDF' },
   outline:    { i: 'git-branch', t: 'Story Breakdown Hub' },
   copilot:    { i: 'brain', t: 'AI Co-Pilot / Unstuck' },
+  ideas:      { i: 'sparkles', t: 'Idea Lab' },
   characters: { i: 'users', t: 'Character Matrix', badge: () => (currentBook() || { characters: [] }).characters.length },
   network:    { i: 'network', t: 'Relationship Network' },
   sandbox:    { i: 'message-square', t: 'Dialogue Sandbox' },
@@ -2576,8 +2623,8 @@ function defaultNav() {
   return [
     { id: 'g_profiles', label: 'BOOK PROFILES', tone: 'red', open: true, items: ['library', 'profile'] },
     { id: 'g_command', label: 'COMMAND', tone: '', open: true, items: ['dashboard'] },
-    { id: 'g_book', label: 'THE BOOK', tone: 'red', open: true, items: ['cover', 'title', 'prologue', 'chapters'] },
-    { id: 'g_arch', label: 'ARCHITECTURE', tone: '', open: true, items: ['outline', 'copilot'] },
+    { id: 'g_book', label: 'THE BOOK', tone: 'red', open: true, items: ['cover', 'title', 'prologue', 'chapters', 'designer'] },
+    { id: 'g_arch', label: 'ARCHITECTURE', tone: '', open: true, items: ['outline', 'copilot', 'ideas'] },
     { id: 'g_cast', label: 'CAST SYSTEM', tone: '', open: true, items: ['characters', 'network', 'sandbox'] },
     { id: 'g_work', label: 'GENRE WORKSPACES', tone: '', open: true, items: ['genres', 'comics', 'kids'] },
     { id: 'g_vault', label: 'VAULT', tone: '', open: true, items: ['research', 'masterclass'] },
@@ -3649,6 +3696,7 @@ function editorHTML(id, html, ph, opts) {
       (opts.allowImage ? '<button class="etool" data-act="edImage" data-ed="' + id + '" title="Insert a picture or GIF into the text"><i data-lucide="image-plus"></i></button>' : '') +
       '<button class="etool" data-act="edMark" data-ed="' + id + '" title="Tag this paragraph as a part of the story (climax, reveal, conclusion…)"><i data-lucide="bookmark"></i></button>' +
       '<button class="etool" data-act="edPaper" data-ed="' + id + '" title="Manuscript paper mode"><i data-lucide="file-text"></i></button>' +
+      '<button class="etool' + (state.ui.pageSim === id ? ' on' : '') + '" data-act="edPageView" data-ed="' + id + '" title="See this on real book pages as you write"><i data-lucide="book-open"></i></button>' +
       '<button class="etool" data-act="edFocus" data-ed="' + id + '" title="Focus mode (large type)"><i data-lucide="maximize"></i></button>' +
       '<span style="flex:1"></span>' +
       '<span class="wcount" id="' + id + '-stats">0 words</span>' +
@@ -3661,7 +3709,8 @@ function editorHTML(id, html, ph, opts) {
       '<button class="btn sm ghost" data-act="aiUndo" data-ed="' + id + '"><i data-lucide="rotate-ccw"></i>UNDO</button>' +
       '<button class="btn sm lime" data-act="aiKeep" data-ed="' + id + '"><i data-lucide="check"></i>KEEP</button>' +
     '</div>' +
-  '</div>';
+  '</div>' +
+  (state.ui.pageSim === id ? '<div class="mt14">' + pageSimHTML(currentBook(), id) + '</div>' : '');
 }
 
 function wireEditor(id, setter, label) {
@@ -3683,7 +3732,10 @@ function wireEditor(id, setter, label) {
       logActivity('write', 'Edited ' + label);
     }
   }, 700);
-  el.addEventListener('input', () => { update(); commit(); });
+  el.addEventListener('input', () => {
+    update(); commit();
+    if (state.ui.pageSim === id) pageSimSoon(el.innerHTML, label);
+  });
   el.addEventListener('keyup', saveRange);
   el.addEventListener('mouseup', saveRange);
   el.addEventListener('blur', saveRange);
@@ -3697,6 +3749,7 @@ function wireEditor(id, setter, label) {
     if (e.key === 'Tab') { e.preventDefault(); document.execCommand('insertHTML', false, '&nbsp;&nbsp;&nbsp;&nbsp;'); }
   });
   update();
+  if (state.ui.pageSim === id) setTimeout(() => pageSimRepaint(el.innerHTML, label), 60);
 }
 function saveRange() {
   const s = window.getSelection();
@@ -7247,6 +7300,8 @@ function migrateBook(bk) {
   out.slideshow.slides = (out.slideshow.slides || []).filter(x => x && x.src);
   out.lore = bk.lore || [];
   out.gallery = (bk.gallery || []).filter(x => x && x.src);
+  out.ideas = bk.ideas || [];
+  out.design = bk.design ? Object.assign(newDesign(), bk.design) : null;
   out.theme = bk.theme || null;
   out.pageThemes = bk.pageThemes || {};
   out.banners = {};
@@ -7827,6 +7882,33 @@ const VIEW_HELP = {
       'Light styles (Social Light, Manuscript, Nordic, Typewriter, Lagoon, Arctic) turn the whole app bright.',
       'Your API key never leaves this browser.'
     ] },
+  ideas: {
+    one: 'A bench of brainstorming tools that have already read your book — pick one and it generates ideas that actually fit your story.',
+    steps: [
+      'Check the right book is selected at the top. Everything here is generated from that book.',
+      'Press <strong>What should I write next?</strong> if you are unsure where to go — it reads what you have written and tells you the next sensible step.',
+      'Otherwise pick any tool on the left. Twenty-one of them, grouped by Premise, People, Plot, Scene and Depth.',
+      'On each idea: bookmark it, send it to your notes, turn it into a beat, or start a whole chapter from it.'
+    ],
+    tips: [
+      'Press <em>What the AI sees</em> to check what it knows about your book. Filling in the About tab and your cast dossiers makes every tool sharper.',
+      'It all works offline. Connect a provider in Settings for richer, more specific results.'
+    ]
+  },
+  designer: {
+    one: 'See your book as real printed pages, choose how it should look, and save it as a proper PDF.',
+    steps: [
+      'Pick a <strong>book style</strong> on the left — Classic Trade is what most novels look like.',
+      'Adjust anything you like: size of the book, typeface, text size, margins, chapter openings, page numbers.',
+      'The preview in the middle is the actual typeset book, page by page, updating as you change things.',
+      'Press <strong>Save as PDF</strong>. In the print window choose “Save as PDF”, set margins to <em>None</em> and turn headers/footers <em>off</em>.'
+    ],
+    tips: [
+      'Manuscript Submission is the format agents ask for: Courier, double spaced, one-inch margins.',
+      'Inner margin is the one next to the spine — it needs to be wider than the outer one on a printed book.',
+      'While writing, press the open-book button in any editor toolbar to see just that chapter as live pages.'
+    ]
+  },
   storage: {
     one: 'Where your writing actually lives, and how to make sure you never lose a word of it.',
     steps: [
@@ -7895,6 +7977,7 @@ const PROF_TABS = [
   ['about', 'About This Book', 'info'],
   ['cast', 'Cast', 'users'],
   ['world', 'World & Lore', 'globe'],
+  ['covers', 'Cover Art', 'image'],
   ['gallery', 'Gallery', 'image'],
   ['notes', 'Notes', 'sticky-note']
 ];
@@ -7985,6 +8068,7 @@ VIEWS.profile = {
       : tab === 'about' ? this.about(b)
       : tab === 'cast' ? this.cast(b)
       : tab === 'world' ? this.world(b)
+      : tab === 'covers' ? this.covers(b)
       : tab === 'gallery' ? VIEWS.profile.gallery(b)
       : this.notes(b));
   },
@@ -8109,6 +8193,16 @@ VIEWS.profile = {
 
       /* right: story map + summary */
       '<div><div style="position:sticky;top:56px">' +
+        (function () {
+          const adv = storyAdvice(b);
+          if (!adv.length) return '';
+          const top = adv.find(x => x.primary) || adv[0];
+          const idx = adv.indexOf(top);
+          return '<div class="panel clip mb10"><div class="panel-hd"><i data-lucide="compass"></i><h3>WHAT TO WRITE NEXT</h3></div>' +
+            '<div class="panel-bd">' + adviceCard(top, idx) +
+            '<button class="btn sm ghost w100" data-act="adviceAsk"><i data-lucide="brain"></i>SEE EVERYTHING IT SUGGESTS</button>' +
+            '</div></div>';
+        })() +
         '<div class="panel clip mb10 tone-red"><div class="panel-hd"><i data-lucide="target"></i><h3>STORY MAP</h3>' +
           '<span style="flex:1"></span><span class="sub">' + markers.length + ' MARKS</span></div>' +
           '<div class="panel-bd" style="max-height:280px;overflow:auto">' +
@@ -8271,6 +8365,60 @@ VIEWS.profile = {
         : '<div class="panel clip"><div class="panel-bd"><div class="empty"><i data-lucide="globe"></i><h4>NOTHING RECORDED YET</h4>' +
           '<div class="fs13 mb14">Add the first place, faction or invented term in your story.</div>' +
           '<button class="btn solid" data-act="loreAdd"><i data-lucide="plus"></i>NEW LORE ENTRY</button></div></div></div>');
+  },
+
+  /* ------------------------------ COVERS -------------------------------- */
+  covers(b) {
+    const f = b.cover.front, k = b.cover.back, sp = b.cover.spine;
+    const has = !!(f.art || k.art);
+    const shot = (title, side, artHTML, tips) =>
+      '<div class="panel clip"><div class="panel-hd"><i data-lucide="image"></i><h3>' + esc(title) + '</h3>' +
+        '<span style="flex:1"></span>' +
+        '<button class="btn xs" data-act="coverArt" data-arg="' + side + '"><i data-lucide="upload"></i>UPLOAD</button>' +
+        '<button class="btn xs ghost" data-act="coverArtUrl" data-arg="' + side + '"><i data-lucide="link"></i></button>' +
+      '</div><div class="panel-bd"><div class="cover-showcase">' + artHTML + '</div>' +
+      '<div class="hint mt10">' + tips + '</div></div></div>';
+
+    return '<div class="panel clip mb14"><div class="panel-bd">' +
+      '<div class="helpbox"><b>YOUR BOOK AS AN OBJECT</b>' +
+        'The full-size artwork for the front, the back and the spine, shown as large as the screen allows. ' +
+        'Upload straight from here, or open the <strong>Cover Studio</strong> to lay out the type, blurb and print guides.</div>' +
+      '<div class="flex gap6 wrap mt10">' +
+        '<button class="btn solid" data-go="cover"><i data-lucide="image"></i>OPEN COVER STUDIO</button>' +
+        '<button class="btn ghost" data-act="coversFromGallery"><i data-lucide="library"></i>USE A PICTURE FROM MY ALBUM</button>' +
+        (has ? '<button class="btn ghost" data-act="printCover"><i data-lucide="printer"></i>PRINT THE WRAP</button>' : '') +
+      '</div>' +
+    '</div></div>' +
+
+    '<div class="partsection">THE FULL WRAP</div>' +
+    '<div class="panel clip mb14"><div class="panel-bd">' +
+      '<div class="wrap3d">' +
+        '<div class="w3-back">' + coverBackPreview(b) + '</div>' +
+        '<div class="w3-spine" style="background:' + attr(sp.color || '#0a1420') + '">' +
+          '<span>' + esc(sp.text || (b.title + '   ·   ' + (b.author || ''))) + '</span></div>' +
+        '<div class="w3-front">' + coverFrontPreview(b) + '</div>' +
+      '</div>' +
+      '<div class="hint mt10" style="text-align:center">Back cover · spine · front cover, laid out as they would be printed on one sheet.</div>' +
+    '</div></div>' +
+
+    '<div class="partsection">EACH SIDE, LARGE</div>' +
+    '<div class="grid-auto" style="grid-template-columns:repeat(auto-fit,minmax(300px,1fr))">' +
+      shot('Front Cover', 'front', coverFrontPreview(b),
+        'The one job of a front cover is to say what kind of book this is from across a room. Genre first, cleverness second.') +
+      shot('Back Cover', 'back', coverBackPreview(b),
+        'Tagline, blurb, author bio, barcode. Aim for 120–180 words of blurb — the Cover Studio has the formula.') +
+      '<div class="panel clip"><div class="panel-hd"><i data-lucide="book"></i><h3>Spine</h3></div>' +
+        '<div class="panel-bd"><div class="cover-showcase spine-shot">' +
+          '<div class="spine-big" style="background:' + attr(sp.color || '#0a1420') + '">' +
+            '<span>' + esc(sp.text || (b.title + '   ·   ' + (b.author || ''))) + '</span></div>' +
+        '</div>' +
+        '<div class="grid-auto g2 mt10" data-root="book" data-sub="cover.spine">' +
+          '<label class="fld" style="margin:0"><span class="lb">Spine text</span><input class="inp" data-model="text" data-rerender value="' + attr(sp.text) + '" placeholder="' + attr(b.title + ' · ' + (b.author || '')) + '"></label>' +
+          '<label class="fld" style="margin:0"><span class="lb">Spine colour</span><input type="color" data-model="color" data-rerender value="' + attr(sp.color) + '"></label>' +
+        '</div>' +
+        '<div class="hint mt10">Spine width grows with page count — roughly 0.0572mm per page on 80gsm cream. Under about 100 pages a printer will not put text on it at all.</div>' +
+      '</div></div>' +
+    '</div>';
   },
 
   /* ------------------------------- NOTES -------------------------------- */
@@ -8935,6 +9083,35 @@ VIEWS.profile.gallery = function (b) {
         '</figure>').join('') + '</div>'
     : '');
 };
+ACTIONS.coversFromGallery = function () {
+  const b = requireBook(); if (!b) return;
+  const pool = (b.gallery || []).concat(collectBookImages(b));
+  if (!pool.length) { toast('No pictures yet — add some in the Gallery tab.', 'warn'); return; }
+  window.__coverPool = pool;
+  openModal({
+    title: 'USE A PICTURE AS COVER ART', icon: 'image', size: 'wide',
+    body: '<div class="hint mb10">Choose a picture, then say which side of the book it belongs on.</div><div class="gal">' +
+      pool.map((im, i) => '<figure data-act="coverPick" data-i="' + i + '" style="cursor:pointer">' +
+        '<img src="' + attr(im.src) + '"><figcaption>' + esc(im.title || 'Untitled') + '</figcaption></figure>').join('') + '</div>'
+  });
+};
+ACTIONS.coverPick = function (el) {
+  const im = (window.__coverPool || [])[Number(el.getAttribute('data-i'))]; if (!im) return;
+  window.__coverPickSrc = im.src;
+  openModal({
+    title: 'WHERE SHOULD IT GO?', icon: 'image', size: 'narrow',
+    body: '<img src="' + attr(im.src) + '" style="width:100%;max-height:260px;object-fit:contain;border:1px solid var(--line)">',
+    footer: '<button class="btn ghost" data-modal-close>CANCEL</button>' +
+      '<button class="btn" data-act="coverPickTo" data-arg="back">BACK COVER</button>' +
+      '<button class="btn solid" data-act="coverPickTo" data-arg="front">FRONT COVER</button>'
+  });
+};
+ACTIONS.coverPickTo = function (el) {
+  const b = requireBook(); if (!b) return;
+  b.cover[el.getAttribute('data-arg')].art = window.__coverPickSrc;
+  markDirty(); closeAllModals(); render();
+  toast('Cover art set.', 'ok');
+};
 ACTIONS.galAutoToggle = function (el) { state.ui.galAuto = el.checked; markDirty(true); render(); };
 ACTIONS.photoLayoutToggle = function () {
   state.app.photoLayout = (state.app.photoLayout || 'right') === 'right' ? 'below' : 'right';
@@ -9427,6 +9604,1099 @@ function qsTile(icon, title, sub, act, go) {
     '<strong class="fs13" style="color:var(--txt)">' + title + '</strong></div>' +
     '<div class="fs11 muted mt6">' + sub + '</div></button>';
 }
+
+
+/* ===========================================================================
+   v4 · BOOK DESIGNER — real typeset pages, live, and the same markup printed
+   The preview and the exported PDF are produced by one function, so what you
+   arrange on screen is exactly what comes out of the printer.
+   ========================================================================= */
+
+const TRIMS = [
+  ['6x9', '6 × 9 in — US trade (most common)', 6, 9],
+  ['5.5x8.5', '5.5 × 8.5 in — digest', 5.5, 8.5],
+  ['5.25x8', '5.25 × 8 in — small trade', 5.25, 8],
+  ['5x8', '5 × 8 in — compact', 5, 8],
+  ['4.25x6.87', '4.25 × 6.87 in — mass-market pocket', 4.25, 6.87],
+  ['a5', 'A5 — 148 × 210 mm', 5.83, 8.27],
+  ['7x10', '7 × 10 in — large format', 7, 10],
+  ['8.5x11', '8.5 × 11 in — manuscript / letter', 8.5, 11]
+];
+const BOOK_FONTS = [
+  ['"Playfair Display",Georgia,serif', 'Playfair Display — classic book serif'],
+  ['Georgia,"Times New Roman",serif', 'Georgia — warm, very readable'],
+  ['"Times New Roman",Times,serif', 'Times — traditional'],
+  ['"Cinzel",Georgia,serif', 'Cinzel — engraved, epic'],
+  ['"Inter",system-ui,sans-serif', 'Inter — clean modern sans'],
+  ['"Special Elite",Courier,monospace', 'Typewriter'],
+  ['"Courier New",Courier,monospace', 'Courier — manuscript standard']
+];
+const OPENERS = [['centered', 'Centred, with a rule'], ['big-number', 'Huge chapter number'], ['left', 'Left aligned, plain'], ['ornament', 'Ornament above the title'], ['none', 'No chapter heading']];
+const FOLIOS = [['bottom-center', 'Bottom, centred'], ['bottom-outer', 'Bottom, outer edge'], ['top-outer', 'Top, outer edge'], ['none', 'No page numbers']];
+
+function newDesign(o) {
+  return Object.assign({
+    tpl: 'trade', trim: '6x9',
+    mTop: 0.75, mBottom: 0.75, mInner: 0.85, mOuter: 0.6,
+    font: '"Playfair Display",Georgia,serif', size: 11, leading: 1.5,
+    align: 'justify', indent: 1.4, paraGap: 0,
+    dropCap: true, opener: 'centered', folio: 'bottom-center',
+    runningHead: 'author-title', sceneBreak: '* * *',
+    frontMatter: true, dedication: true, chapterNewPage: true,
+    inkColor: '#14161a', paperColor: '#fbf8f1', spread: true
+  }, o || {});
+}
+const DESIGN_TEMPLATES = [
+  { id: 'trade', name: 'Classic Trade', blurb: 'What most novels on a shelf look like. Serif, justified, drop cap.', d: {} },
+  { id: 'literary', name: 'Modern Literary', blurb: 'Airy, sans-serif, no indents, space between paragraphs.',
+    d: { trim: '5.5x8.5', font: '"Inter",system-ui,sans-serif', size: 10.5, leading: 1.72, align: 'left', indent: 0, paraGap: 0.55, dropCap: false, opener: 'big-number', folio: 'bottom-outer' } },
+  { id: 'epic', name: 'Fantasy Epic', blurb: 'Engraved chapter titles, ornament breaks, generous drop caps.',
+    d: { trim: '6x9', font: '"Playfair Display",Georgia,serif', size: 11.5, leading: 1.55, opener: 'ornament', sceneBreak: '❖', dropCap: true, paperColor: '#f7f1e3' } },
+  { id: 'cosy', name: 'Cosy Mystery', blurb: 'Warm paper, softer measure, friendly proportions.',
+    d: { trim: '5.25x8', font: 'Georgia,"Times New Roman",serif', size: 11, leading: 1.6, paperColor: '#fdf6ec', opener: 'centered', sceneBreak: '~' } },
+  { id: 'submission', name: 'Manuscript Submission', blurb: 'The industry standard for sending to agents: Courier, double spaced, 1in margins.',
+    d: { trim: '8.5x11', font: '"Courier New",Courier,monospace', size: 12, leading: 2, align: 'left', indent: 0.5, mTop: 1, mBottom: 1, mInner: 1, mOuter: 1, dropCap: false, opener: 'left', folio: 'top-outer', runningHead: 'surname-title', paperColor: '#ffffff', spread: false } },
+  { id: 'largeprint', name: 'Large Print', blurb: 'Bigger type and more leading for comfortable reading.',
+    d: { trim: '7x10', size: 14, leading: 1.75, indent: 1.2, dropCap: false, font: 'Georgia,"Times New Roman",serif' } },
+  { id: 'pocket', name: 'Pocket Paperback', blurb: 'Tight and compact, like an airport thriller.',
+    d: { trim: '4.25x6.87', size: 9.5, leading: 1.42, mTop: 0.5, mBottom: 0.5, mInner: 0.6, mOuter: 0.45, dropCap: false, opener: 'left' } },
+  { id: 'typewriter', name: 'Typewriter Draft', blurb: 'Looks like it came out of a 1962 Olivetti.',
+    d: { font: '"Special Elite",Courier,monospace', size: 11, leading: 1.8, align: 'left', dropCap: false, opener: 'left', paperColor: '#f4efe4' } }
+];
+function trimOf(id) { return TRIMS.find(t => t[0] === id) || TRIMS[0]; }
+
+/* ---------------------------- the page engine ---------------------------- */
+/** Builds the ordered stream of blocks that make up the book. */
+function bookBlocks(b, d) {
+  const out = [];
+  if (d.frontMatter) {
+    out.push({ type: 'page-title', html:
+      '<div class="bk-title">' + esc(b.titlePage.text || b.title) + '</div>' +
+      (b.subtitle ? '<div class="bk-sub">' + esc(b.subtitle) + '</div>' : '') +
+      (b.author ? '<div class="bk-author">' + esc(b.author) + '</div>' : '') +
+      (b.titlePage.imprint ? '<div class="bk-imprint">' + esc(b.titlePage.imprint) + '</div>' : '') });
+  }
+  if (d.dedication && (b.dedication.text || '').trim()) {
+    out.push({ type: 'page-ded', html: '<div class="bk-ded">' + nl2br(b.dedication.text) + '</div>' });
+  }
+  const sections = [];
+  if ((b.prologue.html || '').trim()) sections.push({ title: 'Prologue', num: '', html: b.prologue.html });
+  (b.chapters || []).forEach((c, i) => sections.push({ title: c.title || 'Chapter ' + (i + 1), num: String(i + 1), html: c.html }));
+  sections.forEach(sec => out.push({ type: 'chapter', title: sec.title, num: sec.num, html: sec.html }));
+  return out;
+}
+/** Converts one chapter's editor HTML into clean, printable block elements. */
+function chapterNodes(html, d) {
+  const holder = document.createElement('div');
+  holder.innerHTML = html || '';
+  holder.querySelectorAll('script,style').forEach(n => n.remove());
+  const nodes = [];
+  Array.from(holder.childNodes).forEach(n => {
+    if (n.nodeType === 3) {
+      const t = n.textContent.trim();
+      if (t) nodes.push('<p>' + esc(t) + '</p>');
+      return;
+    }
+    if (n.nodeType !== 1) return;
+    const tag = n.tagName.toLowerCase();
+    if (tag === 'hr') { nodes.push('<p class="bk-break">' + esc(d.sceneBreak || '* * *') + '</p>'); return; }
+    if (tag === 'img') { nodes.push('<figure class="bk-fig"><img src="' + attr(n.getAttribute('src') || '') + '" alt=""></figure>'); return; }
+    const inner = n.innerHTML;
+    if (!stripHTML(inner).trim() && !n.querySelector('img')) return;
+    if (tag === 'h2' || tag === 'h3') nodes.push('<h3 class="bk-h">' + inner + '</h3>');
+    else if (tag === 'blockquote') nodes.push('<blockquote class="bk-q">' + inner + '</blockquote>');
+    else if (tag === 'ul' || tag === 'ol') nodes.push('<' + tag + ' class="bk-list">' + inner + '</' + tag + '>');
+    else nodes.push('<p>' + inner + '</p>');
+  });
+  return nodes;
+}
+/** Fills fixed-height pages with the block stream, splitting long paragraphs
+ *  by word so a page is filled edge to edge exactly as print would. */
+function paginate(b, d, opts) {
+  opts = opts || {};
+  const tr = trimOf(d.trim);
+  const DPI = 96;
+  const pw = tr[2] * DPI, ph = tr[3] * DPI;
+  const contentH = Math.round(ph - (d.mTop + d.mBottom) * DPI) - (d.folio === 'none' ? 0 : 22);
+  const contentW = Math.round(pw - (d.mInner + d.mOuter) * DPI);
+
+  const gauge = document.createElement('div');
+  gauge.style.cssText = 'position:fixed;left:-99999px;top:0;visibility:hidden;box-sizing:border-box;' +
+    'width:' + contentW + 'px;font-family:' + d.font + ';font-size:' + d.size + 'pt;line-height:' + d.leading + ';' +
+    'text-align:' + d.align + ';';
+  gauge.className = 'bk-gauge';
+  document.body.appendChild(gauge);
+  /* mirror the page's own paragraph metrics or every measurement is wrong */
+  const gaugeCSS = document.createElement('style');
+  gaugeCSS.textContent =
+    '.bk-gauge p{margin:0 0 ' + (d.paraGap || 0) + 'em;text-indent:' + (d.indent || 0) + 'em;}' +
+    '.bk-gauge p.bk-first,.bk-gauge p.bk-cont{text-indent:0;}' +
+    '.bk-gauge .bk-break{text-align:center;text-indent:0;margin:1.1em 0;}' +
+    '.bk-gauge .bk-q{margin:1em 1.4em;text-indent:0;}' +
+    '.bk-gauge .bk-h{font-size:1.08em;margin:1.3em 0 .5em;text-indent:0;}' +
+    '.bk-gauge .bk-list{margin:0 0 .8em 1.4em;text-indent:0;}' +
+    '.bk-gauge .bk-fig{margin:1em 0;} .bk-gauge .bk-fig img{max-width:100%;display:block;}' +
+    '.bk-gauge .bk-drop{float:left;font-size:3.1em;line-height:.82;padding:.05em .08em 0 0;}' +
+    '.bk-gauge .bk-open{margin:0 0 1.6em;text-indent:0;}' +
+    '.bk-gauge .bk-open.ctr{padding-top:1.6in;} .bk-gauge .bk-open.big{padding-top:1.1in;}' +
+    '.bk-gauge .bk-open.orn{padding-top:1.4in;}' +
+    '.bk-gauge .bk-open.big .n{display:block;font-size:4.2em;line-height:1;}' +
+    '.bk-gauge .bk-open h2{font-size:1.5em;margin:0 0 .5em;}';
+  document.head.appendChild(gaugeCSS);
+
+  const pages = [];
+  let cur = [], curType = 'body', curTitle = '';
+  const flush = () => { if (cur.length) { pages.push({ html: cur.join(''), type: curType, title: curTitle }); cur = []; curType = 'body'; } };
+  const fits = (candidate) => { gauge.innerHTML = candidate; return gauge.scrollHeight <= contentH; };
+
+  const blocks = bookBlocks(b, d);
+  const maxPages = opts.max || 2000;
+
+  blocks.forEach(blk => {
+    if (blk.type === 'page-title' || blk.type === 'page-ded') {
+      flush();
+      pages.push({ html: blk.html, type: blk.type, title: '', bare: true });
+      return;
+    }
+    /* chapter */
+    if (d.chapterNewPage) flush();
+    curTitle = blk.title;
+    let head = '';
+    if (d.opener !== 'none') {
+      if (d.opener === 'big-number') head = '<div class="bk-open big"><span class="n">' + esc(blk.num || '·') + '</span><h2>' + esc(blk.title) + '</h2></div>';
+      else if (d.opener === 'ornament') head = '<div class="bk-open orn"><div class="o">❦</div><h2>' + esc(blk.title) + '</h2></div>';
+      else if (d.opener === 'left') head = '<div class="bk-open left"><h2>' + esc(blk.title) + '</h2></div>';
+      else head = '<div class="bk-open ctr"><h2>' + esc(blk.title) + '</h2><div class="rule"></div></div>';
+    }
+    const nodes = chapterNodes(blk.html, d);
+    if (d.dropCap && nodes.length && /^<p>/.test(nodes[0])) {
+      nodes[0] = nodes[0].replace(/^<p>(\s*)([A-Za-z0-9“"'‘(])/, '<p class="bk-first"><span class="bk-drop">$2</span>');
+      if (!/bk-first/.test(nodes[0])) nodes[0] = nodes[0].replace(/^<p>/, '<p class="bk-first">');
+    } else if (nodes.length && /^<p>/.test(nodes[0])) {
+      nodes[0] = nodes[0].replace(/^<p>/, '<p class="bk-first">');
+    }
+    let pending = head ? [head] : [];
+    nodes.forEach(node => { pending.push(node); });
+
+    /* Place one block, spilling a long paragraph across as many pages as it
+       needs. Splitting only once would silently push the tail off the bottom
+       of the page, losing text from the finished PDF. */
+    const place = (node) => {
+      if (pages.length > maxPages) return;
+      if (fits(cur.join('') + node)) { cur.push(node); return; }
+      const m = /^<p([^>]*)>([\s\S]*)<\/p>$/.exec(node);
+      if (!m) { if (cur.length) { flush(); curTitle = blk.title; } cur.push(node); return; }
+      let attrs = m[1], rest = m[2], guard = 0;
+      while (rest && guard++ < 800 && pages.length <= maxPages) {
+        const words = rest.split(/(\s+)/);
+        let lo = 0, hi = words.length, best = 0;
+        while (lo <= hi) {
+          const mid = (lo + hi) >> 1;
+          const trial = '<p' + attrs + '>' + words.slice(0, mid).join('') + '</p>';
+          if (fits(cur.join('') + trial)) { best = mid; lo = mid + 1; } else hi = mid - 1;
+        }
+        if (best <= 2) {
+          if (cur.length) { flush(); curTitle = blk.title; continue; }   /* try a fresh page */
+          best = Math.min(words.length, 24);                             /* page too small — force progress */
+        }
+        cur.push('<p' + attrs + '>' + words.slice(0, best).join('') + '</p>');
+        rest = words.slice(best).join('').replace(/^\s+/, '');
+        if (rest) { flush(); curTitle = blk.title; attrs = ' class="bk-cont"'; }
+      }
+    };
+    pending.forEach(place);
+  });
+  flush();
+  gauge.remove(); gaugeCSS.remove();
+  return { pages: pages, w: pw, h: ph, contentW: contentW, contentH: contentH };
+}
+/** The stylesheet shared by the on-screen preview and the printed file. */
+function bookCSS(d, forPrint) {
+  const tr = trimOf(d.trim);
+  return '' +
+    '.bk-page{position:relative;box-sizing:border-box;background:' + d.paperColor + ';color:' + d.inkColor + ';' +
+      'width:' + tr[2] + 'in;height:' + tr[3] + 'in;padding:' + d.mTop + 'in ' + d.mOuter + 'in ' + d.mBottom + 'in ' + d.mInner + 'in;' +
+      'font-family:' + d.font + ';font-size:' + d.size + 'pt;line-height:' + d.leading + ';text-align:' + d.align + ';overflow:hidden;}' +
+    '.bk-page.left{padding-left:' + d.mOuter + 'in;padding-right:' + d.mInner + 'in;}' +
+    '.bk-page p{margin:0 0 ' + (d.paraGap || 0) + 'em;text-indent:' + (d.indent || 0) + 'em;hyphens:auto;}' +
+    '.bk-page p.bk-first,.bk-page p.bk-cont{text-indent:0;}' +
+    '.bk-page .bk-break{text-align:center;text-indent:0;margin:1.1em 0;letter-spacing:.4em;}' +
+    '.bk-page .bk-q{margin:1em 1.4em;font-style:italic;text-indent:0;}' +
+    '.bk-page .bk-h{font-size:1.08em;margin:1.3em 0 .5em;text-indent:0;text-align:left;font-weight:600;}' +
+    '.bk-page .bk-list{margin:0 0 .8em 1.4em;text-indent:0;text-align:left;}' +
+    '.bk-page .bk-fig{margin:1em 0;text-indent:0;}' +
+    '.bk-page .bk-fig img{max-width:100%;display:block;margin:0 auto;}' +
+    '.bk-drop{float:left;font-size:3.1em;line-height:.82;padding:.05em .08em 0 0;font-weight:700;}' +
+    '.bk-open{margin:0 0 1.6em;text-indent:0;}' +
+    '.bk-open.ctr{text-align:center;padding-top:1.6in;}' +
+    '.bk-open.ctr h2{font-size:1.5em;letter-spacing:.06em;margin:0 0 .5em;font-weight:600;}' +
+    '.bk-open.ctr .rule{width:2.2em;height:1px;background:currentColor;opacity:.5;margin:0 auto;}' +
+    '.bk-open.big{text-align:center;padding-top:1.1in;}' +
+    '.bk-open.big .n{display:block;font-size:4.2em;line-height:1;opacity:.18;font-weight:800;}' +
+    '.bk-open.big h2{font-size:1.25em;letter-spacing:.16em;text-transform:uppercase;margin:.2em 0 0;font-weight:600;}' +
+    '.bk-open.orn{text-align:center;padding-top:1.4in;}' +
+    '.bk-open.orn .o{font-size:1.7em;opacity:.55;margin-bottom:.3em;}' +
+    '.bk-open.orn h2{font-size:1.45em;letter-spacing:.08em;margin:0;font-weight:600;}' +
+    '.bk-open.left h2{font-size:1.25em;margin:0;font-weight:600;text-align:left;}' +
+    '.bk-folio{position:absolute;left:' + d.mInner + 'in;right:' + d.mOuter + 'in;font-size:8.5pt;opacity:.65;text-indent:0;}' +
+    '.bk-folio.bottom{bottom:' + (d.mBottom / 2.2) + 'in;}' +
+    '.bk-folio.top{top:' + (d.mTop / 2.6) + 'in;}' +
+    '.bk-folio .l{float:left;} .bk-folio .r{float:right;} .bk-folio .c{text-align:center;}' +
+    '.bk-title{font-size:2.4em;text-align:center;margin-top:2.2in;text-indent:0;line-height:1.15;font-weight:700;}' +
+    '.bk-sub{font-size:1.05em;text-align:center;margin-top:.6em;text-indent:0;opacity:.8;}' +
+    '.bk-author{font-size:1.05em;text-align:center;margin-top:1.6em;text-indent:0;letter-spacing:.18em;text-transform:uppercase;}' +
+    '.bk-imprint{position:absolute;bottom:' + d.mBottom + 'in;left:0;right:0;text-align:center;font-size:8pt;letter-spacing:.2em;text-transform:uppercase;opacity:.6;}' +
+    '.bk-ded{margin-top:2.6in;text-align:center;font-style:italic;text-indent:0;font-size:1.05em;}' +
+    (forPrint
+      ? '@page{size:' + tr[2] + 'in ' + tr[3] + 'in;margin:0;}' +
+        'html,body{margin:0;padding:0;background:#fff;}' +
+        '.bk-page{page-break-after:always;break-after:page;}' +
+        '.bk-page:last-child{page-break-after:auto;break-after:auto;}'
+      : '');
+}
+function folioHTML(d, b, n, isLeft) {
+  if (d.folio === 'none') return '';
+  const head = d.runningHead === 'none' ? ''
+    : d.runningHead === 'surname-title' ? esc((b.author || '').split(/\s+/).pop() || '') + ' / ' + esc(b.title)
+    : isLeft ? esc(b.author || '') : esc(b.title || '');
+  const pos = d.folio.indexOf('top') === 0 ? 'top' : 'bottom';
+  if (d.folio === 'bottom-center') return '<div class="bk-folio ' + pos + ' c">' + n + '</div>';
+  return '<div class="bk-folio ' + pos + '">' +
+    (isLeft ? '<span class="l">' + n + '</span><span class="r">' + head + '</span>'
+            : '<span class="l">' + head + '</span><span class="r">' + n + '</span>') + '</div>';
+}
+function renderPages(b, d, pg, opts) {
+  opts = opts || {};
+  return pg.pages.map((pageObj, i) => {
+    const n = i + 1;
+    const isLeft = n % 2 === 0;
+    return '<div class="bk-page' + (isLeft ? ' left' : '') + '" data-page="' + n + '">' +
+      pageObj.html +
+      (pageObj.bare ? '' : folioHTML(d, b, n, isLeft)) +
+      '</div>';
+  }).join('');
+}
+
+VIEWS.designer = {
+  render() {
+    const b = requireBook(); if (!b) return noBookPanel('Design a book once you have something written.');
+    b.design = b.design || newDesign();
+    const d = b.design;
+    const tr = trimOf(d.trim);
+    return '' +
+    '<div class="grid-auto" style="grid-template-columns:minmax(280px,340px) minmax(0,1fr)">' +
+      '<div><div style="position:sticky;top:12px;max-height:calc(100vh - 90px);overflow:auto;padding-right:4px">' +
+
+        '<div class="panel clip mb14"><div class="panel-hd"><i data-lucide="book"></i><h3>BOOK STYLE</h3></div>' +
+          '<div class="panel-bd">' +
+            '<div class="grid-auto" style="grid-template-columns:1fr 1fr;gap:7px">' +
+              DESIGN_TEMPLATES.map(t => '<button class="optcard ' + (d.tpl === t.id ? 'sel' : '') + '" data-act="dsnTemplate" data-id="' + t.id + '" style="text-align:left;padding:9px">' +
+                '<strong class="fs12" style="color:var(--txt)">' + esc(t.name) + '</strong>' +
+                '<div class="fs11 muted mt6" style="line-height:1.45">' + esc(t.blurb) + '</div></button>').join('') +
+            '</div>' +
+          '</div></div>' +
+
+        '<div class="panel clip mb14" data-root="book" data-sub="design"><div class="panel-hd"><i data-lucide="sliders-horizontal"></i><h3>PAGE &amp; TYPE</h3></div>' +
+          '<div class="panel-bd">' +
+            '<label class="fld"><span class="lb">Book size (trim)</span><select class="sel" data-model="trim" data-live="dsnLive">' +
+              TRIMS.map(t => '<option value="' + t[0] + '"' + (d.trim === t[0] ? ' selected' : '') + '>' + esc(t[1]) + '</option>').join('') + '</select></label>' +
+            '<label class="fld"><span class="lb">Typeface</span><select class="sel" data-model="font" data-live="dsnLive">' +
+              BOOK_FONTS.map(f => '<option value="' + attr(f[0]) + '"' + (d.font === f[0] ? ' selected' : '') + '>' + esc(f[1]) + '</option>').join('') + '</select></label>' +
+            '<div class="grid-auto g2">' +
+              '<label class="fld"><span class="lb">Text size — ' + d.size + 'pt</span><input type="range" min="8" max="18" step="0.5" data-model="size" data-live="dsnLive" value="' + d.size + '"></label>' +
+              '<label class="fld"><span class="lb">Line spacing — ' + d.leading + '</span><input type="range" min="1.1" max="2.2" step="0.05" data-model="leading" data-live="dsnLive" value="' + d.leading + '"></label>' +
+              '<label class="fld"><span class="lb">Alignment</span><select class="sel" data-model="align" data-live="dsnLive">' +
+                [['justify', 'Justified (book standard)'], ['left', 'Left aligned']].map(o => '<option value="' + o[0] + '"' + (d.align === o[0] ? ' selected' : '') + '>' + o[1] + '</option>').join('') + '</select></label>' +
+              '<label class="fld"><span class="lb">First-line indent — ' + d.indent + 'em</span><input type="range" min="0" max="3" step="0.1" data-model="indent" data-live="dsnLive" value="' + d.indent + '"></label>' +
+              '<label class="fld"><span class="lb">Gap between paragraphs — ' + d.paraGap + 'em</span><input type="range" min="0" max="1.2" step="0.05" data-model="paraGap" data-live="dsnLive" value="' + d.paraGap + '"></label>' +
+              '<label class="fld"><span class="lb">Scene-break mark</span><input class="inp" data-model="sceneBreak" data-live="dsnLive" value="' + attr(d.sceneBreak) + '"></label>' +
+            '</div>' +
+            '<div class="lb mt10">Margins (inches)</div>' +
+            '<div class="grid-auto g4">' +
+              ['mTop:Top', 'mBottom:Bottom', 'mInner:Inner (spine)', 'mOuter:Outer'].map(x => {
+                const k = x.split(':')[0], lab = x.split(':')[1];
+                return '<label class="fld" style="margin:0"><span class="lb">' + lab + '</span>' +
+                  '<input class="inp" type="number" min="0.25" max="2" step="0.05" data-model="' + k + '" data-live="dsnLive" value="' + d[k] + '"></label>';
+              }).join('') +
+            '</div>' +
+          '</div></div>' +
+
+        '<div class="panel clip mb14" data-root="book" data-sub="design"><div class="panel-hd"><i data-lucide="type"></i><h3>CHAPTERS &amp; PAGE FURNITURE</h3></div>' +
+          '<div class="panel-bd">' +
+            '<label class="fld"><span class="lb">Chapter openings</span><select class="sel" data-model="opener" data-live="dsnLive">' +
+              OPENERS.map(o => '<option value="' + o[0] + '"' + (d.opener === o[0] ? ' selected' : '') + '>' + o[1] + '</option>').join('') + '</select></label>' +
+            '<label class="fld"><span class="lb">Page numbers</span><select class="sel" data-model="folio" data-live="dsnLive">' +
+              FOLIOS.map(o => '<option value="' + o[0] + '"' + (d.folio === o[0] ? ' selected' : '') + '>' + o[1] + '</option>').join('') + '</select></label>' +
+            '<label class="fld"><span class="lb">Running head</span><select class="sel" data-model="runningHead" data-live="dsnLive">' +
+              [['author-title', 'Author on the left, title on the right'], ['surname-title', 'Surname / Title (submission style)'], ['none', 'Nothing']]
+                .map(o => '<option value="' + o[0] + '"' + (d.runningHead === o[0] ? ' selected' : '') + '>' + o[1] + '</option>').join('') + '</select></label>' +
+            '<div class="grid-auto g2">' +
+              '<label class="fld"><span class="lb">Paper colour</span><input type="color" data-model="paperColor" data-live="dsnLive" value="' + attr(d.paperColor) + '"></label>' +
+              '<label class="fld"><span class="lb">Ink colour</span><input type="color" data-model="inkColor" data-live="dsnLive" value="' + attr(d.inkColor) + '"></label>' +
+            '</div>' +
+            '<label class="flex center gap8 fs13 mb6"><input type="checkbox" data-model="dropCap" data-live="dsnLive"' + (d.dropCap ? ' checked' : '') + '> Drop capital at each chapter start</label>' +
+            '<label class="flex center gap8 fs13 mb6"><input type="checkbox" data-model="chapterNewPage" data-live="dsnLive"' + (d.chapterNewPage ? ' checked' : '') + '> Start every chapter on a new page</label>' +
+            '<label class="flex center gap8 fs13 mb6"><input type="checkbox" data-model="frontMatter" data-live="dsnLive"' + (d.frontMatter ? ' checked' : '') + '> Include the title page</label>' +
+            '<label class="flex center gap8 fs13 mb6"><input type="checkbox" data-model="dedication" data-live="dsnLive"' + (d.dedication ? ' checked' : '') + '> Include the dedication</label>' +
+            '<label class="flex center gap8 fs13"><input type="checkbox" data-model="spread" data-live="dsnLive"' + (d.spread ? ' checked' : '') + '> Show two pages side by side</label>' +
+          '</div></div>' +
+
+        '<div class="panel clip"><div class="panel-hd"><i data-lucide="printer"></i><h3>EXPORT</h3></div>' +
+          '<div class="panel-bd">' +
+            '<button class="btn solid lg w100 mb6" data-act="dsnPrint"><i data-lucide="printer"></i>SAVE AS PDF</button>' +
+            '<div class="hint mb10">Opens your browser\'s print window. Choose <strong>“Save as PDF”</strong> as the destination, set margins to <strong>None</strong> and turn <strong>off</strong> headers and footers — the page furniture is already built into the design.</div>' +
+            '<button class="btn ghost w100 mb6" data-act="dsnHTML"><i data-lucide="file-code"></i>DOWNLOAD AS HTML</button>' +
+            '<button class="btn ghost w100" data-act="dsnReset"><i data-lucide="rotate-ccw"></i>RESET THIS DESIGN</button>' +
+          '</div></div>' +
+      '</div></div>' +
+
+      '<div>' +
+        '<div class="panel clip mb10"><div class="panel-bd" style="padding:10px">' +
+          '<div class="flex between center wrap gap8">' +
+            '<div class="flex gap6 wrap center">' +
+              '<span class="chip cy" id="dsnCount">…</span>' +
+              '<span class="chip">' + esc(tr[1].split('—')[0].trim()) + '</span>' +
+              '<span class="chip am">' + fmt(bookWords(b)) + ' WORDS</span>' +
+            '</div>' +
+            '<div class="flex gap6 wrap center">' +
+              '<span class="mono fs10 faint">ZOOM</span>' +
+              '<button class="btn xs ghost" data-act="dsnZoom" data-d="-1">−</button>' +
+              '<span class="mono fs11" id="dsnZoomV">' + Math.round((state.ui.dsnZoom || 0.62) * 100) + '%</span>' +
+              '<button class="btn xs ghost" data-act="dsnZoom" data-d="1">+</button>' +
+            '</div>' +
+          '</div>' +
+        '</div></div>' +
+        '<div id="dsnPreview" class="dsn-preview"><div class="mono fs11 faint" style="padding:30px">Typesetting…</div></div>' +
+      '</div>' +
+    '</div>';
+  },
+  mount() { dsnRepaint(); }
+};
+function dsnRepaint() {
+  const b = currentBook(); if (!b) return;
+  const host = $('#dsnPreview'); if (!host) return;
+  const d = b.design = b.design || newDesign();
+  const zoom = state.ui.dsnZoom || 0.62;
+  let pg;
+  try { pg = paginate(b, d, { max: 400 }); }
+  catch (e) { host.innerHTML = '<div class="fs13 t-rd" style="padding:20px">Could not typeset: ' + esc(e.message) + '</div>'; return; }
+  const cnt = $('#dsnCount');
+  if (cnt) cnt.textContent = pg.pages.length + ' PAGE' + (pg.pages.length === 1 ? '' : 'S');
+  const zv = $('#dsnZoomV'); if (zv) zv.textContent = Math.round(zoom * 100) + '%';
+  host.innerHTML =
+    '<style>' + bookCSS(d, false) + '</style>' +
+    '<div class="dsn-sheet' + (d.spread ? ' spread' : '') + '" style="zoom:' + zoom + '">' +
+      (pg.pages.length ? renderPages(b, d, pg)
+        : '<div class="bk-page"><p>Nothing written yet — add a prologue or a chapter and it will appear here as real pages.</p></div>') +
+    '</div>';
+}
+const dsnRepaintSoon = debounce(dsnRepaint, 260);
+ACTIONS.dsnLive = function () { markDirty(); dsnRepaintSoon(); };
+ACTIONS.dsnTemplate = function (el) {
+  const b = requireBook(); if (!b) return;
+  const t = DESIGN_TEMPLATES.find(x => x.id === el.getAttribute('data-id')); if (!t) return;
+  b.design = newDesign(Object.assign({ tpl: t.id }, t.d));
+  markDirty(); render();
+  toast('“' + t.name + '” applied.', 'ok');
+};
+ACTIONS.dsnZoom = function (el) {
+  const step = Number(el.getAttribute('data-d')) * 0.08;
+  state.ui.dsnZoom = clamp((state.ui.dsnZoom || 0.62) + step, 0.22, 1.6);
+  markDirty(true); dsnRepaint();
+};
+ACTIONS.dsnReset = function () {
+  const b = requireBook(); if (!b) return;
+  b.design = newDesign(); markDirty(); render(); toast('Design reset.', 'ok');
+};
+function designedDocument(b, d) {
+  const pg = paginate(b, d, { max: 2000 });
+  return '<!DOCTYPE html><html><head><meta charset="utf-8"><title>' + esc(b.title) + '</title>' +
+    '<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400..800;1,400..700&family=Inter:wght@300..700&family=Cinzel:wght@400..700&family=Special+Elite&display=swap" rel="stylesheet">' +
+    '<style>' + bookCSS(d, true) + '</style></head><body>' +
+    renderPages(b, d, pg) + '</body></html>';
+}
+ACTIONS.dsnPrint = function () {
+  const b = requireBook(); if (!b) return;
+  const w = window.open('', '_blank');
+  if (!w) { toast('Your browser blocked the pop-up. Allow pop-ups for this page and try again.', 'err'); return; }
+  w.document.open();
+  w.document.write(designedDocument(b, b.design).replace('</body>', '<scr' + 'ipt>window.onload=function(){setTimeout(function(){window.print()},700)}</scr' + 'ipt></body>'));
+  w.document.close();
+  toast('Print window opened — choose “Save as PDF”, margins None, headers off.', 'ok', 'EXPORTING');
+};
+ACTIONS.dsnHTML = function () {
+  const b = requireBook(); if (!b) return;
+  downloadBlob(slug(b.title) + '-typeset.html', designedDocument(b, b.design), 'text/html');
+  toast('Typeset HTML downloaded — it prints identically.', 'ok');
+};
+
+/* --------------- live page simulation inside the editors ----------------- */
+ACTIONS.edPageView = function (el) {
+  const b = requireBook(); if (!b) return;
+  const edId = el.getAttribute('data-ed');
+  state.ui.pageSim = state.ui.pageSim === edId ? '' : edId;
+  markDirty(true); render();
+};
+/** Renders just what is in one editor as live book pages beside it. */
+function pageSimHTML(b, label) {
+  return '<div class="panel clip" id="pageSimPanel"><div class="panel-hd"><i data-lucide="book-open"></i><h3>BOOK PAGE VIEW</h3>' +
+    '<span style="flex:1"></span><span class="sub" id="pageSimCount">—</span>' +
+    '<button class="btn xs ghost" data-go="designer" title="Change the page design">DESIGN</button>' +
+    '<button class="btn xs ghost" data-act="edPageView" data-ed="' + attr(state.ui.pageSim) + '">CLOSE</button></div>' +
+    '<div class="panel-bd" style="padding:10px">' +
+      '<div class="hint mb10">This is your text set on real book pages, at the size you chose in the Book Designer. Keep typing — when a page fills up the words flow onto the next one.</div>' +
+      '<div id="pageSim" class="dsn-preview" style="max-height:none"></div>' +
+    '</div></div>';
+}
+function pageSimRepaint(html, title) {
+  const host = $('#pageSim'); if (!host) return;
+  const b = currentBook(); if (!b) return;
+  const d = b.design = b.design || newDesign();
+  const fake = {
+    title: b.title, subtitle: b.subtitle, author: b.author,
+    titlePage: b.titlePage, dedication: { text: '' },
+    prologue: { html: '' }, chapters: [{ title: title || 'Chapter', html: html || '' }],
+    design: d
+  };
+  const sim = Object.assign({}, d, { frontMatter: false, dedication: false, spread: true });
+  let pg;
+  try { pg = paginate(fake, sim, { max: 60 }); } catch (e) { return; }
+  const c = $('#pageSimCount');
+  if (c) c.textContent = pg.pages.length + ' PAGE' + (pg.pages.length === 1 ? '' : 'S');
+  host.innerHTML = '<style>' + bookCSS(sim, false) + '</style>' +
+    '<div class="dsn-sheet spread" style="zoom:' + (state.ui.simZoom || 0.5) + '">' + renderPages(fake, sim, pg) + '</div>';
+}
+const pageSimSoon = debounce((html, title) => pageSimRepaint(html, title), 400);
+
+
+/* ===========================================================================
+   v4 · STORY ADVISOR  +  IDEA LAB
+   The advisor reads the state of your book and tells you what the next
+   sensible thing to write is. The lab is a bench of brainstorming tools that
+   already know your story.
+   ========================================================================= */
+
+/** A compact briefing on the current book, handed to every AI call. */
+function bookBrief(b, opts) {
+  opts = opts || {};
+  if (!b) return 'No book selected.';
+  const g = GENRES.find(x => x.id === b.genre);
+  const A = b.about || {};
+  const cast = (b.characters || []).slice(0, 8).map(c =>
+    c.name + (c.role ? ' (' + c.role + ')' : '') + (c.motivation ? ' — wants ' + c.motivation : '')).join('; ');
+  const parts = [
+    'TITLE: ' + (b.title || 'untitled'),
+    b.subtitle ? 'SUBTITLE: ' + b.subtitle : '',
+    'GENRE: ' + (g ? g.name : (b.genre || 'unset')) + (A.subgenre ? ' / ' + A.subgenre : ''),
+    A.audience ? 'AUDIENCE: ' + A.audience : '',
+    b.logline ? 'LOGLINE: ' + b.logline : '',
+    A.pitch ? 'PITCH: ' + A.pitch : '',
+    A.setting ? 'SETTING: ' + A.setting + (A.period ? ', ' + A.period : '') : '',
+    A.themes ? 'THEMES: ' + A.themes : '',
+    A.tone ? 'TONE: ' + A.tone : '',
+    A.pov ? 'POV/TENSE: ' + A.pov + ', ' + (A.tense || 'past') : '',
+    cast ? 'CAST: ' + cast : '',
+    (b.lore || []).length ? 'WORLD: ' + b.lore.slice(0, 8).map(l => l.name + ' (' + l.type + ')').join('; ') : '',
+    (b.outline.beats || []).length ? 'BEATS SO FAR: ' + b.outline.beats.slice(0, 14).map(x => x.title).join(' → ') : '',
+    'PROGRESS: ' + (b.chapters || []).length + ' chapters, ' + fmt(bookWords(b)) + ' of ' + fmt(b.goalWords) + ' words',
+    (b.chapters || []).length ? 'CHAPTERS: ' + b.chapters.slice(0, 20).map((c, i) => (i + 1) + '. ' + (c.title || 'untitled') + (c.part ? ' [' + ((partOf(c.part) || {}).label || '') + ']' : '')).join(' | ') : ''
+  ].filter(Boolean);
+  if (opts.tail) {
+    const last = (b.chapters || []).slice(-1)[0];
+    const src = last && last.html ? last.html : b.prologue.html;
+    const t = lastWords(stripHTML(src), 220);
+    if (t) parts.push('MOST RECENT PROSE:\n' + t);
+  }
+  return parts.join('\n');
+}
+
+/* ------------------------------ the advisor ------------------------------ */
+function hasPart(b, id) { return (b.chapters || []).some(c => c.part === id); }
+function storyAdvice(b) {
+  if (!b) return [];
+  const out = [];
+  const chs = b.chapters || [];
+  const words = bookWords(b);
+  const hasPro = countWords(stripHTML(b.prologue.html)) > 40;
+  const written = chs.filter(c => wordsOfHTML(c.html) > 60).length;
+  const A = b.about || {};
+  const push = (o) => out.push(o);
+
+  if (!VAULT_HANDLE && HAS_FSA && state.books.length && words > 300)
+    push({ t: 'Set up a vault file', why: 'You have real work here now. Point the app at a file on your computer and it will save everything into it automatically — the copy that survives a new machine.', go: 'storage', tone: 'rd', tag: 'SAFETY' });
+
+  if (!b.genre)
+    push({ t: 'Decide what kind of story this is', why: 'Genre sets the promises you are making to a reader — the shape of the plot, the pacing, the ending they will accept. Everything downstream gets easier once it is chosen.', go: 'genres', tone: 'am', tag: 'FOUNDATION' });
+
+  if (!(b.logline || '').trim())
+    push({ t: 'Write your logline', why: 'One sentence: when ___ happens, ___ must ___ or else ___. If you cannot write it yet, the plot is not settled — and that is worth knowing now rather than at chapter twenty.', go: 'profile', tab: 'about', tone: 'am', tag: 'FOUNDATION' });
+
+  if (!(b.characters || []).some(c => c.tier === 'lead'))
+    push({ t: 'Create your protagonist', why: 'A story needs one person who wants something and is being stopped. Give them a want, a flaw and a voice — those three make them usable in any scene.', go: 'characters', tone: 'am', tag: 'CAST' });
+
+  const answered = STORY_QS.filter(q => (b.outline.answers || {})[q.k] && String(b.outline.answers[q.k]).trim()).length;
+  if (answered < 3)
+    push({ t: 'Answer the story questions', why: 'Seven short questions turn a vague idea into a plan. You do not need all of them — even three produces a usable beat sheet.', go: 'outline', tone: 'cy', tag: 'PLAN' });
+  else if (!(b.outline.beats || []).length)
+    push({ t: 'Generate your beat sheet', why: 'You have answered the questions. Turn them into an act-by-act plan you can build chapters from.', go: 'outline', tone: 'cy', tag: 'PLAN' });
+
+  /* --- the core structural advice --- */
+  if (!hasPro && !chs.length)
+    push({ t: 'Write the opening', why: 'Start with either a prologue (a question the reader must carry) or Chapter One (your protagonist, wanting something, being refused). Do not write both first — pick the one you can see clearly.', go: 'prologue', tone: 'lm', tag: 'WRITE', primary: true });
+  else if (hasPro && !written)
+    push({
+      t: 'Now write Chapter One', why: 'Your prologue is down. Chapter One has a different job: it must ground us in the ordinary world and introduce the person whose choices the book will follow. ' +
+        'Open one beat after the scene starts, show your protagonist wanting something small and concrete, and let the world refuse them. The prologue asked a question — chapter one must make us care who answers it.',
+      go: 'profile', act: 'feedAdd', tone: 'lm', tag: 'WRITE', primary: true
+    });
+  else if (written && !hasPart(b, 'inciting'))
+    push({ t: 'Write the inciting incident', why: 'You have an opening. The next load-bearing beat is the event that makes the ordinary impossible to continue — usually 10–15% in. Write it, then tag that chapter <em>Inciting Incident</em> so the shape of the book stays visible.', go: 'profile', act: 'feedAdd', tone: 'lm', tag: 'WRITE', primary: true });
+  else if (hasPart(b, 'inciting') && !hasPart(b, 'midpoint') && written >= 2)
+    push({ t: 'Build toward the midpoint', why: 'Rising action next: two or three chapters where each attempt to fix things makes them worse. Then the midpoint — the reversal where your protagonist stops reacting and starts choosing. That is the hinge the whole book turns on.', go: 'profile', act: 'feedAdd', tone: 'lm', tag: 'WRITE', primary: true });
+  else if (hasPart(b, 'midpoint') && !hasPart(b, 'lowpoint'))
+    push({ t: 'Write the all-is-lost moment', why: 'After the midpoint the pressure has to keep climbing until your protagonist loses the thing they were protecting. Do not soften it — the ending only lands if this one hurts.', go: 'profile', act: 'feedAdd', tone: 'lm', tag: 'WRITE', primary: true });
+  else if (hasPart(b, 'lowpoint') && !hasPart(b, 'climax'))
+    push({ t: 'Write the climax', why: 'Your protagonist should face the antagonistic force using what the story has taught them, and pay for it. Make sure they <em>choose</em> — a climax the hero merely survives is an ending that happens to them.', go: 'profile', act: 'feedAdd', tone: 'rd', tag: 'WRITE', primary: true });
+  else if (hasPart(b, 'climax') && !hasPart(b, 'conclusion'))
+    push({ t: 'Write the conclusion', why: 'Short. Show the new ordinary and what it cost. Mirror your opening image so the reader feels the distance travelled, then stop earlier than feels comfortable.', go: 'profile', act: 'feedAdd', tone: 'lm', tag: 'WRITE', primary: true });
+  else if (written && words < (b.goalWords || 80000) * 0.9)
+    push({ t: 'Keep drafting', why: 'The structure is in place. You are ' + fmt(Math.max(0, (b.goalWords || 80000) - words)) + ' words from your goal — the only thing left is pages. Pick up where you left off.', go: 'profile', tone: 'lm', tag: 'WRITE', primary: true });
+
+  const untagged = chs.filter(c => !c.part && wordsOfHTML(c.html) > 60).length;
+  if (untagged >= 3)
+    push({ t: 'Tag your chapters with story parts', why: untagged + ' written chapters have no story part. Tagging them draws the shape of your book on the page, and shows instantly where the structure sags.', go: 'profile', tone: 'cy', tag: 'STRUCTURE' });
+
+  if (chs.length >= 4) {
+    const flat = chs.slice(0, -1).filter((c, i) => Math.abs((c.tension || 5) - (chs[i + 1].tension || 5)) === 0).length;
+    if (flat >= 3) push({ t: 'Your tension line is flat', why: 'Several chapters in a row sit at the same tension. Readers stop feeling escalation they cannot measure — cut one, merge two, or raise the stakes in the middle of the run.', go: 'dashboard', tone: 'am', tag: 'PACING' });
+  }
+  if (written >= 3 && !(b.characters || []).some(c => c.tier === 'co'))
+    push({ t: 'Add a co-lead or a real antagonist', why: 'Three chapters in with only one significant character means the pressure has nowhere to come from. Somebody needs to want something incompatible.', go: 'characters', tone: 'cy', tag: 'CAST' });
+  if (words > 4000 && !(b.lore || []).length)
+    push({ t: 'Start a world bible', why: 'You are far enough in to start contradicting yourself. Write down the places, factions and invented words now, while you still remember what you decided.', go: 'profile', tab: 'world', tone: 'cy', tag: 'WORLD' });
+  if (words > 8000 && !b.cover.front.art)
+    push({ t: 'Make a cover', why: 'Not for anyone else — for you. A cover makes the thing feel real, and real books get finished.', go: 'cover', tone: 'vi', tag: 'MORALE' });
+  if (written >= 2 && !(A.synopsisShort || '').trim())
+    push({ t: 'Write a one-paragraph synopsis', why: 'Doing this while drafting catches plot holes early, and you will need it the moment you talk to anyone about the book.', go: 'profile', tab: 'about', tone: 'cy', tag: 'ADMIN' });
+  if (words > (b.goalWords || 80000) * 0.75)
+    push({ t: 'Set the book in the Book Designer', why: 'You are close. Choose a trim size and typeface and see it as real pages — it is a genuine motivator, and you can export a PDF at any point.', go: 'designer', tone: 'vi', tag: 'FINISH' });
+
+  return out;
+}
+function adviceCard(a, i) {
+  return '<div class="advice ' + (a.primary ? 'primary' : '') + '">' +
+    '<div class="flex between center gap8 wrap mb6">' +
+      '<span class="chip ' + (a.tone || 'cy') + '">' + esc(a.tag || 'NEXT') + '</span>' +
+      (a.primary ? '<span class="chip lm">DO THIS NEXT</span>' : '') +
+    '</div>' +
+    '<div class="advice-t">' + esc(a.t) + '</div>' +
+    '<div class="advice-w">' + a.why + '</div>' +
+    '<button class="btn sm ' + (a.primary ? 'solid' : 'ghost') + ' mt10" data-act="adviceGo" data-i="' + i + '">' +
+      '<i data-lucide="arrow-right"></i>' + (a.primary ? 'TAKE ME THERE' : 'OPEN') + '</button>' +
+  '</div>';
+}
+ACTIONS.adviceGo = function (el) {
+  const b = requireBook(); if (!b) return;
+  const a = storyAdvice(b)[Number(el.getAttribute('data-i'))]; if (!a) return;
+  if (a.tab && b.profile) b.profile.tab = a.tab;
+  closeAllModals();
+  go(a.go || 'profile');
+  if (a.act && ACTIONS[a.act]) setTimeout(() => ACTIONS[a.act]({ getAttribute: () => '' }), 260);
+};
+ACTIONS.adviceAsk = async function () {
+  const b = requireBook(); if (!b) return;
+  const rules = storyAdvice(b);
+  openModal({
+    title: 'WHAT SHOULD I WRITE NEXT?', icon: 'compass', size: '',
+    body: '<div class="helpbox mb14"><b>READ FROM YOUR ACTUAL BOOK</b>' +
+      'This looks at what you have written, what is tagged, how long it is and what is missing, then works out the next thing that makes sense for a novel at this stage.</div>' +
+      '<div id="adviceAI" class="mb14"></div>' +
+      (rules.length ? rules.map(adviceCard).join('') : '<div class="empty"><i data-lucide="check"></i><h4>NOTHING OBVIOUS LEFT</h4><div class="fs13">The structure is complete and the word count is there. Revise, or start the next book.</div></div>'),
+    footer: '<button class="btn ghost" data-modal-close>CLOSE</button>'
+  });
+  if (aiReady()) {
+    const host = $('#adviceAI');
+    if (host) host.innerHTML = '<div class="mono fs11 t-am">◌ ASKING ' + esc(state.app.ai.provider.toUpperCase()) + '…</div>';
+    const txt = await aiComplete({
+      system: 'You are a developmental editor. Be specific and practical. No preamble, no lists of options — one clear recommendation in 3-5 sentences.',
+      user: 'Here is the current state of a novel in progress:\n\n' + bookBrief(b, { tail: true }) +
+        '\n\nBased on standard novel structure and what already exists, what exactly should the author write next, and why? Name the specific scene or section.',
+      maxTokens: 420, fallback: () => ''
+    });
+    const h2 = $('#adviceAI');
+    if (h2) h2.innerHTML = txt
+      ? '<div class="advice primary"><div class="flex between center mb6"><span class="chip lm">' + esc(state.app.ai.provider.toUpperCase()) + '</span></div>' +
+        '<div class="advice-w" style="font-size:14px">' + nl2br(txt) + '</div></div>'
+      : '';
+  }
+};
+
+/* ------------------------------- IDEA LAB -------------------------------- */
+const IDEA_TOOLS = [
+  { id: 'whatif', name: 'What-If Machine', icon: 'zap', group: 'Premise',
+    blurb: 'Twelve "what if" questions aimed straight at your premise.',
+    ask: 'Generate 10 provocative "What if…" questions that could reshape this story. Each on its own line, no numbering.' },
+  { id: 'premise', name: 'Premise Mixer', icon: 'shuffle', group: 'Premise',
+    blurb: 'Collides your setting, cast and themes into fresh premises.',
+    ask: 'Write 8 alternative one-sentence premises for this story, each taking it somewhere genuinely different. One per line.' },
+  { id: 'title', name: 'Title Generator', icon: 'type', group: 'Premise',
+    blurb: 'Title candidates in several registers, from plain to literary.',
+    ask: 'Suggest 14 possible titles for this book — mix short and evocative, longer and literary, and one or two that use a phrase from the story itself. One per line.' },
+  { id: 'logline', name: 'Logline Doctor', icon: 'target', group: 'Premise',
+    blurb: 'Rewrites your one-sentence pitch six different ways.',
+    ask: 'Write 6 different loglines for this story, each under 40 words, each emphasising a different angle (character, stakes, world, irony, mystery, theme). One per line.' },
+  { id: 'comps', name: 'Comparison Titles', icon: 'library', group: 'Premise',
+    blurb: '"For readers of…" — how to place your book on a shelf.',
+    ask: 'Suggest 8 comparison pitches in the form "X meets Y" or "for readers of X", appropriate to this genre and premise. One per line.' },
+
+  { id: 'charseed', name: 'Character Seeds', icon: 'user-plus', group: 'People',
+    blurb: 'New people who would create friction with your existing cast.',
+    ask: 'Invent 6 new characters who would create real friction with the existing cast. For each give: name, role, what they want, and the flaw that will cost them. One per line, using — as separators.' },
+  { id: 'names', name: 'Name Forge', icon: 'pencil-line', group: 'People',
+    blurb: 'Names that fit the world you have built.',
+    ask: 'Suggest 20 character names that suit this setting and period. Mix given names and surnames. One per line with a two-word note on who they feel like.' },
+  { id: 'interview', name: 'Interrogate My Cast', icon: 'help-circle', group: 'People',
+    blurb: 'Hard questions your characters have not answered yet.',
+    ask: 'Ask 10 hard, specific questions about these characters that the author has probably not answered yet. One per line.' },
+  { id: 'relation', name: 'Relationship Sparks', icon: 'network', group: 'People',
+    blurb: 'Hidden ties and betrayals waiting inside your cast.',
+    ask: 'Propose 8 hidden connections, secrets or betrayals between the existing characters that would deepen the plot. One per line.' },
+
+  { id: 'twist', name: 'Twist Machine', icon: 'git-branch', group: 'Plot',
+    blurb: 'Reversals that reframe everything already written.',
+    ask: 'Propose 8 twists that would reframe what has already happened in this story without cheating the reader. One per line.' },
+  { id: 'obstacle', name: 'Obstacle Escalator', icon: 'flame', group: 'Plot',
+    blurb: 'Ways to make everything harder, in ascending order.',
+    ask: 'List 10 obstacles for the protagonist, ordered from inconvenient to catastrophic. One per line.' },
+  { id: 'subplot', name: 'Subplot Suggester', icon: 'layers', group: 'Plot',
+    blurb: 'B-stories that carry the theme rather than pad the page.',
+    ask: 'Suggest 6 subplots that would carry this book\'s theme rather than pad it. For each say who it belongs to and how it pays off. One per line.' },
+  { id: 'endings', name: 'Ending Options', icon: 'flag', group: 'Plot',
+    blurb: 'Several ways this could end, and what each one argues.',
+    ask: 'Propose 6 possible endings for this story, each arguing something different thematically. One per line, naming the cost in each.' },
+  { id: 'cliff', name: 'Cliffhanger Kit', icon: 'activity', group: 'Plot',
+    blurb: 'Chapter-out lines that make the next page unavoidable.',
+    ask: 'Write 10 chapter-ending beats for this story that would make a reader continue. One per line.' },
+
+  { id: 'scene', name: 'Scene Sparks', icon: 'sparkles', group: 'Scene',
+    blurb: 'Specific scenes worth writing, with their purpose.',
+    ask: 'Suggest 10 specific scenes worth writing in this book. For each give the scene and, after a dash, what it accomplishes. One per line.' },
+  { id: 'setting', name: 'Setting Builder', icon: 'globe', group: 'Scene',
+    blurb: 'Places with atmosphere and a reason to exist in the plot.',
+    ask: 'Invent 8 locations for this story. For each give the name, one sensory detail, and why a scene would need to happen there. One per line.' },
+  { id: 'sensory', name: 'Sensory Palette', icon: 'eye', group: 'Scene',
+    blurb: 'The specific textures this world should keep returning to.',
+    ask: 'Give 12 concrete sensory details unique to this story\'s world — smells, sounds, textures, tastes. One per line.' },
+  { id: 'openings', name: 'Opening Lines', icon: 'quote', group: 'Scene',
+    blurb: 'First sentences with a hook already inside them.',
+    ask: 'Write 10 possible opening lines for this book. Each must be a complete sentence with tension already inside it. One per line.' },
+
+  { id: 'theme', name: 'Theme Explorer', icon: 'compass', group: 'Depth',
+    blurb: 'What your book is arguing, and how to test the argument.',
+    ask: 'Identify what this story appears to be arguing, then suggest 6 ways to test that argument through plot events. One per line.' },
+  { id: 'holes', name: 'Plot Hole Hunter', icon: 'search', group: 'Depth',
+    blurb: 'The questions a sharp reader will ask.',
+    ask: 'Point out 8 things a sharp reader would question about this story as described — gaps, conveniences, unexplained motives. One per line.' },
+  { id: 'symbol', name: 'Motifs & Symbols', icon: 'star', group: 'Depth',
+    blurb: 'Images to plant early and pay off late.',
+    ask: 'Suggest 8 recurring images or motifs that would suit this story, saying where each should first appear and how it should pay off. One per line.' }
+];
+const IDEA_GROUPS = ['Premise', 'People', 'Plot', 'Scene', 'Depth'];
+
+/* Local generators — used offline. Built from the book's own material. */
+function simulateIdeas(tool, b) {
+  const names = castNames();
+  const lead = names[0] || 'your protagonist';
+  const second = names[1] || 'the antagonist';
+  const g = GENRES.find(x => x.id === b.genre);
+  const A = b.about || {};
+  const place = (b.lore || []).filter(l => l.type === 'Location')[0];
+  const setting = A.setting || (place && place.name) || 'the world of the book';
+  const theme = (A.themes || '').split(/[.,;]/)[0].trim() || 'what people owe each other';
+  const thing = (b.lore || [])[0];
+  const T = thing ? thing.name : 'the thing everyone wants';
+  const pick2 = (arr, n) => shuffle(arr).slice(0, n);
+
+  const banks = {
+    whatif: [
+      'What if ' + lead + ' is right about everything and it still does not matter?',
+      'What if ' + second + ' is the only person telling the truth?',
+      'What if the thing ' + lead + ' is protecting does not want to be protected?',
+      'What if the story is being told by someone who was not there?',
+      'What if solving it publicly destroys more lives than the secret does?',
+      'What if ' + T + ' has been in the wrong hands from page one — including now?',
+      'What if the deadline is artificial, and someone set it deliberately?',
+      'What if ' + lead + ' already did this once and does not remember?',
+      'What if the institution is not corrupt, merely indifferent — and that is worse?',
+      'What if the person who dies at the midpoint should be the one the reader likes most?',
+      'What if ' + setting + ' is actively hostile to being understood?',
+      'What if the ending everyone wants is the one that proves the theme wrong?'
+    ],
+    premise: [
+      'A story in which ' + lead + ' wins early, and spends the rest of the book discovering what winning cost.',
+      'The same events, told by ' + second + ', who believes they are the reasonable one.',
+      'A version where the central question is answered on page thirty and the book is about the aftermath.',
+      'A version set entirely in one room, over one conversation, with ' + setting + ' pressing in from outside.',
+      'A version where ' + lead + ' is trying to stop the truth coming out, not release it.',
+      'A version where the deadline passes at the midpoint and nothing anyone predicted happens.',
+      'A version told backwards, so the reader knows the cost before they know the choice.',
+      'A version where the antagonist and the protagonist never meet.'
+    ],
+    title: [
+      'The ' + (T.split(/\s+/).pop() || 'Record'), 'What the Water Kept', 'Nine Days of Silence',
+      'The Weight of ' + theme.split(/\s+/).slice(0, 2).join(' '), 'Everything We Filed Away',
+      'A Small Complicity', 'The Last Honest Signature', 'Below the Waterline',
+      'Every Record Can Be Rewritten', 'The Quiet Part', 'Names We Did Not Keep',
+      'The Second Signature', 'Nothing Was Ever Lost', 'What ' + lead + ' Knew'
+    ],
+    logline: [
+      'When the truth surfaces, ' + lead + ' must choose between being believed and being safe.',
+      'A story about ' + theme + ', told through one person who cannot stop asking.',
+      'With days left, ' + lead + ' has to prove something that everyone has agreed to forget.',
+      lead + ' wants the record put right; ' + second + ' wants everyone to sleep at night. Only one of them can be satisfied.',
+      'Everything in ' + setting + ' is exactly where it should be — which is how ' + lead + ' knows something is badly wrong.',
+      'The evidence exists, the witness is eight years old, and the deadline is not negotiable.'
+    ],
+    comps: [
+      (g ? g.name : 'This') + ' with the pacing of a heist and the ending of a tragedy.',
+      'For readers who liked the institutional dread of a good procedural.',
+      'THE CITY & THE CITY meets a small-town missing-person case.',
+      'A quiet literary thriller — think STATION ELEVEN with paperwork.',
+      'For readers of slow-burn mysteries where the system is the antagonist.',
+      'Cosy in texture, brutal in consequence.',
+      'A one-sitting read with a twenty-year hangover.',
+      'For anyone who has ever been told the record says otherwise.'
+    ],
+    charseed: [
+      'The Auditor — sent to close the case — wants a clean file — cannot tolerate being wrong in public',
+      'The Predecessor — held ' + lead + '\'s job before them — wants to stay forgotten — drinks to keep it that way',
+      'The Believer — the only person who takes ' + lead + ' seriously — wants to be useful — is useful to the wrong side',
+      'The Child Who Saw — a witness nobody will call — wants an adult who does not lie — trusts instantly and completely',
+      'The Fixer — makes problems disappear politely — wants order — mistakes tidiness for justice',
+      'The Journalist — needs a story big enough to matter — wants vindication — publishes before she is certain'
+    ],
+    names: ['Vera', 'Idris', 'Toma', 'Sela', 'Ovin', 'Marrow', 'Kell', 'Solane', 'Adair', 'Pell', 'Cartwright', 'Neave', 'Bram', 'Iseult', 'Corran', 'Halloway', 'Wren', 'Ashby', 'Maren', 'Voss']
+      .map(n => n + ' — feels like someone who has been waiting a long time'),
+    interview: [
+      'What does ' + lead + ' do with their hands when they are lying?',
+      'Who taught ' + lead + ' to be like this, and are they still alive?',
+      'What is the kindest thing ' + second + ' has ever done, and who knows about it?',
+      'What would make ' + lead + ' walk away from all of it tomorrow?',
+      'Which character is lying to themselves rather than to anyone else?',
+      'What does ' + lead + ' own that has no practical use?',
+      'Who in this cast has never been asked what they want?',
+      'What would each character say at the funeral of the one they trust least?',
+      'What did ' + lead + ' believe at twenty that they cannot say out loud now?',
+      'Which character would be right if the book were told from their side?'
+    ],
+    relation: [
+      lead + ' and ' + second + ' were once responsible for the same mistake.',
+      'One character has been quietly paying for another\'s silence.',
+      'Two characters are related and only one of them knows.',
+      'The mentor figure recommended the antagonist for the job.',
+      'Someone in the cast has already written a confession and never sent it.',
+      'The most loyal character is loyal for a reason nobody has asked about.',
+      'Two characters agreed, years ago, never to discuss a particular night.',
+      'The witness recognises ' + lead + ' but cannot place them.'
+    ],
+    twist: [
+      'The document was forged to protect ' + lead + ', not to frame them.',
+      'The deadline was invented by an ally to force ' + lead + '\'s hand.',
+      'The person searching hardest already knows where it is.',
+      'What ' + lead + ' remembers happening did happen — to someone else.',
+      'The institution is not hiding the crime; it is hiding that no crime occurred.',
+      'The witness has been coached, kindly, by someone who believed they were helping.',
+      'The mentor\'s advice has been consistently, deliberately, one degree wrong.',
+      'Publishing the truth is exactly what the antagonist wanted all along.'
+    ],
+    obstacle: [
+      'A form requires a signature from someone who will not give it.',
+      'The archive closes early and the key is signed out.',
+      'A sympathetic colleague asks ' + lead + ' to stop, gently.',
+      'The only copy is somewhere that floods.',
+      'Someone reports ' + lead + ' for something unrelated but true.',
+      lead + ' is offered a promotion that would end the matter.',
+      'The witness recants under no pressure at all.',
+      'A death makes the question look distasteful to pursue.',
+      'The evidence is real but was obtained in a way that voids it.',
+      'The public simply does not care, and says so.'
+    ],
+    subplot: [
+      'The apprentice thread — someone learning ' + lead + '\'s job, and learning the wrong lessons — pays off when they are asked to lie.',
+      'The domestic thread — a relationship being quietly starved by the investigation — pays off in the dark moment.',
+      'The rival institution thread — another body wants the same truth for the wrong reason.',
+      'The child thread — the youngest character\'s parallel, smaller version of the same problem.',
+      'The retirement thread — an older character deciding what their career meant.',
+      'The object thread — something inherited that keeps demanding a decision.'
+    ],
+    endings: [
+      'The truth is published, everything is lost, and one person is saved — cost: ' + lead + '\'s place in the world.',
+      'The truth is buried by agreement and ' + lead + ' accepts it — cost: the reader\'s faith in them, deliberately.',
+      'The truth comes out and changes nothing — cost: the belief that it would.',
+      'Someone else publishes it and takes the credit — cost: vindication without recognition.',
+      lead + ' destroys the evidence to protect a person — cost: the theme, argued in reverse.',
+      'It is left genuinely unresolved and the last scene is small and domestic — cost: catharsis.'
+    ],
+    cliff: [
+      'The signature on the bottom of the page was her own.',
+      '"You were there," he said. "You just were not listening."',
+      'She counted the exits again. There were two. One of them was a lie.',
+      'The file had been requested once before. By her.',
+      'Nine hours.',
+      'He said yes, and understood immediately that he had chosen wrong.',
+      'The child had drawn the room exactly, including the person in it.',
+      'Nobody in the building had woken up. Not one.',
+      'The water reached the second shelf overnight.',
+      'She opened the drawer and stopped being able to explain it.'
+    ],
+    scene: [
+      'The protagonist doing their job competently — establishes what they lose later.',
+      'A meal where nobody says the thing — establishes the relationship shape.',
+      'The antagonist being generous — makes them a person rather than a function.',
+      'A bureaucratic refusal — shows the system rather than describing it.',
+      'The witness alone, doing something ordinary — makes the stakes concrete.',
+      'A moment of real competence under pressure — buys reader trust for the failure to come.',
+      'The protagonist lying to someone who trusts them — starts the internal cost.',
+      'Two allies disagreeing about method — externalises the theme.',
+      'Something small being repaired — foreshadows what cannot be.',
+      'The last quiet moment before the point of no return.'
+    ],
+    setting: [
+      'The records floor — smells of wet paper and hot dust — where the proof is and cannot be removed.',
+      'The gate house — the click of cooling metal — where the deadline is physically operated.',
+      'A stairwell between two floors — carries every conversation upward — where the honest talk happens.',
+      'A flat with too little furniture — cold air and cheap detergent — where the protagonist does not really live.',
+      'The public counter — laminate and queue tickets — where the institution meets people.',
+      'A roof with a view of the water — wind, distant traffic — the thinking place.',
+      'A storeroom that floods — mineral cold — where evidence goes to die.',
+      'The canteen at the wrong hour — humming fridge — where allies are recruited.'
+    ],
+    sensory: [
+      'wet rag paper and glue', 'the tick of cooling pipes', 'sodium light making everyone look ill',
+      'grit under a fingernail', 'the specific silence of a building that should be occupied',
+      'iron and rain on concrete', 'condensation crawling down glass', 'a lock testing itself',
+      'the mineral cold of standing water', 'old laminate, warm under the hand',
+      'the flat taste of recycled air', 'a fridge cycling in another room'
+    ],
+    openings: [
+      'The flood siren tested at three in the morning, three months out of schedule, and no one woke up.',
+      'She had filed the same lie four hundred times before she noticed it.',
+      'There were two ways out of the building and she had stopped believing in one of them.',
+      'The boy drew the room from memory and put a person in it who should not have been there.',
+      'Nobody signs for the truth, which is how it goes missing.',
+      'By the time the water reached the second shelf, the argument was already over.',
+      'He was good at his job, which is the most dangerous thing a man in his position can be.',
+      'The record said otherwise, and the record was hers.',
+      'It began with a form nobody had asked her to complete.',
+      'She had eleven years of other people\'s disasters filed in alphabetical order.'
+    ],
+    theme: [
+      'The book appears to argue that ' + theme + ' is decided in small increments, not single moments.',
+      'Test it: give ' + lead + ' an easy, defensible way out early on and let them take it.',
+      'Test it: show a character who made the opposite choice and is fine.',
+      'Test it: make the honest act cause measurable harm to an innocent.',
+      'Test it: have the antagonist articulate the theme more persuasively than the hero.',
+      'Test it: let the ending refuse to confirm the argument.',
+      'Test it: repeat the opening situation late, with the protagonist on the other side of it.'
+    ],
+    holes: [
+      'Why has nobody asked this question in eleven years?',
+      'What stops ' + lead + ' simply telling a journalist on page twenty?',
+      'Who benefits financially, and has that been established?',
+      'Why is the evidence still in existence at all?',
+      'How does ' + second + ' explain their behaviour to themselves?',
+      'What are the consequences for ordinary people, shown rather than asserted?',
+      'Why does the deadline actually matter — has the reader seen it matter?',
+      'If the protagonist failed, what specifically would happen the next morning?'
+    ],
+    symbol: [
+      'Standing water — first as a nuisance, later as the thing that decides everything.',
+      'Signatures — introduce as routine, pay off as identity.',
+      'A lamp left on — kindness early, evidence late.',
+      'Index cards — order early, futility late.',
+      'A locked drawer opened casually in chapter two and desperately in chapter thirty.',
+      'The sound of a siren — background early, foreground at the climax.',
+      'Something being carefully filed — competence early, complicity late.',
+      'A child\'s drawing — sweet early, unbearable when re-examined.'
+    ]
+  };
+  return pick2(banks[tool.id] || ['No local suggestions for this tool yet.'], 14);
+}
+
+VIEWS.ideas = {
+  render() {
+    const b = currentBook();
+    const tool = IDEA_TOOLS.find(t => t.id === state.ui.ideaTool) || null;
+    const advice = b ? storyAdvice(b) : [];
+    return '' +
+    '<div class="panel clip mb14"><div class="corner-tl"></div><div class="corner-br"></div>' +
+      '<div class="panel-hd"><i data-lucide="brain"></i><h3>IDEA LAB</h3><span style="flex:1"></span>' +
+        '<span class="chip ' + (aiReady() ? 'lm' : '') + '">' + esc(aiLabel()) + '</span></div>' +
+      '<div class="panel-bd">' +
+        '<div class="helpbox mb14"><b>BRAINSTORMING THAT KNOWS YOUR BOOK</b>' +
+          'Every tool below reads your actual story first — title, genre, cast, world, themes, what you have written so far — then generates ideas that fit it. ' +
+          'Pick a book, pick a tool, and take what is useful.</div>' +
+        '<div class="flex gap8 wrap center">' +
+          '<span class="lb" style="margin:0">Working on</span>' +
+          '<select class="sel" style="width:260px" id="ideaBook">' +
+            state.books.map(bk => '<option value="' + bk.id + '"' + (b && b.id === bk.id ? ' selected' : '') + '>' + esc(bk.title) + '</option>').join('') +
+          '</select>' +
+          (b ? '<span class="chip cy">' + fmt(bookWords(b)) + ' WORDS</span><span class="chip">' + b.chapters.length + ' CH</span><span class="chip">' + b.characters.length + ' CAST</span>' : '') +
+          '<span style="flex:1"></span>' +
+          '<button class="btn solid" data-act="adviceAsk"><i data-lucide="compass"></i>WHAT SHOULD I WRITE NEXT?</button>' +
+          '<button class="btn ghost sm" data-act="ideaBrief"><i data-lucide="eye"></i>WHAT THE AI SEES</button>' +
+        '</div>' +
+      '</div></div>' +
+
+    (advice.length ? '<div class="panel clip mb14"><div class="panel-hd"><i data-lucide="compass"></i><h3>YOUR NEXT STEP</h3></div>' +
+      '<div class="panel-bd"><div class="grid-auto" style="grid-template-columns:repeat(auto-fit,minmax(280px,1fr))">' +
+      advice.slice(0, 3).map((a, i) => adviceCard(a, i)).join('') + '</div></div></div>' : '') +
+
+    '<div class="grid-auto" style="grid-template-columns:minmax(250px,320px) minmax(0,1fr)">' +
+      '<div><div style="position:sticky;top:12px;max-height:calc(100vh - 100px);overflow:auto">' +
+        IDEA_GROUPS.map(gr =>
+          '<div class="panel clip mb10"><div class="panel-hd"><h3>' + esc(gr.toUpperCase()) + '</h3></div>' +
+          '<div class="panel-bd" style="padding:7px">' +
+            IDEA_TOOLS.filter(t => t.group === gr).map(t =>
+              '<button class="navitem w100' + (tool && tool.id === t.id ? ' active' : '') + '" data-act="ideaRun" data-id="' + t.id + '" style="align-items:flex-start">' +
+                '<i data-lucide="' + t.icon + '"></i>' +
+                '<span style="flex:1;min-width:0"><span style="display:block">' + esc(t.name) + '</span>' +
+                '<span class="fs11 faint" style="display:block;white-space:normal;line-height:1.4">' + esc(t.blurb) + '</span></span></button>').join('') +
+          '</div></div>').join('') +
+      '</div></div>' +
+
+      '<div id="ideaOut">' +
+        (tool ? '' :
+          '<div class="panel clip"><div class="panel-bd"><div class="empty" style="padding:44px">' +
+          '<i data-lucide="sparkles"></i><h4>PICK A TOOL</h4>' +
+          '<div class="fs13">' + IDEA_TOOLS.length + ' brainstorming tools on the left, grouped by what they help with. ' +
+          'Every one of them reads your book first.</div></div></div></div>') +
+      '</div>' +
+    '</div>' +
+
+    ((b && (b.ideas || []).length) ? '<div class="panel clip mt14"><div class="panel-hd"><i data-lucide="bookmark"></i><h3>IDEAS YOU KEPT</h3>' +
+      '<span style="flex:1"></span><span class="sub">' + b.ideas.length + '</span>' +
+      '<button class="btn xs ghost red" data-act="ideaClearKept">CLEAR</button></div>' +
+      '<div class="panel-bd">' + b.ideas.map((k, i) =>
+        '<div class="flex between center gap8 wrap mb6" style="padding:8px 11px;border:1px solid var(--line);background:var(--bg-panel)">' +
+          '<div style="flex:1;min-width:0"><div class="fs13" style="color:var(--txt)">' + esc(k.text) + '</div>' +
+          '<div class="mono fs10 faint">' + esc(k.tool) + ' · ' + esc(timeAgo(k.at)) + '</div></div>' +
+          '<button class="btn xs ghost red" data-act="ideaUnkeep" data-i="' + i + '"><i data-lucide="x"></i></button></div>').join('') +
+      '</div></div>' : '');
+  },
+  mount() {
+    const sel = $('#ideaBook');
+    if (sel) sel.addEventListener('change', () => { setActiveBook(sel.value); render(); });
+    if (state.ui.ideaTool && !window.__ideaRendered) ideaRun(state.ui.ideaTool);
+  }
+};
+ACTIONS.ideaRun = function (el) { ideaRun(el.getAttribute('data-id')); };
+async function ideaRun(id) {
+  const tool = IDEA_TOOLS.find(t => t.id === id); if (!tool) return;
+  const b = requireBook();
+  if (!b) { toast('Create a book first — these tools work from your story.', 'warn'); return; }
+  state.ui.ideaTool = id; markDirty(true);
+  window.__ideaRendered = true;
+  render();
+  const host = $('#ideaOut'); if (!host) return;
+  host.innerHTML = '<div class="panel clip"><div class="panel-hd"><i data-lucide="' + tool.icon + '"></i><h3>' + esc(tool.name.toUpperCase()) + '</h3></div>' +
+    '<div class="panel-bd"><div class="mono fs11 t-am">◌ THINKING ABOUT “' + esc(b.title) + '”…</div></div></div>';
+  let lines = [];
+  if (aiReady()) {
+    const txt = await aiComplete({
+      system: 'You are a brilliant, practical story consultant. Reply with ONLY the requested list, one item per line, no numbering, no preamble, no closing remarks.',
+      user: 'Here is the book:\n\n' + bookBrief(b, { tail: id === 'cliff' || id === 'scene' }) + '\n\n' + tool.ask,
+      maxTokens: 900, fallback: () => ''
+    });
+    lines = String(txt).split('\n').map(l => l.replace(/^\s*[-*•\d.)\s]+/, '').trim()).filter(l => l.length > 3);
+  }
+  if (!lines.length) lines = simulateIdeas(tool, b);
+  window.__ideaLines = lines;
+  const h2 = $('#ideaOut'); if (!h2) return;
+  h2.innerHTML = '<div class="panel clip"><div class="panel-hd"><i data-lucide="' + tool.icon + '"></i><h3>' + esc(tool.name.toUpperCase()) + '</h3>' +
+    '<span style="flex:1"></span><span class="sub">' + lines.length + ' IDEAS · ' + esc(aiReady() ? state.app.ai.provider.toUpperCase() : 'OFFLINE') + '</span>' +
+    '<button class="btn xs" data-act="ideaRun" data-id="' + tool.id + '"><i data-lucide="refresh-cw"></i>AGAIN</button></div>' +
+    '<div class="panel-bd">' +
+      '<div class="fs13 muted mb14">' + esc(tool.blurb) + '</div>' +
+      lines.map((l, i) =>
+        '<div class="idea-row">' +
+          '<div class="idea-text">' + esc(l) + '</div>' +
+          '<div class="flex gap4 wrap">' +
+            '<button class="btn xs ghost" data-act="ideaKeep" data-i="' + i + '" title="Keep this idea"><i data-lucide="bookmark"></i></button>' +
+            '<button class="btn xs ghost" data-act="ideaToNotes" data-i="' + i + '" title="Send to this book\'s notes"><i data-lucide="sticky-note"></i></button>' +
+            '<button class="btn xs ghost" data-act="ideaToBeat" data-i="' + i + '" title="Add as a beat in the outline"><i data-lucide="git-branch"></i></button>' +
+            '<button class="btn xs ghost" data-act="ideaToChapter" data-i="' + i + '" title="Start a chapter from this"><i data-lucide="files"></i></button>' +
+            '<button class="btn xs ghost" data-act="ideaCopy" data-i="' + i + '" title="Copy"><i data-lucide="copy"></i></button>' +
+          '</div>' +
+        '</div>').join('') +
+      '<div class="flex gap6 wrap mt14">' +
+        '<button class="btn ghost sm" data-act="ideaCopyAll"><i data-lucide="copy"></i>COPY ALL</button>' +
+        '<button class="btn ghost sm" data-act="ideaDownload"><i data-lucide="download"></i>DOWNLOAD</button>' +
+      '</div>' +
+    '</div></div>';
+  icons();
+  logActivity('ideas', 'Used the ' + tool.name);
+}
+function ideaLine(i) { return (window.__ideaLines || [])[Number(i)] || ''; }
+ACTIONS.ideaCopy = function (el) { copyText(ideaLine(el.getAttribute('data-i'))); };
+ACTIONS.ideaCopyAll = function () { copyText((window.__ideaLines || []).join('\n')); };
+ACTIONS.ideaDownload = function () {
+  const b = currentBook();
+  const tool = IDEA_TOOLS.find(t => t.id === state.ui.ideaTool) || { name: 'ideas' };
+  downloadBlob(slug(b.title) + '-' + slug(tool.name) + '.txt',
+    tool.name + ' — ' + b.title + '\n\n' + (window.__ideaLines || []).map((l, i) => (i + 1) + '. ' + l).join('\n'));
+};
+ACTIONS.ideaKeep = function (el) {
+  const b = requireBook(); if (!b) return;
+  const tool = IDEA_TOOLS.find(t => t.id === state.ui.ideaTool) || { name: 'Idea Lab' };
+  b.ideas = b.ideas || [];
+  b.ideas.unshift({ text: ideaLine(el.getAttribute('data-i')), tool: tool.name, at: nowISO() });
+  markDirty(); toast('Kept. It is at the bottom of this page.', 'ok');
+};
+ACTIONS.ideaUnkeep = function (el) {
+  const b = requireBook(); if (!b) return;
+  b.ideas.splice(Number(el.getAttribute('data-i')), 1); markDirty(); render();
+};
+ACTIONS.ideaClearKept = async function () {
+  const ok = await confirmDlg('CLEAR KEPT IDEAS', '<p>Remove every kept idea for this book?</p>', true);
+  if (!ok) return;
+  const b = requireBook(); b.ideas = []; markDirty(); render();
+};
+ACTIONS.ideaToNotes = function (el) {
+  const b = requireBook(); if (!b) return;
+  const line = ideaLine(el.getAttribute('data-i'));
+  b.about.notes = (b.about.notes ? b.about.notes.replace(/\s*$/, '') + '\n' : '') + '• ' + line;
+  markDirty(); toast('Added to this book’s notes.', 'ok');
+};
+ACTIONS.ideaToBeat = function (el) {
+  const b = requireBook(); if (!b) return;
+  b.outline.beats = b.outline.beats || [];
+  b.outline.beats.push({ id: uid('bt'), act: 'FROM IDEA LAB', title: excerptOf(ideaLine(el.getAttribute('data-i')), 60), text: ideaLine(el.getAttribute('data-i')) });
+  markDirty(); toast('Added to your beat sheet.', 'ok');
+};
+ACTIONS.ideaToChapter = function (el) {
+  const b = requireBook(); if (!b) return;
+  const line = ideaLine(el.getAttribute('data-i'));
+  const c = newChapter(b.chapters.length + 1);
+  c.title = excerptOf(line, 50);
+  c.goal = line;
+  c.status = 'outline';
+  c.html = '<p><em>' + esc(line) + '</em></p>';
+  b.chapters.push(c);
+  markDirty(); toast('New chapter started from that idea.', 'ok');
+};
+ACTIONS.ideaBrief = function () {
+  const b = requireBook(); if (!b) return;
+  openModal({
+    title: 'WHAT THE AI KNOWS ABOUT YOUR BOOK', icon: 'eye', size: '',
+    body: '<div class="helpbox mb14"><b>THIS IS SENT WITH EVERY IDEA REQUEST</b>' +
+      'Assembled automatically from your book. The more you fill in on the <strong>About This Book</strong> tab, in your cast dossiers and in World &amp; Lore, the sharper every tool here becomes.</div>' +
+      '<pre class="mono fs12" style="white-space:pre-wrap;background:var(--field);border:1px solid var(--line);padding:12px;color:var(--txt-dim);max-height:52vh;overflow:auto">' + esc(bookBrief(b, { tail: true })) + '</pre>',
+    footer: '<button class="btn ghost" data-act="ideaBriefCopy">COPY</button><button class="btn solid" data-modal-close>CLOSE</button>'
+  });
+  window.__brief = bookBrief(b, { tail: true });
+};
+ACTIONS.ideaBriefCopy = function () { copyText(window.__brief || ''); };
 
 /* ============================ BOOT SEQUENCE ============================== */
 function seedStarterBook() {
