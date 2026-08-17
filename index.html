@@ -979,6 +979,20 @@ label.fld > .hint{ margin-top:3px; }
 .navmove .btn{ padding:0 4px; line-height:1.05; font-size:9px; }
 @media(max-width:820px){ .tabmove .mono{ display:none; } }
 
+
+/* top bar must never widen the page on a phone */
+.brandbar{ overflow:hidden; }
+.brandbar > div:last-child{ min-width:0; overflow:hidden; }
+.brand-title,.brand-sub{ overflow:hidden; text-overflow:ellipsis; }
+@media(max-width:1100px){ #vaultPill{ display:none; } }
+@media(max-width:900px){ .savepill{ display:none; } }
+@media(max-width:820px){ .hide-sm{ display:none; } }
+@media(max-width:640px){
+  .brandbar{ gap:8px; padding:0 8px; }
+  .brand-sub{ display:none; }
+  #btnSaveNow{ display:none; }
+}
+
 </style>
 </head>
 <body>
@@ -1005,12 +1019,12 @@ label.fld > .hint{ margin-top:3px; }
 
     <div class="flex center gap6" style="flex-wrap:wrap;justify-content:flex-end">
       <span class="savepill" id="savePill"><span class="dot"></span><span id="savePillTxt">SYNCED</span></span>
+      <button class="chip" id="vaultPill" data-go="storage" style="cursor:pointer" title="Where your work is being saved">NO VAULT FILE</button>
       <button class="btn ghost sm" id="btnSearch" title="Search everything (Ctrl+K)"><i data-lucide="search"></i><span class="hide-sm">FIND</span></button>
       <button class="btn ghost sm" data-act="guideOnAll" title="Show or hide the plain-English guide on every page"><i data-lucide="help-circle"></i></button>
-      <button class="btn ghost sm" data-act="themeEdit" title="Change colours, fonts and background for this page"><i data-lucide="palette"></i></button>
+      <button class="btn ghost sm" data-act="themeEdit" title="Change colours, fonts and background"><i data-lucide="palette"></i></button>
       <button class="btn ghost sm" id="btnSaveNow" title="Save right now (Ctrl+S)"><i data-lucide="hard-drive-download"></i></button>
-      <button class="btn ghost sm" id="btnFx" title="Toggle scanline / grid effects"><i data-lucide="sparkles"></i></button>
-      <button class="btn sm" data-go="settings" title="AI Engine Settings"><i data-lucide="settings-2"></i></button>
+      <button class="btn solid sm" data-act="quickSettings" title="Settings — appearance, storage, AI, program name"><i data-lucide="settings-2"></i><span class="hide-sm">SETTINGS</span></button>
     </div>
   </header>
 
@@ -1060,6 +1074,11 @@ label.fld > .hint{ margin-top:3px; }
    Toasts · Modals · Global event delegation · Router
    ========================================================================= */
 'use strict';
+
+/* Click/─change handlers and data-root resolvers are registered from every
+   module below, so both registries are declared before anything runs. */
+const ACTIONS = Object.create(null);
+const ROOTS = Object.create(null);
 
 /* ----------------------------- micro-helpers ---------------------------- */
 const $  = (s, r) => (r || document).querySelector(s);
@@ -1320,64 +1339,324 @@ function promptDlg(title, label, value, multiline) {
   });
 }
 
-/* ============================== PERSISTENCE ============================== */
+/* ============================== PERSISTENCE ==============================
+   Four layers, strongest first:
+     1. VAULT FILE  — a real file on disk you choose once (File System Access
+        API). Written automatically; survives clearing the browser, moving to
+        a new machine, or reinstalling. This is the copy that matters.
+     2. INDEXEDDB   — the working copy, written with a write-ahead record so a
+        power cut mid-write can never leave a half-written state.
+     3. SNAPSHOTS   — a rolling history inside IndexedDB you can roll back to.
+     4. LOCALSTORAGE— a small last-resort mirror and the crash-flush target.
+   ========================================================================= */
 const DB_NAME = 'ravenbane-architect';
 const DB_STORE = 'vault';
+const DB_SNAPS = 'snapshots';
+const DB_VER = 2;
 const LS_KEY = 'ravenbane.architect.state.v1';
+const LS_CRASH = 'ravenbane.architect.crashflush';
 let _idb = null, ENGINE = 'localStorage';
+let SAVE_SEQ = 0;
+
+const HAS_FSA = typeof window !== 'undefined' && typeof window.showSaveFilePicker === 'function';
+let VAULT_HANDLE = null;         /* FileSystemFileHandle for the chosen file */
+let VAULT_STATUS = 'none';       /* none | ready | needs-permission | error | unsupported */
+let VAULT_LAST = null;
+let VAULT_WRITING = false;
 
 function idbOpen() {
   return new Promise((resolve) => {
     if (!('indexedDB' in window)) return resolve(null);
     let req;
-    try { req = indexedDB.open(DB_NAME, 1); } catch (e) { return resolve(null); }
-    req.onupgradeneeded = () => { const db = req.result; if (!db.objectStoreNames.contains(DB_STORE)) db.createObjectStore(DB_STORE); };
+    try { req = indexedDB.open(DB_NAME, DB_VER); } catch (e) { return resolve(null); }
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains(DB_STORE)) db.createObjectStore(DB_STORE);
+      if (!db.objectStoreNames.contains(DB_SNAPS)) db.createObjectStore(DB_SNAPS, { keyPath: 'id' });
+    };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => resolve(null);
     req.onblocked = () => resolve(null);
     setTimeout(() => resolve(req.result || null), 2500);
   });
 }
-function idbPut(key, val) {
+function idbPut(key, val, store) {
   return new Promise((resolve, reject) => {
     if (!_idb) return reject(new Error('no idb'));
-    const tx = _idb.transaction(DB_STORE, 'readwrite');
-    tx.objectStore(DB_STORE).put(val, key);
+    const st = store || DB_STORE;
+    const tx = _idb.transaction(st, 'readwrite');
+    const os = tx.objectStore(st);
+    if (os.keyPath) os.put(val); else os.put(val, key);
     tx.oncomplete = () => resolve(true);
     tx.onerror = () => reject(tx.error);
     tx.onabort = () => reject(tx.error || new Error('aborted'));
   });
 }
-function idbGet(key) {
+function idbGet(key, store) {
   return new Promise((resolve, reject) => {
     if (!_idb) return reject(new Error('no idb'));
-    const tx = _idb.transaction(DB_STORE, 'readonly');
-    const rq = tx.objectStore(DB_STORE).get(key);
+    const tx = _idb.transaction(store || DB_STORE, 'readonly');
+    const rq = tx.objectStore(store || DB_STORE).get(key);
     rq.onsuccess = () => resolve(rq.result);
     rq.onerror = () => reject(rq.error);
   });
 }
+function idbDel(key, store) {
+  return new Promise((resolve) => {
+    if (!_idb) return resolve(false);
+    const tx = _idb.transaction(store || DB_STORE, 'readwrite');
+    tx.objectStore(store || DB_STORE).delete(key);
+    tx.oncomplete = () => resolve(true);
+    tx.onerror = () => resolve(false);
+  });
+}
+function idbAll(store) {
+  return new Promise((resolve) => {
+    if (!_idb) return resolve([]);
+    try {
+      const tx = _idb.transaction(store, 'readonly');
+      const rq = tx.objectStore(store).getAll();
+      rq.onsuccess = () => resolve(rq.result || []);
+      rq.onerror = () => resolve([]);
+    } catch (e) { resolve([]); }
+  });
+}
 
+/* --------------------------- the backup payload -------------------------- */
+const BACKUP_MAGIC = 'RAVENBANE-ARCHITECT-VAULT';
+/** One object containing absolutely everything, with a checksum. */
+function buildBackup(reason) {
+  const payload = {
+    magic: BACKUP_MAGIC,
+    format: 2,
+    app: 'RAVENBANE · ARCHITECT',
+    exported: nowISO(),
+    reason: reason || 'manual',
+    seq: ++SAVE_SEQ,
+    stats: {
+      books: state.books.length,
+      words: state.books.reduce((n, b) => n + bookWords(b), 0),
+      chapters: state.books.reduce((n, b) => n + b.chapters.length, 0),
+      characters: state.books.reduce((n, b) => n + b.characters.length, 0)
+    },
+    state: state
+  };
+  const body = JSON.stringify(payload);
+  payload.checksum = hashString(body);
+  return payload;
+}
+/** Small, fast, dependency-free checksum — enough to spot a truncated file. */
+function hashString(str) {
+  let h1 = 0x811c9dc5, h2 = 0x01000193;
+  for (let i = 0; i < str.length; i++) {
+    const c = str.charCodeAt(i);
+    h1 = (h1 ^ c) >>> 0; h1 = (h1 * 16777619) >>> 0;
+    h2 = (h2 + c * (i % 97 + 1)) >>> 0;
+  }
+  return (h1.toString(16) + '-' + h2.toString(16) + '-' + str.length.toString(36));
+}
+function verifyBackup(obj) {
+  if (!obj || typeof obj !== 'object') return { ok: false, why: 'Not a readable file.' };
+  const hasState = obj.state && Array.isArray(obj.state.books);
+  const hasBooks = Array.isArray(obj.books);
+  const bare = Array.isArray(obj);
+  if (!hasState && !hasBooks && !bare) return { ok: false, why: 'No RAVENBANE project data inside this file.' };
+  let checksum = 'not checked';
+  if (obj.checksum && obj.magic === BACKUP_MAGIC) {
+    const copy = Object.assign({}, obj); delete copy.checksum;
+    checksum = hashString(JSON.stringify(copy)) === obj.checksum ? 'verified' : 'MISMATCH';
+  }
+  return { ok: true, checksum: checksum, books: hasState ? obj.state.books.length : (hasBooks ? obj.books.length : obj.length) };
+}
+
+/* ------------------------------ vault file ------------------------------- */
+async function handlePerm(h, request) {
+  if (!h || !h.queryPermission) return true;
+  const opts = { mode: 'readwrite' };
+  try {
+    if ((await h.queryPermission(opts)) === 'granted') return true;
+    if (request && (await h.requestPermission(opts)) === 'granted') return true;
+  } catch (e) { }
+  return false;
+}
+async function vaultRestoreHandle() {
+  if (!HAS_FSA) { VAULT_STATUS = 'unsupported'; return; }
+  try {
+    const rec = await idbGet('vaultHandle');
+    if (!rec || !rec.handle) { VAULT_STATUS = 'none'; return; }
+    VAULT_HANDLE = rec.handle;
+    VAULT_LAST = rec.at || null;
+    VAULT_STATUS = (await handlePerm(VAULT_HANDLE, false)) ? 'ready' : 'needs-permission';
+  } catch (e) { VAULT_STATUS = 'none'; }
+}
+async function vaultWriteNow(reason) {
+  if (!VAULT_HANDLE || VAULT_WRITING) return false;
+  if (!(await handlePerm(VAULT_HANDLE, false))) { VAULT_STATUS = 'needs-permission'; paintVaultPill(); return false; }
+  VAULT_WRITING = true;
+  try {
+    /* createWritable() writes to a swap file and only replaces the real one on
+       close(), so an interrupted write leaves the previous file intact. */
+    const w = await VAULT_HANDLE.createWritable();
+    await w.write(JSON.stringify(buildBackup(reason || 'autosave'), null, 1));
+    await w.close();
+    VAULT_LAST = nowISO();
+    VAULT_STATUS = 'ready';
+    try { await idbPut('vaultHandle', { handle: VAULT_HANDLE, name: VAULT_HANDLE.name, at: VAULT_LAST }); } catch (e) { }
+    paintVaultPill();
+    return true;
+  } catch (e) {
+    console.warn('vault write failed', e);
+    VAULT_STATUS = 'error';
+    paintVaultPill();
+    return false;
+  } finally { VAULT_WRITING = false; }
+}
+ACTIONS.vaultChoose = async function () {
+  if (!HAS_FSA) { toast('This browser cannot write directly to a file. Use Chrome, Edge or Opera — or use Download Backup instead.', 'warn', 'NOT SUPPORTED'); return; }
+  try {
+    const h = await window.showSaveFilePicker({
+      suggestedName: slug((state.app.titleA || 'ravenbane') + '-' + (state.app.titleB || 'vault')) + '.rvbn.json',
+      types: [{ description: 'RAVENBANE vault', accept: { 'application/json': ['.json', '.rvbn'] } }]
+    });
+    VAULT_HANDLE = h;
+    state.app.storage.vaultName = h.name;
+    await idbPut('vaultHandle', { handle: h, name: h.name, at: nowISO() });
+    VAULT_STATUS = 'ready';
+    await vaultWriteNow('vault created');
+    markDirty(); render();
+    toast('Vault file connected. Everything you write is now saved into “' + h.name + '” automatically.', 'ok', 'VAULT LINKED');
+  } catch (e) { if (e && e.name !== 'AbortError') toast(String(e.message || e), 'err'); }
+};
+ACTIONS.vaultOpen = async function () {
+  if (!HAS_FSA) { ACTIONS.impPick(); return; }
+  try {
+    const [h] = await window.showOpenFilePicker({
+      types: [{ description: 'RAVENBANE vault', accept: { 'application/json': ['.json', '.rvbn'] } }]
+    });
+    if (!(await handlePerm(h, true))) { toast('Permission to that file was declined.', 'warn'); return; }
+    const text = await (await h.getFile()).text();
+    let data; try { data = JSON.parse(text); } catch (e) { toast('That file is not readable JSON.', 'err'); return; }
+    const v = verifyBackup(data);
+    if (!v.ok) { toast(v.why, 'err'); return; }
+    VAULT_HANDLE = h;
+    await idbPut('vaultHandle', { handle: h, name: h.name, at: nowISO() });
+    window.__import = data;
+    openModal({
+      title: 'OPEN VAULT FILE', icon: 'database', size: 'narrow',
+      body: '<div class="prose-c"><p>Read <code>' + esc(h.name) + '</code>.</p>' +
+        '<ul><li><strong>' + v.books + '</strong> book(s) inside</li>' +
+        '<li>Integrity check: <strong class="' + (v.checksum === 'MISMATCH' ? 't-rd' : 't-lm') + '">' + esc(v.checksum) + '</strong></li>' +
+        (data.exported ? '<li>Saved ' + esc(new Date(data.exported).toLocaleString()) + '</li>' : '') + '</ul>' +
+        '<p>From now on this file will also be your live vault — everything you write goes straight into it.</p></div>',
+      footer: '<button class="btn ghost" data-modal-close>CANCEL</button>' +
+        '<button class="btn" data-act="impMerge"><i data-lucide="plus"></i>ADD TO WHAT I HAVE</button>' +
+        '<button class="btn solid red" data-act="impReplace"><i data-lucide="refresh-cw"></i>REPLACE EVERYTHING</button>'
+    });
+  } catch (e) { if (e && e.name !== 'AbortError') toast(String(e.message || e), 'err'); }
+};
+ACTIONS.vaultReconnect = async function () {
+  if (!VAULT_HANDLE) return;
+  if (await handlePerm(VAULT_HANDLE, true)) {
+    VAULT_STATUS = 'ready'; await vaultWriteNow('reconnected'); render();
+    toast('Vault file reconnected.', 'ok');
+  } else toast('Permission declined — the vault file is not being written to.', 'warn');
+};
+ACTIONS.vaultForget = async function () {
+  const ok = await confirmDlg('DISCONNECT VAULT FILE', '<p>Stop writing to <strong>' + esc((VAULT_HANDLE && VAULT_HANDLE.name) || 'the vault file') + '</strong>?</p><p>The file itself is left exactly as it is — this only stops the automatic saving into it.</p>');
+  if (!ok) return;
+  VAULT_HANDLE = null; VAULT_STATUS = 'none'; state.app.storage.vaultName = '';
+  await idbDel('vaultHandle');
+  markDirty(); render(); toast('Vault file disconnected.', 'warn');
+};
+ACTIONS.vaultWriteNow = async function () {
+  if (!VAULT_HANDLE) { ACTIONS.vaultChoose(); return; }
+  const ok = await vaultWriteNow('manual');
+  toast(ok ? 'Written to “' + VAULT_HANDLE.name + '”.' : 'Could not write to the vault file.', ok ? 'ok' : 'err');
+  render();
+};
+
+/* ------------------------------ snapshots -------------------------------- */
+async function snapshotTake(label, silent) {
+  if (!_idb) return false;
+  try {
+    const payload = buildBackup('snapshot');
+    const rec = {
+      id: 'snap_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+      at: nowISO(), label: label || 'Automatic', seq: payload.seq,
+      bytes: JSON.stringify(payload).length,
+      stats: payload.stats,
+      data: payload
+    };
+    await idbPut(null, rec, DB_SNAPS);
+    await snapshotTrim();
+    if (!silent) toast('Snapshot saved.', 'ok');
+    return true;
+  } catch (e) { console.warn('snapshot failed', e); return false; }
+}
+async function snapshotTrim() {
+  const keep = clamp(Number(state.app.storage.snapshotKeep) || 12, 3, 60);
+  const all = (await idbAll(DB_SNAPS)).sort((a, b) => new Date(b.at) - new Date(a.at));
+  /* always preserve anything the writer labelled by hand */
+  const auto = all.filter(s => !s.pinned);
+  for (let i = keep; i < auto.length; i++) await idbDel(auto[i].id, DB_SNAPS);
+}
+async function snapshotList() {
+  return (await idbAll(DB_SNAPS)).sort((a, b) => new Date(b.at) - new Date(a.at));
+}
+
+/* -------------------------- core read / write ---------------------------- */
 async function storageInit() {
   _idb = await idbOpen();
   ENGINE = _idb ? 'IndexedDB' : 'localStorage';
   const el = $('#railEngine'); if (el) el.textContent = _idb ? 'IDB' : 'LS';
+  await vaultRestoreHandle();
 }
 async function storageLoad() {
+  /* write-ahead recovery: a `pending` newer than `state` means the last write
+     was interrupted, so the pending copy is the freshest complete data. */
+  let main = null, pending = null;
+  try { if (_idb) main = await idbGet('state'); } catch (e) { console.warn('IDB read failed', e); }
+  try { if (_idb) pending = await idbGet('pending'); } catch (e) { }
+  if (typeof main === 'string') { try { main = JSON.parse(main); } catch (e) { main = null; } }
+  if (typeof pending === 'string') { try { pending = JSON.parse(pending); } catch (e) { pending = null; } }
+
+  let crash = null;
   try {
-    if (_idb) { const v = await idbGet('state'); if (v) return typeof v === 'string' ? JSON.parse(v) : v; }
-  } catch (e) { console.warn('IDB read failed', e); }
-  try { const s = localStorage.getItem(LS_KEY); if (s) return JSON.parse(s); } catch (e) { console.warn('LS read failed', e); }
-  return null;
+    const raw = localStorage.getItem(LS_CRASH);
+    if (raw) crash = JSON.parse(raw);
+  } catch (e) { }
+
+  const cand = [];
+  if (main) cand.push({ src: 'main', seq: main.__seq || 0, at: main.__at || '', data: main });
+  if (pending) cand.push({ src: 'pending', seq: pending.__seq || 0, at: pending.__at || '', data: pending });
+  if (crash) cand.push({ src: 'crash', seq: crash.__seq || 0, at: crash.__at || '', data: crash });
+  if (!cand.length) {
+    try { const s = localStorage.getItem(LS_KEY); if (s) return { data: JSON.parse(s), recovered: false }; } catch (e) { }
+    return null;
+  }
+  cand.sort((a, b) => (b.seq - a.seq) || (String(b.at).localeCompare(String(a.at))));
+  const win = cand[0];
+  SAVE_SEQ = Math.max(SAVE_SEQ, win.seq || 0);
+  return { data: win.data, recovered: win.src !== 'main', from: win.src, alternatives: cand.length };
 }
 async function storageSave(obj) {
   let ok = false;
-  try { if (_idb) { await idbPut('state', obj); ok = true; } } catch (e) { console.warn('IDB write failed', e); }
+  obj.__seq = ++SAVE_SEQ;
+  obj.__at = nowISO();
+  try {
+    if (_idb) {
+      await idbPut('pending', obj);   /* 1 · write-ahead */
+      await idbPut('state', obj);     /* 2 · commit      */
+      await idbDel('pending');        /* 3 · clear       */
+      ok = true;
+    }
+  } catch (e) { console.warn('IDB write failed', e); }
   try {
     const s = JSON.stringify(obj);
     if (s.length < 4.4 * 1024 * 1024) { localStorage.setItem(LS_KEY, s); ok = true; }
     else if (!ok) throw new Error('payload too large for localStorage');
-    else localStorage.setItem(LS_KEY + '.meta', JSON.stringify({ note: 'payload stored in IndexedDB', at: nowISO(), bytes: s.length }));
+    else localStorage.setItem(LS_KEY + '.meta', JSON.stringify({ note: 'stored in IndexedDB', at: nowISO(), bytes: s.length }));
+    localStorage.removeItem(LS_CRASH);
   } catch (e) {
     if (!ok) { console.error(e); throw e; }
   }
@@ -1392,6 +1671,16 @@ async function storageUsage() {
   } catch (e) { }
   try { const s = localStorage.getItem(LS_KEY) || ''; return { used: s.length, quota: 5 * 1024 * 1024 }; } catch (e) { }
   return { used: 0, quota: 0 };
+}
+/** Ask the browser not to evict this origin's data under disk pressure. */
+async function requestPersistence() {
+  try {
+    if (navigator.storage && navigator.storage.persist) {
+      if (await navigator.storage.persisted()) return true;
+      return await navigator.storage.persist();
+    }
+  } catch (e) { }
+  return false;
 }
 
 /* ================================ STATE ================================== */
@@ -1528,6 +1817,7 @@ function defaultState() {
       titleB: 'ARCHITECT',
       sub: 'ARCHITECT CORE // v2077.1 // GRID ONLINE',
       logo: '',
+      titleAColor: '', titleBColor: '', subColor: '', titleSize: 19,
       accent: '#23e0ff',
       accent2: '#ff2b3d',
       fx: true,
@@ -1535,6 +1825,7 @@ function defaultState() {
       globalBanner: newBanner(230),
       perViewBanners: true,
       photoLayout: 'right',
+      storage: { vaultName: '', autoVault: true, vaultEverySec: 20, snapshotEverySec: 120, snapshotKeep: 12, persisted: false },
       theme: null,
       pageThemes: {},
       showGuides: true,
@@ -1564,6 +1855,7 @@ function defaultState() {
 
 let state = defaultState();
 let DIRTY = false, SAVING = false, lastSaved = null;
+let VAULT_DIRTY = false, SNAP_DIRTY = false;
 
 function currentBook() {
   if (!state.books.length) return null;
@@ -1589,7 +1881,7 @@ function logActivity(kind, text) {
 
 /* ------------------------------- autosave ------------------------------- */
 function markDirty(silent) {
-  DIRTY = true;
+  DIRTY = true; VAULT_DIRTY = true; SNAP_DIRTY = true;
   const b = currentBook(); if (b) b.updated = nowISO();
   if (!silent) paintSavePill('dirty');
 }
@@ -1618,11 +1910,24 @@ async function saveNow(force) {
     return false;
   } finally { SAVING = false; }
 }
-let autosaveTimer = null;
+let autosaveTimer = null, vaultTimer = null, snapTimer = null;
 function startAutosave() {
   if (autosaveTimer) clearInterval(autosaveTimer);
+  if (vaultTimer) clearInterval(vaultTimer);
+  if (snapTimer) clearInterval(snapTimer);
+  const st = state.app.storage || {};
   const sec = clamp(Number(state.app.autosaveSec) || 5, 2, 120);
   autosaveTimer = setInterval(() => { if (DIRTY) saveNow(); }, sec * 1000);
+
+  /* the vault file is written on its own, slower beat so we are not hammering
+     the disk on every keystroke — but only when something actually changed */
+  const vs = clamp(Number(st.vaultEverySec) || 20, 5, 600);
+  vaultTimer = setInterval(() => {
+    if (VAULT_HANDLE && st.autoVault !== false && VAULT_DIRTY) { VAULT_DIRTY = false; vaultWriteNow('autosave'); }
+  }, vs * 1000);
+
+  const ss = clamp(Number(st.snapshotEverySec) || 120, 30, 3600);
+  snapTimer = setInterval(() => { if (SNAP_DIRTY) { SNAP_DIRTY = false; snapshotTake('Automatic', true); } }, ss * 1000);
 }
 async function refreshStorageMeter() {
   const u = await storageUsage();
@@ -1633,8 +1938,6 @@ async function refreshStorageMeter() {
 }
 
 /* ======================= GLOBAL EVENT DELEGATION ========================= */
-const ACTIONS = Object.create(null);
-const ROOTS = Object.create(null);
 ROOTS.app = () => state.app;
 ROOTS.ui = () => state.ui;
 ROOTS.book = () => currentBook() || {};
@@ -1713,10 +2016,25 @@ document.addEventListener('keydown', (e) => {
   if (mod && e.key.toLowerCase() === 's') { e.preventDefault(); saveNow(true).then(ok => { if (ok) toast('Project written to ' + ENGINE + '.', 'ok', 'SAVED'); }); }
   if (mod && e.key.toLowerCase() === 'k') { e.preventDefault(); ACTIONS.globalSearch && ACTIONS.globalSearch(); }
 });
-window.addEventListener('beforeunload', (e) => {
-  if (DIRTY) { try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch (_) { } }
+/* Synchronous last-gasp write. pagehide fires in cases beforeunload does not
+   (mobile task-switch, tab discard), and both run before the tab is killed. */
+function crashFlush() {
+  if (!DIRTY) return;
+  try {
+    const snap = Object.assign({}, state, { __seq: SAVE_SEQ + 1, __at: nowISO() });
+    localStorage.setItem(LS_CRASH, JSON.stringify(snap));
+  } catch (_) { }
+}
+window.addEventListener('beforeunload', crashFlush);
+window.addEventListener('pagehide', crashFlush);
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    crashFlush();
+    if (DIRTY) saveNow();
+    if (VAULT_HANDLE && (state.app.storage || {}).autoVault !== false && VAULT_DIRTY) { VAULT_DIRTY = false; vaultWriteNow('tab hidden'); }
+  }
 });
-document.addEventListener('visibilitychange', () => { if (document.hidden && DIRTY) saveNow(); });
+window.addEventListener('blur', () => { if (DIRTY) saveNow(); });
 
 /* ================================ ROUTER ================================= */
 const VIEWS = Object.create(null);   // populated by the feature modules
@@ -2219,6 +2537,7 @@ const VIEW_META = {
   research:   { t: 'Research & Lore Vault',    e: 'VAULT',                   d: 'Moodboard canvas and external reference library.', i: 'pin' },
   masterclass:{ t: 'Masterclass Writing Library', e: 'VAULT',                d: 'Interactive craft tutorials from the archive.', i: 'graduation-cap' },
   settings:   { t: 'Settings & Appearance',    e: 'SYSTEM',                  d: 'How the app looks, AI providers, storage and privacy.', i: 'settings-2' },
+  storage:    { t: 'Storage & Backups',        e: 'SYSTEM',                  d: 'Where your work is saved, snapshots you can roll back to, and full backups.', i: 'database' },
   exportv:    { t: 'Export & Data Management', e: 'SYSTEM',                  d: 'Backups, manuscripts and portable formats.', i: 'download' }
 };
 
@@ -2242,8 +2561,16 @@ const NAV_ITEMS = {
   kids:       { i: 'baby', t: "Children's Studio" },
   research:   { i: 'pin', t: 'Research & Lore' },
   masterclass:{ i: 'graduation-cap', t: 'Masterclass Library' },
+  storage:    { i: 'database', t: 'Storage & Backups' },
   settings:   { i: 'settings-2', t: 'Settings & Appearance' },
   exportv:    { i: 'download', t: 'Export & Data' }
+};
+/* Where a newly-added page should appear for someone who already customised
+   their menu, so new features never land in a random group. */
+const NAV_HOME = {
+  storage: 'g_sys', settings: 'g_sys', exportv: 'g_sys',
+  ideas: 'g_arch', designer: 'g_book', pages: 'g_book',
+  profile: 'g_profiles', library: 'g_profiles'
 };
 function defaultNav() {
   return [
@@ -2254,7 +2581,7 @@ function defaultNav() {
     { id: 'g_cast', label: 'CAST SYSTEM', tone: '', open: true, items: ['characters', 'network', 'sandbox'] },
     { id: 'g_work', label: 'GENRE WORKSPACES', tone: '', open: true, items: ['genres', 'comics', 'kids'] },
     { id: 'g_vault', label: 'VAULT', tone: '', open: true, items: ['research', 'masterclass'] },
-    { id: 'g_sys', label: 'SYSTEM', tone: '', open: true, items: ['settings', 'exportv'] }
+    { id: 'g_sys', label: 'SYSTEM', tone: '', open: true, items: ['storage', 'settings', 'exportv'] }
   ];
 }
 /** Repairs the saved sidebar layout: drops unknown ids, appends any page the
@@ -2269,9 +2596,12 @@ function normaliseNav() {
   }));
   const missing = Object.keys(NAV_ITEMS).filter(v => !seen[v]);
   if (missing.length) {
-    const home = nav.find(g => g.id === 'g_profiles') || nav[0];
-    if (home) home.items = home.items.concat(missing);
-    else nav.push({ id: uid('g'), label: 'MORE', tone: '', open: true, items: missing });
+    missing.forEach(v => {
+      const wanted = NAV_HOME[v] || 'g_profiles';
+      const g = nav.find(x => x.id === wanted) || nav.find(x => x.id === 'g_profiles') || nav[0];
+      if (g) g.items.push(v);
+      else nav.push({ id: uid('g'), label: 'MORE', tone: '', open: true, items: [v] });
+    });
   }
   /* One-time relocation: 'All My Books' used to live under COMMAND. Move it to
      the top of BOOK PROFILES once, leaving any other arrangement untouched. */
@@ -2292,8 +2622,14 @@ function renderBrand() {
   const a = state.app;
   document.title = (a.titleA + ' ' + a.titleB).trim() || 'ARCHITECT';
   const t = $('#brandTitle');
-  t.innerHTML = '<span class="a">' + esc(a.titleA) + '</span>' + (a.titleB ? '<span class="sep">·</span><span class="b">' + esc(a.titleB) + '</span>' : '');
-  $('#brandSub').textContent = a.sub || '';
+  t.style.fontSize = (Number(a.titleSize) || 19) + 'px';
+  const ca = a.titleAColor ? 'style="color:' + attr(a.titleAColor) + '"' : '';
+  const cb = a.titleBColor ? 'style="color:' + attr(a.titleBColor) + '"' : '';
+  t.innerHTML = '<span class="a" ' + ca + '>' + esc(a.titleA) + '</span>' +
+    (a.titleB ? '<span class="sep">·</span><span class="b" ' + cb + '>' + esc(a.titleB) + '</span>' : '');
+  const sub = $('#brandSub');
+  sub.textContent = a.sub || '';
+  sub.style.color = a.subColor || '';
   const logo = $('#brandLogo');
   if (a.logo) logo.innerHTML = '<img src="' + attr(a.logo) + '" alt="logo" />';
   else logo.innerHTML = '<span style="font-family:var(--font-display);font-size:17px;font-weight:900;color:var(--accent-2);text-shadow:0 0 10px color-mix(in srgb, var(--accent-2) 90%, transparent)">' + esc((a.titleA || 'R').charAt(0).toUpperCase()) + '</span>';
@@ -6936,6 +7272,7 @@ function migrateState(loaded) {
   s.app.pageThemes = (loaded.app || {}).pageThemes || {};
   s.app.showGuides = (loaded.app || {}).showGuides !== false;
   s.app.photoLayout = (loaded.app || {}).photoLayout || 'right';
+  s.app.storage = Object.assign(clone(d.app.storage), (loaded.app || {}).storage || {});
   s.ui = Object.assign(clone(d.ui), loaded.ui || {});
   s.ui.lastEdited = s.ui.lastEdited || {};
   s.ui.helpClosed = s.ui.helpClosed || {};
@@ -7490,6 +7827,20 @@ const VIEW_HELP = {
       'Light styles (Social Light, Manuscript, Nordic, Typewriter, Lagoon, Arctic) turn the whole app bright.',
       'Your API key never leaves this browser.'
     ] },
+  storage: {
+    one: 'Where your writing actually lives, and how to make sure you never lose a word of it.',
+    steps: [
+      'Press <strong>Choose where to save</strong> and pick a file — in Documents, Dropbox, OneDrive, anywhere. The app then writes everything into that one file automatically as you work.',
+      'On a new computer, press <strong>Open an existing vault file</strong> and point at that same file. You are instantly back where you left off.',
+      'Press <strong>Download a full backup</strong> now and then as a belt-and-braces second copy.',
+      'If something goes wrong, <strong>roll back</strong> to any snapshot in the history below.'
+    ],
+    tips: [
+      'Saving straight to a file needs Chrome, Edge, Opera or Brave. On Firefox and Safari use the backup file instead — it holds exactly the same thing.',
+      'A power cut cannot corrupt your work: saves are written ahead of time and committed in one go, and the last keystrokes are flushed the moment the tab closes.',
+      'Name a snapshot before you try something drastic — named ones are never recycled.'
+    ]
+  },
   exportv: { one: 'Save your work out of the browser, and bring it back in.',
     steps: ['Press <strong>Export Entire Vault</strong> for a complete backup file. Do this often.', 'Press <strong>Printable Manuscript</strong> then use your browser’s Save-as-PDF.', 'Use <strong>Import / Restore</strong> to load a backup on another computer.'],
     tips: ['Everything lives in this browser only. Clearing site data deletes it — the JSON backup is your safety net.'] }
@@ -8804,6 +9155,279 @@ function wireTabDrag() {
   });
 }
 
+
+/* ===========================================================================
+   v4 · STORAGE & BACKUPS PAGE  +  QUICK SETTINGS  +  BRANDING COLOURS
+   ========================================================================= */
+
+VIEWS.storage = {
+  render() {
+    const st = state.app.storage;
+    const vaultName = (VAULT_HANDLE && VAULT_HANDLE.name) || st.vaultName || '';
+    const words = state.books.reduce((n, b) => n + bookWords(b), 0);
+    const badge = { ready: ['lm', 'CONNECTED'], 'needs-permission': ['am', 'NEEDS PERMISSION'], error: ['rd', 'WRITE FAILED'], none: ['', 'NOT SET UP'], unsupported: ['', 'NOT AVAILABLE HERE'] }[VAULT_STATUS] || ['', 'NOT SET UP'];
+
+    return '' +
+    '<div class="grid-auto" style="grid-template-columns:minmax(0,1.25fr) minmax(280px,360px)">' +
+      '<div>' +
+
+        /* ---------------- the vault file ---------------- */
+        '<div class="panel clip mb14 ' + (VAULT_STATUS === 'ready' ? '' : 'tone-red') + '"><div class="corner-tl"></div><div class="corner-br"></div>' +
+          '<div class="panel-hd"><i data-lucide="database"></i><h3>YOUR VAULT FILE</h3><span style="flex:1"></span>' +
+            '<span class="chip ' + badge[0] + '">' + badge[1] + '</span></div>' +
+          '<div class="panel-bd">' +
+            '<div class="helpbox mb14"><b>THE ONE FILE THAT HOLDS EVERYTHING</b>' +
+              'Pick a file on your computer — in Documents, Dropbox, OneDrive, a USB stick, anywhere. From that moment this app ' +
+              '<strong>writes everything into it automatically</strong> as you work: every book, chapter, character, picture and setting. ' +
+              'Put that one file on a new computer, open this app, press <em>Open a vault file</em>, and you are exactly where you left off.</div>' +
+
+            (!HAS_FSA
+              ? '<div class="panel mb14" style="padding:12px;border-color:color-mix(in srgb, var(--c-amber) 45%, transparent)">' +
+                '<div class="flex center gap8 mb6"><i data-lucide="alert-triangle" style="width:16px;height:16px;color:var(--c-amber)"></i>' +
+                '<strong class="t-am">This browser cannot write straight to a file</strong></div>' +
+                '<div class="fs13 muted">Saving directly into a file of your choosing needs Chrome, Edge, Opera or Brave. ' +
+                'You are on a browser without it (Firefox and Safari do not support it yet). Everything still saves inside the browser, ' +
+                'and <strong>Download a full backup</strong> below gives you the same single file — you just save it by hand instead of automatically.</div></div>'
+              : (vaultName
+                ? '<div class="flex between center wrap gap10 mb14" style="padding:12px;border:1px solid var(--line-hard);background:color-mix(in srgb, var(--accent) 6%, transparent)">' +
+                  '<div style="min-width:0"><div class="mono fs10 faint">SAVING INTO</div>' +
+                  '<div style="font-family:var(--font-display);font-size:15px;color:var(--txt);word-break:break-all">' + esc(vaultName) + '</div>' +
+                  '<div class="mono fs10 faint mt6">LAST WRITTEN ' + (VAULT_LAST ? esc(timeAgo(VAULT_LAST)) : 'not yet') + '</div></div>' +
+                  '<div class="flex gap6 wrap">' +
+                    (VAULT_STATUS === 'needs-permission' ? '<button class="btn amber" data-act="vaultReconnect"><i data-lucide="key"></i>RECONNECT</button>' : '') +
+                    '<button class="btn" data-act="vaultWriteNow"><i data-lucide="hard-drive-download"></i>WRITE NOW</button>' +
+                    '<button class="btn ghost" data-act="vaultChoose"><i data-lucide="folder"></i>CHANGE FILE</button>' +
+                    '<button class="btn ghost red" data-act="vaultForget"><i data-lucide="x"></i>DISCONNECT</button>' +
+                  '</div></div>'
+                : '<div class="flex gap6 wrap mb14">' +
+                  '<button class="btn solid lg" data-act="vaultChoose"><i data-lucide="folder"></i>CHOOSE WHERE TO SAVE</button>' +
+                  '<button class="btn lg" data-act="vaultOpen"><i data-lucide="upload"></i>OPEN AN EXISTING VAULT FILE</button>' +
+                  '</div>')) +
+
+            (HAS_FSA && vaultName ? '<div class="grid-auto g3" data-root="app" data-sub="storage">' +
+              '<label class="flex center gap8 fs13"><input type="checkbox" data-model="autoVault" data-live="storageLive"' + (st.autoVault !== false ? ' checked' : '') + '> Save into it automatically</label>' +
+              '<label class="fld" style="margin:0"><span class="lb">…at most every</span>' +
+                '<select class="sel" data-model="vaultEverySec" data-live="storageLive">' +
+                  [[5, 'every 5 seconds'], [10, 'every 10 seconds'], [20, 'every 20 seconds'], [60, 'every minute'], [300, 'every 5 minutes']]
+                    .map(o => '<option value="' + o[0] + '"' + (Number(st.vaultEverySec) === o[0] ? ' selected' : '') + '>' + o[1] + '</option>').join('') +
+                '</select></label>' +
+              '<div><div class="lb">Also written</div><div class="fs12 muted">whenever you switch away from the tab or close it</div></div>' +
+            '</div>' : '') +
+          '</div></div>' +
+
+        /* ---------------- backup file ---------------- */
+        '<div class="panel clip mb14"><div class="panel-hd"><i data-lucide="file-json"></i><h3>BACKUP FILE</h3></div>' +
+          '<div class="panel-bd">' +
+            '<div class="helpbox mb14"><b>ONE FILE, ABSOLUTELY EVERYTHING</b>' +
+              'Every book, every chapter, every character, every picture, your menu layout, your colours, your AI settings — all of it, in a single file with a built-in integrity check. ' +
+              'Keep a copy somewhere safe. Upload it on any computer to be exactly back where you were.</div>' +
+            '<div class="grid-auto g2">' +
+              '<button class="btn solid lg" data-act="expAll"><i data-lucide="download"></i>DOWNLOAD A FULL BACKUP</button>' +
+              '<button class="btn amber lg" data-act="impPick"><i data-lucide="upload"></i>RESTORE FROM A BACKUP</button>' +
+            '</div>' +
+            '<div class="dropzone mt14" id="restoreDrop" data-act="impPick">' +
+              '<i data-lucide="upload"></i><div><strong>…or drop a backup file here</strong></div>' +
+              '<div class="fs12">.json or .rvbn — it is checked before anything is changed</div></div>' +
+            '<div class="grid-auto g3 mt14">' +
+              miniStat('Books', String(state.books.length)) +
+              miniStat('Words', fmt(words)) +
+              miniStat('Backup size', bytesHuman(JSON.stringify(state).length)) +
+            '</div>' +
+          '</div></div>' +
+
+        /* ---------------- snapshots ---------------- */
+        '<div class="panel clip"><div class="panel-hd"><i data-lucide="clock"></i><h3>SNAPSHOT HISTORY</h3><span style="flex:1"></span>' +
+          '<button class="btn xs" data-act="snapNow"><i data-lucide="plus"></i>SNAPSHOT NOW</button></div>' +
+          '<div class="panel-bd">' +
+            '<div class="helpbox mb14"><b>GO BACK IN TIME</b>' +
+              'The app quietly keeps a rolling history of your whole project. If you delete something by mistake, or a chapter goes wrong, ' +
+              'roll back to how things were minutes or hours ago. Snapshots you name yourself are kept forever; automatic ones are recycled.</div>' +
+            '<div class="grid-auto g2 mb14" data-root="app" data-sub="storage">' +
+              '<label class="fld" style="margin:0"><span class="lb">Take one automatically</span>' +
+                '<select class="sel" data-model="snapshotEverySec" data-live="storageLive">' +
+                  [[30, 'every 30 seconds'], [60, 'every minute'], [120, 'every 2 minutes'], [300, 'every 5 minutes'], [900, 'every 15 minutes']]
+                    .map(o => '<option value="' + o[0] + '"' + (Number(st.snapshotEverySec) === o[0] ? ' selected' : '') + '>' + o[1] + '</option>').join('') +
+                '</select><span class="hint">Only when something has actually changed.</span></label>' +
+              '<label class="fld" style="margin:0"><span class="lb">How many to keep</span>' +
+                '<input class="inp" type="number" min="3" max="60" data-model="snapshotKeep" data-live="storageLive" value="' + attr(st.snapshotKeep) + '">' +
+                '<span class="hint">Older automatic ones are removed to save space.</span></label>' +
+            '</div>' +
+            '<div id="snapList"><div class="mono fs11 faint">loading…</div></div>' +
+          '</div></div>' +
+      '</div>' +
+
+      /* ---------------- right column ---------------- */
+      '<div><div style="position:sticky;top:12px">' +
+        '<div class="panel clip mb14"><div class="panel-hd"><i data-lucide="shield-check"></i><h3>HOW SAFE IS MY WORK?</h3></div>' +
+          '<div class="panel-bd">' +
+            safetyRow('Vault file on your disk', VAULT_STATUS === 'ready', VAULT_STATUS === 'ready' ? 'Written automatically to ' + esc(vaultName) : 'Not set up — this is the one that survives everything') +
+            safetyRow('Working copy in the browser', true, 'Saved every ' + (state.app.autosaveSec || 5) + ' seconds, with a write-ahead record') +
+            safetyRow('Power-cut protection', true, 'An interrupted save can never corrupt your data, and the last keystrokes are flushed as the tab closes') +
+            safetyRow('Snapshot history', true, '<span id="snapCount">…</span> snapshots you can roll back to') +
+            safetyRow('Browser will not evict it', !!st.persisted, st.persisted ? 'This site has persistent storage' : 'Ask the browser to protect this data') +
+            (!st.persisted ? '<button class="btn sm w100 mt10" data-act="askPersist"><i data-lucide="shield-check"></i>ASK THE BROWSER TO PROTECT IT</button>' : '') +
+          '</div></div>' +
+        '<div class="panel clip mb14"><div class="panel-hd"><i data-lucide="database"></i><h3>SPACE USED</h3></div>' +
+          '<div class="panel-bd">' +
+            '<div class="flex between center mb10"><span class="fs13">Engine</span><span class="chip cy">' + esc(ENGINE) + '</span></div>' +
+            '<div id="stgUse" class="mono fs11 faint mb10">measuring…</div>' +
+            '<div class="bar mb10"><i id="stgBar" style="width:2%"></i></div>' +
+            '<div class="hint">Pictures are what fill this up. If you run low, the vault file has no such limit.</div>' +
+          '</div></div>' +
+        '<div class="panel clip tone-red"><div class="panel-hd"><i data-lucide="alert-triangle"></i><h3>MOVING TO A NEW COMPUTER</h3></div>' +
+          '<div class="panel-bd prose-c fs13"><ol>' +
+            '<li>Press <strong>Download a full backup</strong> (or just copy your vault file).</li>' +
+            '<li>Put that one file on the new machine.</li>' +
+            '<li>Open this app there and press <strong>Restore from a backup</strong> — or <strong>Open an existing vault file</strong>.</li>' +
+            '<li>Everything is back, exactly as it was.</li>' +
+          '</ol></div></div>' +
+      '</div></div>' +
+    '</div>';
+  },
+  async mount() {
+    storageUsage().then(u => {
+      const el = $('#stgUse'), bar = $('#stgBar');
+      if (el) el.textContent = bytesHuman(u.used) + (u.quota ? ' of about ' + bytesHuman(u.quota) + ' available' : '');
+      if (bar) bar.style.width = clamp(u.quota ? (u.used / u.quota) * 100 : 2, 1.5, 100) + '%';
+    });
+    const list = await snapshotList();
+    const c = $('#snapCount'); if (c) c.textContent = String(list.length);
+    const host = $('#snapList'); if (!host) return;
+    host.innerHTML = list.length
+      ? list.map(sn =>
+        '<div class="flex between center wrap gap8 mb6" style="padding:9px 11px;border:1px solid var(--line);background:var(--bg-panel)">' +
+          '<div style="min-width:0;flex:1">' +
+            '<div class="flex center gap6"><strong class="fs13" style="color:var(--txt)">' + esc(sn.label || 'Automatic') + '</strong>' +
+            (sn.pinned ? '<span class="chip am">KEPT</span>' : '') + '</div>' +
+            '<div class="mono fs10 faint">' + esc(timeAgo(sn.at)) + ' · ' + esc(new Date(sn.at).toLocaleString()) + ' · ' +
+            ((sn.stats && sn.stats.books) || 0) + ' books · ' + fmt((sn.stats && sn.stats.words) || 0) + ' words · ' + bytesHuman(sn.bytes) + '</div>' +
+          '</div>' +
+          '<div class="flex gap4 wrap">' +
+            '<button class="btn xs" data-act="snapRestore" data-id="' + sn.id + '"><i data-lucide="rotate-ccw"></i>ROLL BACK</button>' +
+            '<button class="btn xs ghost" data-act="snapDownload" data-id="' + sn.id + '"><i data-lucide="download"></i></button>' +
+            '<button class="btn xs ghost" data-act="snapPin" data-id="' + sn.id + '" title="' + (sn.pinned ? 'Let this be recycled' : 'Keep this one forever') + '">' + (sn.pinned ? '★' : '☆') + '</button>' +
+            '<button class="btn xs ghost red" data-act="snapDel" data-id="' + sn.id + '"><i data-lucide="trash-2"></i></button>' +
+          '</div></div>').join('')
+      : '<div class="empty" style="padding:20px"><i data-lucide="clock"></i><h4>NO SNAPSHOTS YET</h4><div class="fs12">The first one is taken a couple of minutes after you start writing.</div></div>';
+    icons();
+  }
+};
+function safetyRow(label, ok, detail) {
+  return '<div class="flex gap8 mb10" style="align-items:flex-start">' +
+    '<span style="width:17px;flex:0 0 17px;color:' + (ok ? 'var(--c-lime)' : 'var(--c-amber)') + ';font-size:14px">' + (ok ? '✓' : '!') + '</span>' +
+    '<div style="flex:1;min-width:0"><div class="fs13" style="color:var(--txt)">' + esc(label) + '</div>' +
+    '<div class="fs11 faint">' + detail + '</div></div></div>';
+}
+ACTIONS.storageLive = debounce(() => { startAutosave(); }, 400);
+ACTIONS.askPersist = async function () {
+  const ok = await requestPersistence();
+  state.app.storage.persisted = !!ok;
+  markDirty(); render();
+  toast(ok ? 'The browser will now protect this data from automatic clean-ups.' : 'The browser declined. Your vault file is the reliable answer — set one up above.', ok ? 'ok' : 'warn');
+};
+ACTIONS.snapNow = async function () {
+  const label = await promptDlg('NAME THIS SNAPSHOT', 'What is this moment?', 'Before I change the ending');
+  if (label === null) return;
+  const payload = buildBackup('manual');
+  const rec = {
+    id: 'snap_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+    at: nowISO(), label: label.trim() || 'Named snapshot', seq: payload.seq,
+    bytes: JSON.stringify(payload).length, stats: payload.stats, data: payload, pinned: true
+  };
+  await idbPut(null, rec, DB_SNAPS);
+  render(); toast('Snapshot kept. It will never be recycled.', 'ok');
+};
+ACTIONS.snapRestore = async function (el) {
+  const list = await snapshotList();
+  const sn = list.find(x => x.id === el.getAttribute('data-id')); if (!sn) return;
+  const ok = await confirmDlg('ROLL BACK TO THIS SNAPSHOT',
+    '<p>Replace everything you have now with the snapshot from <strong>' + esc(new Date(sn.at).toLocaleString()) + '</strong>?</p>' +
+    '<ul><li>That snapshot has <strong>' + ((sn.stats && sn.stats.books) || 0) + '</strong> book(s) and <strong>' + fmt((sn.stats && sn.stats.words) || 0) + '</strong> words.</li>' +
+    '<li>You have <strong>' + state.books.length + '</strong> book(s) and <strong>' + fmt(state.books.reduce((n, b) => n + bookWords(b), 0)) + '</strong> words right now.</li></ul>' +
+    '<p class="t-am">A snapshot of your current work is taken first, so this is reversible.</p>', true);
+  if (!ok) return;
+  await snapshotTake('Before rolling back', true);
+  state = migrateState(sn.data.state || sn.data);
+  normaliseNav();
+  if (!state.books.length) seedStarterBook();
+  if (!state.ui.bookId || !state.books.some(b => b.id === state.ui.bookId)) state.ui.bookId = state.books[0].id;
+  DIRTY = true; await saveNow(true);
+  if (VAULT_HANDLE) vaultWriteNow('rolled back');
+  renderBrand(); go('storage');
+  toast('Rolled back to ' + timeAgo(sn.at) + '.', 'ok', 'RESTORED');
+};
+ACTIONS.snapDownload = async function (el) {
+  const list = await snapshotList();
+  const sn = list.find(x => x.id === el.getAttribute('data-id')); if (!sn) return;
+  downloadBlob('ravenbane-snapshot-' + dstamp() + '.json', JSON.stringify(sn.data, null, 1), 'application/json');
+};
+ACTIONS.snapPin = async function (el) {
+  const list = await snapshotList();
+  const sn = list.find(x => x.id === el.getAttribute('data-id')); if (!sn) return;
+  sn.pinned = !sn.pinned;
+  await idbPut(null, sn, DB_SNAPS);
+  render();
+};
+ACTIONS.snapDel = async function (el) {
+  await idbDel(el.getAttribute('data-id'), DB_SNAPS);
+  render();
+};
+
+/* ---------------------------- quick settings ----------------------------- */
+ACTIONS.quickSettings = function () {
+  const a = state.app;
+  openModal({
+    title: 'SETTINGS', icon: 'settings-2', size: '',
+    body:
+      '<div class="grid-auto g2 mb14">' +
+        qsTile('palette', 'How it looks', '21 styles, colours, fonts, backgrounds', 'themeEdit') +
+        qsTile('database', 'Storage &amp; backups', 'Vault file, snapshots, restore', null, 'storage') +
+        qsTile('brain', 'AI engine', 'Provider, key, prompt templates', null, 'settings') +
+        qsTile('download', 'Export', 'PDF, Word-ready, Markdown, JSON', null, 'exportv') +
+      '</div>' +
+      '<div class="lb">Program name</div>' +
+      '<div data-root="app">' +
+        '<div class="grid-auto g2">' +
+          '<label class="fld"><span class="lb">First word</span><input class="inp" data-model="titleA" data-live="brandLive" value="' + attr(a.titleA) + '"></label>' +
+          '<label class="fld"><span class="lb">Second word</span><input class="inp" data-model="titleB" data-live="brandLive" value="' + attr(a.titleB) + '"></label>' +
+          '<label class="fld"><span class="lb">Colour of the first word</span><input type="color" data-model="titleAColor" data-live="brandLive" value="' + attr(a.titleAColor || a.accent2 || '#ff2b3d') + '"></label>' +
+          '<label class="fld"><span class="lb">Colour of the second word</span><input type="color" data-model="titleBColor" data-live="brandLive" value="' + attr(a.titleBColor || '#eafcff') + '"></label>' +
+        '</div>' +
+        '<label class="fld"><span class="lb">Little line underneath</span><input class="inp" data-model="sub" data-live="brandLive" value="' + attr(a.sub) + '"></label>' +
+        '<div class="grid-auto g2">' +
+          '<label class="fld"><span class="lb">Colour of that line</span><input type="color" data-model="subColor" data-live="brandLive" value="' + attr(a.subColor || '#4d6b7d') + '"></label>' +
+          '<label class="fld"><span class="lb">Name size — ' + (a.titleSize || 19) + 'px</span><input type="range" min="12" max="34" data-model="titleSize" data-live="brandLive" value="' + (a.titleSize || 19) + '"></label>' +
+        '</div>' +
+        '<div class="flex gap6 wrap mb14">' +
+          '<button class="btn sm" data-act="logoMenu"><i data-lucide="image"></i>CHANGE THE LOGO</button>' +
+          '<button class="btn sm ghost" data-act="brandReset2"><i data-lucide="rotate-ccw"></i>RESET NAME &amp; COLOURS</button>' +
+        '</div>' +
+        '<div class="lb">While you work</div>' +
+        '<div class="grid-auto g2">' +
+          '<label class="fld" style="margin:0"><span class="lb">Save every</span>' +
+            '<select class="sel" data-model="autosaveSec" data-live="autosaveChange">' +
+              [[2, '2 seconds'], [5, '5 seconds'], [10, '10 seconds'], [30, '30 seconds']]
+                .map(o => '<option value="' + o[0] + '"' + (Number(a.autosaveSec) === o[0] ? ' selected' : '') + '>' + o[1] + '</option>').join('') +
+            '</select></label>' +
+          '<div style="align-self:end">' +
+            '<label class="flex center gap8 fs13 mb6"><input type="checkbox" data-model="showGuides" data-live="brandLive"' + (a.showGuides !== false ? ' checked' : '') + '> Show the how-to guide on pages</label>' +
+            '<label class="flex center gap8 fs13"><input type="checkbox" data-model="fx" data-live="brandLive"' + (a.fx ? ' checked' : '') + '> Background texture effects</label>' +
+          '</div>' +
+        '</div>' +
+      '</div>',
+    footer: '<span class="faint fs11" style="margin-right:auto">Changes apply instantly</span>' +
+            '<button class="btn ghost" data-go="settings">ALL SETTINGS</button>' +
+            '<button class="btn solid" data-modal-close>DONE</button>',
+    onClose: () => render()
+  });
+};
+function qsTile(icon, title, sub, act, go) {
+  return '<button class="optcard" style="text-align:left" ' + (go ? 'data-go="' + go + '"' : 'data-act="' + act + '"') + '>' +
+    '<div class="flex center gap8"><i data-lucide="' + icon + '" style="width:16px;height:16px;color:var(--accent)"></i>' +
+    '<strong class="fs13" style="color:var(--txt)">' + title + '</strong></div>' +
+    '<div class="fs11 muted mt6">' + sub + '</div></button>';
+}
+
 /* ============================ BOOT SEQUENCE ============================== */
 function seedStarterBook() {
   const b = newBook('Untitled Manuscript');
@@ -8983,13 +9607,47 @@ ACTIONS.loadDemo = function () {
   toast('Demo project loaded — every module is populated. Delete it any time from the Library.', 'ok', 'DEMO ONLINE');
 };
 
+/** Small always-visible readout of where your work is being saved. */
+function paintVaultPill() {
+  const el = $('#vaultPill'); if (!el) return;
+  const map = {
+    ready: ['lm', 'VAULT FILE ON', 'Your work is being written into ' + ((VAULT_HANDLE && VAULT_HANDLE.name) || 'your vault file')],
+    'needs-permission': ['am', 'VAULT PAUSED', 'Click to give the browser permission to write to your vault file again'],
+    error: ['rd', 'VAULT ERROR', 'The last write to your vault file failed — click to look'],
+    none: ['', 'NO VAULT FILE', 'Click to choose a file on your computer that this app saves into automatically'],
+    unsupported: ['', 'BROWSER SAVE', 'This browser cannot write to a file directly — use Download Backup instead']
+  };
+  const m = map[VAULT_STATUS] || map.none;
+  el.className = 'chip ' + m[0];
+  el.title = m[2];
+  el.textContent = m[1];
+}
+function recoveredModal(from) {
+  const label = from === 'crash' ? 'the emergency copy written as the tab closed'
+    : 'the write-ahead copy from an interrupted save';
+  openModal({
+    title: 'RECOVERED YOUR LATEST WORK', icon: 'shield-check', size: 'narrow', closeOnScrim: false,
+    body: '<div class="helpbox mb14"><b>NOTHING WAS LOST</b>' +
+      'The app did not shut down cleanly last time — a crash, a power cut, or the tab being killed. ' +
+      'Your work has been restored from ' + esc(label) + '.</div>' +
+      '<div class="prose-c fs13"><p>Everything below is back as it was:</p><ul>' +
+      '<li><strong>' + state.books.length + '</strong> book(s)</li>' +
+      '<li><strong>' + fmt(state.books.reduce((n, b) => n + bookWords(b), 0)) + '</strong> words</li>' +
+      '<li><strong>' + fmt(state.books.reduce((n, b) => n + b.chapters.length, 0)) + '</strong> chapters</li></ul>' +
+      '<p>If something still looks wrong, you can roll back to an earlier snapshot.</p></div>',
+    footer: '<button class="btn ghost" data-go="storage">OPEN SNAPSHOTS</button><button class="btn solid" data-modal-close>CARRY ON WRITING</button>'
+  });
+  logActivity('storage', 'Recovered unsaved work after an unclean shutdown');
+}
 async function boot() {
   await storageInit();
-  const loaded = await storageLoad();
-  let first = false;
-  if (loaded) {
-    try { state = migrateState(loaded); }
-    catch (e) { console.error('Migration failed, starting clean.', e); state = defaultState(); first = true; }
+  const res = await storageLoad();
+  let first = false, recovered = null;
+  if (res && res.data) {
+    try {
+      state = migrateState(res.data);
+      if (res.recovered) recovered = res.from;
+    } catch (e) { console.error('Migration failed, starting clean.', e); state = defaultState(); first = true; }
   } else { first = true; }
 
   if (!state.books.length) seedStarterBook();
@@ -9009,13 +9667,14 @@ async function boot() {
   paintSavePill('idle');
 
   /* --- brandbar wiring --- */
-  $('#brandTitle').addEventListener('click', () => ACTIONS.brandRename());
-  $('#brandLogo').addEventListener('click', () => ACTIONS.logoMenu());
-  $('#bookSwitchBtn').addEventListener('click', () => ACTIONS.toggleBookMenu());
-  $('#btnSearch').addEventListener('click', () => ACTIONS.globalSearch());
-  $('#btnSaveNow').addEventListener('click', () => ACTIONS.saveForce());
-  $('#btnFx').addEventListener('click', () => { state.app.fx = !state.app.fx; markDirty(); renderBrand(); toast('Grid FX ' + (state.app.fx ? 'enabled' : 'disabled') + '.', 'ok'); });
-  $('#btnRail').addEventListener('click', () => {
+  /* null-safe: a control removed from the top bar must never break boot */
+  const on = (sel, ev, fn) => { const el = $(sel); if (el) el.addEventListener(ev, fn); };
+  on('#brandTitle', 'click', () => ACTIONS.brandRename());
+  on('#brandLogo', 'click', () => ACTIONS.logoMenu());
+  on('#bookSwitchBtn', 'click', () => ACTIONS.toggleBookMenu());
+  on('#btnSearch', 'click', () => ACTIONS.globalSearch());
+  on('#btnSaveNow', 'click', () => ACTIONS.saveForce());
+  on('#btnRail', 'click', () => {
     const rail = $('#rail');
     rail.classList.toggle('open');
     if (rail.classList.contains('open')) {
@@ -9025,6 +9684,7 @@ async function boot() {
       document.body.appendChild(bd);
     } else { const bd = $('.rail-backdrop'); if (bd) bd.remove(); }
   });
+
 
   /* --- global drag & drop of images onto dropzones --- */
   document.addEventListener('dragover', (e) => {
@@ -9054,7 +9714,10 @@ async function boot() {
     if (h && VIEWS[h] && h !== CURRENT_VIEW) go(h);
   });
 
-  if (first) setTimeout(welcomeModal, 400);
+  requestPersistence().then(p => { state.app.storage.persisted = !!p; });
+  paintVaultPill();
+  if (recovered) setTimeout(() => recoveredModal(recovered), 500);
+  else if (first) setTimeout(welcomeModal, 400);
   console.log('%cRAVENBANE · ARCHITECT online — engine: ' + ENGINE, 'color:#23e0ff;font-family:monospace');
 }
 
