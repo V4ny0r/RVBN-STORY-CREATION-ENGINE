@@ -14,23 +14,40 @@ fallback) and autosaves every 5 seconds.
 
 ## What's inside
 
+### The Book Profile — where you actually work
+
+Every book gets its own social-media style page, first in the menu:
+
+- **Cover picture and profile picture**, both accepting photos, **animated GIFs** or video. Drag the cover to any height in pixels; set the profile picture's size, shape (circle / rounded / square / hexagon) and position (left, middle, right).
+- **Every chapter as one scrollable feed.** Click a chapter to open a full editor inline and type straight into the page. Add a chapter anywhere with the dividers between posts, reorder, duplicate or delete without leaving the feed.
+- **Story parts.** Tag each chapter — Setup, Inciting Incident, Midpoint, Climax, **The Conclusion**, Epilogue and fourteen more — and it gets a coloured stripe and badge. Switch on *Group by story part* to stack the feed under headings and see the shape of the whole book.
+- **Paragraph markers.** Put the cursor in any paragraph and press *Tag paragraph* to mark the exact line where the story turns. Every mark is listed in the **Story Map** beside the feed and jumps you straight there.
+- **Six tabs**: Chapters · About This Book (series, comps, POV, tense, setting, themes, warnings, pitch, synopsis, production plan, plus a completeness checklist) · Cast · World & Lore · Gallery (every picture in the project, gathered automatically) · Notes.
+
+### Making it yours
+
+- **Twelve ready-made themes** (TRON Grid, Ares Red, Vaporwave, Ink Noir, Old Parchment, Deep Sea, Sakura Dusk, Retro Terminal, Blood Moon, Arctic Signal, Candy Pop, Bone & Ash), then fine-tune accents, panel colour and transparency, heading and body fonts, corner style and glow.
+- **Background pictures and GIFs** behind the whole app, with fill mode, blur and dimming.
+- Apply any look to **just one page, one whole book, or everything** — page beats book beats global.
+- **Banners are resizable in pixels everywhere**, with a live vertical reframe slider, opacity, blur and scrim.
+- **Drag your own menu**: press *Arrange Menu* to drag pages between groups, reorder groups, rename them, add your own, or reset.
+- **Dashboard slideshow**: your own images, GIFs or video with six transitions (fade, slide, zoom, flip, blur, Ken Burns), adjustable timing and height. Pull pictures straight from anywhere else in the book.
+
+### Never wondering what a page is for
+
+Every page opens with a plain-English guide: one sentence on what the page is, a numbered *step by step*, and a *good to know* list. Modals and complex fields carry their own explanations. Hide them all with the **?** button in the top bar, bring them back the same way.
+
 | Area | Modules |
 | --- | --- |
-| **Command** | Dashboard with word/reading/chapter/cast telemetry, completion vector, pacing & tension heatmap, activity feed, quick-jump. Multi-project library. |
-| **The Book** | Cover Studio (front, back, spine, full-wrap, trim/barcode guides), Title & Dedication suite with a font selector, Prologue Master Editor with an attached moodboard drawer, and an unlimited Draft Chapter workspace with scene images and per-scene breakdown notes. |
+| **Book Profiles** | The social page for each book: cover, avatar, stats, chapter feed, About / Cast / World / Gallery / Notes tabs. |
+| **Command** | Dashboard with editable slideshow, word/reading/chapter/cast telemetry, completion vector, pacing & tension heatmap, activity feed, quick-jump. Multi-project library. |
+| **The Book** | Cover Studio (front, back, spine, full-wrap, trim/barcode guides), Title & Dedication suite with a font selector, Prologue Master Editor with an attached moodboard drawer, and a focused Draft Chapter desk with scene images and per-scene breakdown notes. |
 | **Architecture** | Guided story builder (seven prompted questions) that expands into multi-act beat sheets across five structural templates, and turns them into chapter stubs. |
 | **AI Co-Pilot** | The Unstuck Engine — reads your last 500 words and returns three distinct next moves (Logical / Twist / Wildcard), inserted with a glowing diff and one-click Keep or Undo. Plus an atmosphere & sensory enhancer and a cliché / repetition / filter-word scanner. |
 | **Cast System** | Four-tier character matrix with full dossiers, a draggable relationship node map (plus matrix and list views), and a dialogue sandbox for talking to your characters in their own voice. |
 | **Workspaces** | Twelve genre dossiers, a comic studio with ten panel layouts and script export, and a children's-book studio with age-tier layouts and exportable AI art prompts. |
 | **Vault** | Draggable moodboard canvas, external reference library, and six in-depth masterclass craft lessons. |
 | **Export** | JSON backup/restore, clean HTML book, Markdown manuscript, printable manuscript, full story bible, cast sheet, comic script and children's dummy book. |
-
-## Customisation
-
-Click the program name to rename it and the badge beside it to set your own logo. The
-banner hub on every page accepts an image, GIF or video, with compact / medium /
-cinematic heights and a live vertical reframe slider — applied per page, per book, or
-globally.
 
 ## AI providers
 
