@@ -14,9 +14,20 @@ fallback) and autosaves every 5 seconds.
 
 ## What's inside
 
+### All My Books — the shelf
+
+The first page in the menu holds every book you have started, each one shown as its own
+profile card: its cover picture, its profile picture, tagline, genre, word count, chapter
+count and progress. Click a card to make that book active and land straight on its profile.
+
+You can keep as many books as you like and nothing is shared between them — separate
+chapters, cast, artwork, research, and even a separate colour scheme per book. Search by
+title, author, genre or tagline, sort by what you worked on most recently, switch between
+big cards and a compact list, and back up any single book to its own file.
+
 ### The Book Profile — where you actually work
 
-Every book gets its own social-media style page, first in the menu:
+Every book gets its own social-media style page, second in the menu:
 
 - **Cover picture and profile picture**, both accepting photos, **animated GIFs** or video. Drag the cover to any height in pixels; set the profile picture's size, shape (circle / rounded / square / hexagon) and position (left, middle, right).
 - **Every chapter as one scrollable feed.** Click a chapter to open a full editor inline and type straight into the page. Add a chapter anywhere with the dividers between posts, reorder, duplicate or delete without leaving the feed.
@@ -39,8 +50,8 @@ Every page opens with a plain-English guide: one sentence on what the page is, a
 
 | Area | Modules |
 | --- | --- |
-| **Book Profiles** | The social page for each book: cover, avatar, stats, chapter feed, About / Cast / World / Gallery / Notes tabs. |
-| **Command** | Dashboard with editable slideshow, word/reading/chapter/cast telemetry, completion vector, pacing & tension heatmap, activity feed, quick-jump. Multi-project library. |
+| **Book Profiles** | *All My Books* — every book as a profile card, searchable and sortable — and the per-book profile: cover, avatar, stats, chapter feed, About / Cast / World / Gallery / Notes tabs. |
+| **Command** | Dashboard with editable slideshow, word/reading/chapter/cast telemetry, completion vector, pacing & tension heatmap, activity feed and quick-jump. |
 | **The Book** | Cover Studio (front, back, spine, full-wrap, trim/barcode guides), Title & Dedication suite with a font selector, Prologue Master Editor with an attached moodboard drawer, and a focused Draft Chapter desk with scene images and per-scene breakdown notes. |
 | **Architecture** | Guided story builder (seven prompted questions) that expands into multi-act beat sheets across five structural templates, and turns them into chapter stubs. |
 | **AI Co-Pilot** | The Unstuck Engine — reads your last 500 words and returns three distinct next moves (Logical / Twist / Wildcard), inserted with a glowing diff and one-click Keep or Undo. Plus an atmosphere & sensory enhancer and a cliché / repetition / filter-word scanner. |
