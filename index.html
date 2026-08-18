@@ -681,6 +681,34 @@ label.fld > .hint{ margin-top:3px; }
 .dropslot{ border:1px dashed color-mix(in srgb, var(--accent) 30%, transparent); color:var(--txt-faint); font-size:11px; text-align:center; padding:9px; margin:3px 0; }
 .railav{ width:18px; height:18px; flex:0 0 18px; border-radius:50%; overflow:hidden; border:1px solid var(--line-hard); }
 .railav img{ width:100%; height:100%; object-fit:cover; }
+.railav.ph{ display:grid; place-items:center; font-family:var(--font-display); font-size:10px; background:var(--void); }
+
+/* ---- flashing LIVE badge for Google Doc sync ---- */
+.livepill{ display:inline-flex; align-items:center; gap:6px; padding:4px 9px; cursor:pointer;
+  border:1px solid #ff2b3d88; background:color-mix(in srgb, #ff2b3d 12%, transparent); color:#ff8e98;
+  font-family:var(--font-mono); font-size:9.5px; letter-spacing:1.6px; text-transform:uppercase; border-radius:var(--r); }
+.livepill.inline{ cursor:default; }
+.livepill .lpdot{ width:7px; height:7px; border-radius:50%; background:#ff2b3d; flex:0 0 7px;
+  animation:lpflash 1.15s ease-in-out infinite; box-shadow:0 0 7px #ff2b3d; }
+@keyframes lpflash{ 0%,100%{ opacity:1; transform:scale(1); } 50%{ opacity:.22; transform:scale(.7); } }
+.livepill.syncing{ border-color:#ffb43a88; color:#ffd79a; background:color-mix(in srgb, #ffb43a 12%, transparent); }
+.livepill.syncing .lpdot{ background:#ffb43a; box-shadow:0 0 7px #ffb43a; animation-duration:.5s; }
+.livepill.pending{ border-color:#ffb43a66; color:#ffd79a; }
+.livepill.pending .lpdot{ background:#ffb43a; box-shadow:0 0 7px #ffb43a; }
+.livepill.error{ border-color:#ff2b3d; color:#ff2b3d; background:color-mix(in srgb, #ff2b3d 20%, transparent); }
+.livepill.error .lpdot{ animation-duration:.4s; }
+@media(prefers-reduced-motion:reduce){ .livepill .lpdot{ animation:none; } }
+@media(max-width:1240px){ #livePill .lptxt{ display:none; } #livePill{ padding:4px 7px; } }
+
+/* ---- character profile page ---- */
+.charcover{ position:relative; background:linear-gradient(135deg, color-mix(in srgb, var(--accent) 16%, var(--void)), var(--void)); border-bottom:1px solid var(--line-hard); }
+.charcover-empty{ position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; color:var(--txt-faint); font-size:12px; letter-spacing:2px; text-transform:uppercase; }
+.charcover-tools{ position:absolute; right:10px; bottom:10px; display:flex; gap:6px; }
+.charhead{ display:flex; gap:16px; align-items:flex-start; padding:0 18px 16px; flex-wrap:wrap; }
+.charav{ flex:0 0 auto; overflow:hidden; border:3px solid var(--accent); background:var(--void); display:grid; place-items:center; box-shadow:0 10px 34px rgba(0,0,0,.55); }
+.charav.sm{ border-width:1px; box-shadow:none; }
+.charname{ font-family:var(--font-display); font-size:clamp(20px,2.4vw,30px); margin:0; color:var(--txt); letter-spacing:1px; }
+@media(max-width:760px){ .charhead{ justify-content:flex-start !important; } .charav{ margin-top:-38px !important; } }
 
 /* ======================= SOCIAL BOOK PROFILE ============================= */
 .prof-cover{ position:relative; width:100%; overflow:hidden; border:1px solid var(--line); background:var(--void); }
@@ -854,7 +882,9 @@ label.fld > .hint{ margin-top:3px; }
 .gal img{ width:100%; height:135px; object-fit:cover; display:block; transition:.25s; }
 .gal figure:hover img{ transform:scale(1.06); }
 .gal figcaption{ position:absolute; left:0; right:0; bottom:0; padding:14px 7px 5px; font-family:var(--font-mono); font-size:9px;
-  letter-spacing:1.2px; color:var(--txt); background:linear-gradient(180deg,transparent,rgba(3,6,12,.92)); }
+  letter-spacing:1.2px; color:var(--txt); background:linear-gradient(180deg,transparent,rgba(3,6,12,.92)); pointer-events:none; }
+/* stacked variant: caption and controls sit under the picture instead of over it */
+.gal.stack figcaption{ position:static; background:none; padding:7px 8px 0; pointer-events:auto; }
 
 @media(max-width:900px){
   .prof-head{ margin-top:-34px; padding:0 12px 14px; gap:12px; }
@@ -1082,6 +1112,7 @@ label.fld > .hint{ margin-top:3px; }
     <div class="flex center gap6" style="flex-wrap:wrap;justify-content:flex-end">
       <span class="savepill" id="savePill"><span class="dot"></span><span id="savePillTxt">SYNCED</span></span>
       <button class="chip" id="vaultPill" data-go="storage" style="cursor:pointer" title="Where your work is being saved">NO VAULT FILE</button>
+      <button class="livepill" id="livePill" data-go="gdoc" style="display:none" title="Live updating a Google Doc"><span class="lpdot"></span><span class="lptxt">LIVE UPDATING</span></button>
       <button class="btn ghost sm" id="btnSearch" title="Search everything (Ctrl+K)"><i data-lucide="search"></i><span class="hide-sm">FIND</span></button>
       <button class="btn ghost sm" data-act="guideOnAll" title="Show or hide the plain-English guide on every page"><i data-lucide="help-circle"></i></button>
       <button class="btn ghost sm" data-act="themeEdit" title="Change colours, fonts and background"><i data-lucide="palette"></i></button>
@@ -1484,13 +1515,75 @@ function idbAll(store) {
   });
 }
 
+/* ========================= VERSION / UPDATE PROOFING ======================
+   Everything written to disk is stamped with the app version and the data
+   format it was written by. On the way back in:
+     · older data is filled out with whatever this build added, and nothing it
+       already had is thrown away;
+     · newer data is loaded as-is — unknown fields are carried through
+       untouched, so opening a newer save in an older build cannot strip it;
+     · when several copies exist, the newest one wins.
+   That means updating the app is: download the new file, delete the old one,
+   point it back at your vault file or storage folder. No export, no re-import.
+   ========================================================================= */
+const APP_VERSION = '7.1.0';
+const APP_BUILD = '2026-08-18';
+const DATA_FORMAT = 3;            /* shape of the saved state */
+
+/** -1 / 0 / 1 — compares dotted version strings without semver library. */
+function verCmp(a, b) {
+  const pa = String(a || '0').split('.').map(n => parseInt(n, 10) || 0);
+  const pb = String(b || '0').split('.').map(n => parseInt(n, 10) || 0);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const x = pa[i] || 0, y = pb[i] || 0;
+    if (x !== y) return x < y ? -1 : 1;
+  }
+  return 0;
+}
+/** Every saved artefact gets the same identity stamp. */
+function stampVersion(o) {
+  o.appVersion = APP_VERSION;
+  o.appBuild = APP_BUILD;
+  o.dataFormat = DATA_FORMAT;
+  o.savedAt = nowISO();
+  return o;
+}
+/** The best "when was this written" we can read out of any saved artefact. */
+function payloadTime(o) {
+  if (!o || typeof o !== 'object') return 0;
+  const t = o.savedAt || o.exported || o.__at || (o.state && o.state.__at) || '';
+  const n = t ? new Date(t).getTime() : 0;
+  return isNaN(n) ? 0 : n;
+}
+function payloadVersion(o) {
+  if (!o || typeof o !== 'object') return '';
+  return o.appVersion || (o.state && o.state.__ver) || o.__ver || '';
+}
+const isPlainObj = (o) => !!o && typeof o === 'object' && !Array.isArray(o);
+/** Deep-fill missing keys from a template while keeping EVERY key the saved
+    copy already has — including ones this build has never heard of. */
+function deepDefaults(src, def) {
+  if (!isPlainObj(def)) return src === undefined ? (def && typeof def === 'object' ? clone(def) : def) : src;
+  const out = {};
+  const keys = Object.keys(def);
+  if (isPlainObj(src)) Object.keys(src).forEach(k => { if (keys.indexOf(k) < 0) keys.push(k); });
+  keys.forEach(k => {
+    const dv = def[k];
+    const sv = isPlainObj(src) ? src[k] : undefined;
+    if (sv === undefined) out[k] = (dv && typeof dv === 'object') ? clone(dv) : dv;
+    else if (isPlainObj(dv) && isPlainObj(sv)) out[k] = deepDefaults(sv, dv);
+    else out[k] = sv;
+  });
+  return out;
+}
+
 /* --------------------------- the backup payload -------------------------- */
 const BACKUP_MAGIC = 'RAVENBANE-ARCHITECT-VAULT';
 /** One object containing absolutely everything, with a checksum. */
 function buildBackup(reason) {
-  const payload = {
+  const payload = stampVersion({
     magic: BACKUP_MAGIC,
-    format: 2,
+    format: DATA_FORMAT,
     app: 'RAVENBANE · ARCHITECT',
     exported: nowISO(),
     reason: reason || 'manual',
@@ -1502,7 +1595,7 @@ function buildBackup(reason) {
       characters: state.books.reduce((n, b) => n + b.characters.length, 0)
     },
     state: state
-  };
+  });
   const body = JSON.stringify(payload);
   payload.checksum = hashString(body);
   return payload;
@@ -1605,14 +1698,12 @@ ACTIONS.vaultOpen = async function () {
     window.__import = data;
     openModal({
       title: 'OPEN VAULT FILE', icon: 'database', size: 'narrow',
-      body: '<div class="prose-c"><p>Read <code>' + esc(h.name) + '</code>.</p>' +
-        '<ul><li><strong>' + v.books + '</strong> book(s) inside</li>' +
-        '<li>Integrity check: <strong class="' + (v.checksum === 'MISMATCH' ? 't-rd' : 't-lm') + '">' + esc(v.checksum) + '</strong></li>' +
-        (data.exported ? '<li>Saved ' + esc(new Date(data.exported).toLocaleString()) + '</li>' : '') + '</ul>' +
-        '<p>From now on this file will also be your live vault — everything you write goes straight into it.</p></div>',
+      body: importComparison(data, h.name, v.books) +
+        '<div class="prose-c fs13"><p>From now on this file is also your live vault — everything you write goes straight into it.</p></div>',
       footer: '<button class="btn ghost" data-modal-close>CANCEL</button>' +
-        '<button class="btn" data-act="impMerge"><i data-lucide="plus"></i>ADD TO WHAT I HAVE</button>' +
-        '<button class="btn solid red" data-act="impReplace"><i data-lucide="refresh-cw"></i>REPLACE EVERYTHING</button>'
+        '<button class="btn" data-act="impMerge"><i data-lucide="plus"></i>ADD AS EXTRA COPIES</button>' +
+        '<button class="btn solid" data-act="impSmart"><i data-lucide="git-merge"></i>MERGE, NEWEST WINS</button>' +
+        '<button class="btn ghost red" data-act="impReplace"><i data-lucide="refresh-cw"></i>REPLACE EVERYTHING</button>'
     });
   } catch (e) { if (e && e.name !== 'AbortError') toast(String(e.message || e), 'err'); }
 };
@@ -1635,6 +1726,196 @@ ACTIONS.vaultWriteNow = async function () {
   const ok = await vaultWriteNow('manual');
   toast(ok ? 'Written to “' + VAULT_HANDLE.name + '”.' : 'Could not write to the vault file.', ok ? 'ok' : 'err');
   render();
+};
+
+
+/* ======================= PERSONAL STORAGE FOLDER =========================
+   A whole folder of your own — Documents, Dropbox, OneDrive, a USB stick —
+   that the app keeps up to date:
+
+     <your folder>/ravenbane-vault.json          ← the live copy, always current
+     <your folder>/backups/ravenbane-<stamp>.json ← a rolling set of dated copies
+
+   This is the piece that makes updating painless. Download a newer build of
+   the app, delete the old file, press "Reconnect my storage folder", and the
+   app reads the newest thing in there and carries on. Nothing to export,
+   nothing to re-import, nothing lost.
+   ========================================================================= */
+const HAS_FSD = typeof window !== 'undefined' && typeof window.showDirectoryPicker === 'function';
+const FOLDER_MAIN = 'ravenbane-vault.json';
+const FOLDER_BAK = 'backups';
+let FOLDER_HANDLE = null;
+let FOLDER_STATUS = 'none';      /* none | ready | needs-permission | error | unsupported */
+let FOLDER_LAST = null;
+let FOLDER_WRITING = false;
+
+async function folderRestoreHandle() {
+  if (!HAS_FSD) { FOLDER_STATUS = 'unsupported'; return; }
+  try {
+    const rec = await idbGet('folderHandle');
+    if (!rec || !rec.handle) { FOLDER_STATUS = 'none'; return; }
+    FOLDER_HANDLE = rec.handle;
+    FOLDER_LAST = rec.at || null;
+    FOLDER_STATUS = (await handlePerm(FOLDER_HANDLE, false)) ? 'ready' : 'needs-permission';
+  } catch (e) { FOLDER_STATUS = 'none'; }
+}
+async function folderWriteFile(dir, name, text) {
+  const fh = await dir.getFileHandle(name, { create: true });
+  const w = await fh.createWritable();      /* swap-file write: atomic on close */
+  await w.write(text);
+  await w.close();
+  return fh;
+}
+/** Write the live copy, and a dated copy into backups/ at most once a run-hour. */
+async function folderWriteNow(reason, withBackup) {
+  if (!FOLDER_HANDLE || FOLDER_WRITING) return false;
+  if (!(await handlePerm(FOLDER_HANDLE, false))) { FOLDER_STATUS = 'needs-permission'; paintVaultPill(); return false; }
+  FOLDER_WRITING = true;
+  try {
+    const text = JSON.stringify(buildBackup(reason || 'folder'), null, 1);
+    await folderWriteFile(FOLDER_HANDLE, FOLDER_MAIN, text);
+    if (withBackup) {
+      const bak = await FOLDER_HANDLE.getDirectoryHandle(FOLDER_BAK, { create: true });
+      await folderWriteFile(bak, 'ravenbane-' + dstamp() + '-' + String(Date.now()).slice(-6) + '.json', text);
+      await folderTrim(bak);
+    }
+    FOLDER_LAST = nowISO();
+    FOLDER_STATUS = 'ready';
+    await idbPut('folderHandle', { handle: FOLDER_HANDLE, name: FOLDER_HANDLE.name, at: FOLDER_LAST });
+    paintVaultPill();
+    return true;
+  } catch (e) {
+    console.warn('folder write failed', e);
+    FOLDER_STATUS = 'error'; paintVaultPill(); return false;
+  } finally { FOLDER_WRITING = false; }
+}
+async function folderTrim(bak) {
+  const keep = clamp(Number(state.app.storage.folderCopies) || 8, 2, 60);
+  const names = [];
+  try { for await (const [n, h] of bak.entries()) if (h.kind === 'file' && /^ravenbane-.*\.json$/.test(n)) names.push(n); }
+  catch (e) { return; }
+  names.sort();
+  for (let i = 0; i < names.length - keep; i++) { try { await bak.removeEntry(names[i]); } catch (e) { } }
+}
+/** Read every RAVENBANE file in the folder and hand back the newest one. */
+async function folderReadNewest(dir) {
+  const found = [];
+  const readOne = async (h, where) => {
+    try {
+      const txt = await (await h.getFile()).text();
+      const obj = JSON.parse(txt);
+      if (verifyBackup(obj).ok) found.push({ obj: obj, where: where, t: payloadTime(obj) });
+    } catch (e) { }
+  };
+  try {
+    for await (const [n, h] of dir.entries()) {
+      if (h.kind === 'file' && /\.(json|rvbn)$/i.test(n)) await readOne(h, n);
+      else if (h.kind === 'directory' && n === FOLDER_BAK) {
+        for await (const [n2, h2] of h.entries()) if (h2.kind === 'file' && /\.json$/i.test(n2)) await readOne(h2, FOLDER_BAK + '/' + n2);
+      }
+    }
+  } catch (e) { }
+  found.sort((a, b) => b.t - a.t);
+  return found;
+}
+ACTIONS.folderChoose = async function () {
+  if (!HAS_FSD) { toast('This browser cannot open a folder. Use Chrome, Edge, Opera or Brave — or use the single vault file instead.', 'warn', 'NOT SUPPORTED'); return; }
+  try {
+    const dir = await window.showDirectoryPicker({ mode: 'readwrite', startIn: 'documents' });
+    if (!(await handlePerm(dir, true))) { toast('Permission to that folder was declined.', 'warn'); return; }
+    const found = await folderReadNewest(dir);
+    FOLDER_HANDLE = dir;
+    state.app.storage.folderName = dir.name;
+    await idbPut('folderHandle', { handle: dir, name: dir.name, at: nowISO() });
+    FOLDER_STATUS = 'ready';
+
+    /* If the folder already holds work, offer whichever copy is newer. */
+    if (found.length) {
+      const best = found[0];
+      const mineT = payloadTime({ savedAt: state.__at }) || 0;
+      window.__import = best.obj;
+      const newer = best.t > mineT;
+      const v = verifyBackup(best.obj);
+      openModal({
+        title: 'THERE IS ALREADY WORK IN THIS FOLDER', icon: 'folder-open', size: 'narrow',
+        body: '<div class="prose-c">' +
+          '<p>Found <code>' + esc(best.where) + '</code> in <strong>' + esc(dir.name) + '</strong>' +
+          (found.length > 1 ? ' (plus ' + (found.length - 1) + ' older cop' + (found.length === 2 ? 'y' : 'ies') + ')' : '') + '.</p>' +
+          '<ul>' +
+            '<li><strong>' + v.books + '</strong> book(s) inside · integrity <strong class="' + (v.checksum === 'MISMATCH' ? 't-rd' : 't-lm') + '">' + esc(v.checksum) + '</strong></li>' +
+            '<li>Written ' + esc(best.t ? new Date(best.t).toLocaleString() : 'at an unknown time') +
+              (payloadVersion(best.obj) ? ' by version ' + esc(payloadVersion(best.obj)) : '') + '</li>' +
+            '<li>What is open here right now: <strong>' + state.books.length + '</strong> book(s), last saved ' +
+              esc(state.__at ? new Date(state.__at).toLocaleString() : 'never') + '</li>' +
+          '</ul>' +
+          '<p class="' + (newer ? 't-lm' : 't-am') + '"><strong>' +
+            (newer ? 'The folder copy is newer than what is open here.' : 'What is open here is newer than the folder copy.') +
+          '</strong> Take whichever you want — nothing is written until you choose.</p></div>',
+        footer: '<button class="btn ghost" data-act="folderKeepMine">KEEP WHAT I HAVE, START SAVING HERE</button>' +
+          '<button class="btn" data-act="impSmart"><i data-lucide="git-merge"></i>MERGE, NEWEST WINS</button>' +
+          '<button class="btn solid red" data-act="impReplace"><i data-lucide="download"></i>LOAD THE FOLDER COPY</button>'
+      });
+    } else {
+      await folderWriteNow('folder connected', true);
+      toast('Storage folder connected. Everything is now written into “' + dir.name + '” as you work.', 'ok', 'FOLDER LINKED');
+    }
+    markDirty(); render();
+  } catch (e) { if (e && e.name !== 'AbortError') toast(String(e.message || e), 'err'); }
+};
+ACTIONS.folderKeepMine = async function () {
+  closeAllModals();
+  await folderWriteNow('kept local copy', true);
+  render();
+  toast('Kept what you had. It has been written into the folder.', 'ok');
+};
+ACTIONS.folderWriteNow = async function () {
+  if (!FOLDER_HANDLE) { ACTIONS.folderChoose(); return; }
+  const ok = await folderWriteNow('manual', true);
+  toast(ok ? 'Written into “' + FOLDER_HANDLE.name + '”, with a dated copy in backups.' : 'Could not write into the folder.', ok ? 'ok' : 'err');
+  render();
+};
+ACTIONS.folderReconnect = async function () {
+  if (!FOLDER_HANDLE) { ACTIONS.folderChoose(); return; }
+  if (await handlePerm(FOLDER_HANDLE, true)) { FOLDER_STATUS = 'ready'; await folderWriteNow('reconnected'); render(); toast('Storage folder reconnected.', 'ok'); }
+  else toast('Permission declined — the folder is not being written to.', 'warn');
+};
+ACTIONS.folderForget = async function () {
+  const ok = await confirmDlg('DISCONNECT STORAGE FOLDER',
+    '<p>Stop writing into <strong>' + esc((FOLDER_HANDLE && FOLDER_HANDLE.name) || 'the folder') + '</strong>?</p>' +
+    '<p>Every file already in it is left exactly where it is — this only stops the automatic saving.</p>');
+  if (!ok) return;
+  FOLDER_HANDLE = null; FOLDER_STATUS = 'none'; state.app.storage.folderName = '';
+  await idbDel('folderHandle');
+  markDirty(); render(); toast('Storage folder disconnected.', 'warn');
+};
+ACTIONS.folderBrowse = async function () {
+  if (!FOLDER_HANDLE) return;
+  if (!(await handlePerm(FOLDER_HANDLE, true))) { toast('Permission declined.', 'warn'); return; }
+  const found = await folderReadNewest(FOLDER_HANDLE);
+  window.__folderFound = found;
+  openModal({
+    title: 'WHAT IS IN YOUR STORAGE FOLDER', icon: 'folder-open', size: 'wide',
+    body: found.length
+      ? '<div class="helpbox mb14"><b>NEWEST FIRST</b>Every RAVENBANE file the app can see inside “' + esc(FOLDER_HANDLE.name) + '”. ' +
+        'Loading one replaces what is open right now — a snapshot of your current work is taken first, so it is reversible.</div>' +
+        found.map((f, i) => {
+          const v = verifyBackup(f.obj);
+          return '<div class="flex between center wrap gap8 mb6" style="padding:9px 11px;border:1px solid var(--line);background:var(--bg-panel)">' +
+            '<div style="min-width:0;flex:1"><div class="fs13" style="color:var(--txt)">' + esc(f.where) + (i === 0 ? ' <span class="chip lm">NEWEST</span>' : '') + '</div>' +
+            '<div class="mono fs10 faint">' + esc(f.t ? new Date(f.t).toLocaleString() : 'unknown date') + ' · ' + v.books + ' books · integrity ' + esc(v.checksum) +
+            (payloadVersion(f.obj) ? ' · version ' + esc(payloadVersion(f.obj)) : '') + '</div></div>' +
+            '<button class="btn xs" data-act="folderLoadOne" data-i="' + i + '"><i data-lucide="rotate-ccw"></i>LOAD THIS</button></div>';
+        }).join('')
+      : '<div class="empty" style="padding:24px"><i data-lucide="folder"></i><h4>NOTHING IN THERE YET</h4>' +
+        '<div class="fs12">Press <strong>Write now</strong> and the app will put your work in it.</div></div>',
+    footer: '<button class="btn ghost" data-modal-close>CLOSE</button>'
+  });
+};
+ACTIONS.folderLoadOne = async function (el) {
+  const f = (window.__folderFound || [])[Number(el.getAttribute('data-i'))]; if (!f) return;
+  window.__import = f.obj;
+  closeAllModals();
+  ACTIONS.impReplace();
 };
 
 /* ------------------------------ snapshots -------------------------------- */
@@ -1672,6 +1953,7 @@ async function storageInit() {
   ENGINE = _idb ? 'IndexedDB' : 'localStorage';
   const el = $('#railEngine'); if (el) el.textContent = _idb ? 'IDB' : 'LS';
   await vaultRestoreHandle();
+  await folderRestoreHandle();
 }
 async function storageLoad() {
   /* write-ahead recovery: a `pending` newer than `state` means the last write
@@ -1696,15 +1978,22 @@ async function storageLoad() {
     try { const s = localStorage.getItem(LS_KEY); if (s) return { data: JSON.parse(s), recovered: false }; } catch (e) { }
     return null;
   }
-  cand.sort((a, b) => (b.seq - a.seq) || (String(b.at).localeCompare(String(a.at))));
+  /* newest wins — by clock first, because a sequence number only means
+     anything within one install; a file carried in from another machine or a
+     newer build of the app is compared on when it was actually written. */
+  cand.forEach(c => { c.t = payloadTime(c.data); });
+  cand.sort((a, b) => (b.t - a.t) || (b.seq - a.seq) || (String(b.at).localeCompare(String(a.at))));
   const win = cand[0];
   SAVE_SEQ = Math.max(SAVE_SEQ, win.seq || 0);
-  return { data: win.data, recovered: win.src !== 'main', from: win.src, alternatives: cand.length };
+  return { data: win.data, recovered: win.src !== 'main', from: win.src, alternatives: cand.length,
+           savedBy: win.data.__ver || '', savedFmt: win.data.__fmt || 0 };
 }
 async function storageSave(obj) {
   let ok = false;
   obj.__seq = ++SAVE_SEQ;
   obj.__at = nowISO();
+  obj.__ver = APP_VERSION;
+  obj.__fmt = DATA_FORMAT;
   try {
     if (_idb) {
       await idbPut('pending', obj);   /* 1 · write-ahead */
@@ -1828,6 +2117,7 @@ function newBook(title) {
     created: nowISO(),
     updated: nowISO(),
     goalWords: 80000,
+    gdoc: { id: '', url: '', title: '', live: false, lastSync: '', lastError: '', lastWords: 0, pushes: 0, hash: '' },
     banners: { profile: newBanner(0) },   /* the profile has its own cover picture */
     cover: {
       front: { art: '', title: '', subtitle: '', author: '', font: 'ff-scifi', size: 40, align: 'center', color: '#eafcff', shadow: true, scrim: 55, position: 'bottom', sketchNotes: '' },
@@ -1889,7 +2179,9 @@ function defaultState() {
       globalBanner: newBanner(230),
       perViewBanners: true,
       photoLayout: 'right',
-      storage: { vaultName: '', autoVault: true, vaultEverySec: 20, snapshotEverySec: 120, snapshotKeep: 12, persisted: false },
+      google: { clientId: '', minSeconds: 12, connected: false },
+      storage: { vaultName: '', folderName: '', autoVault: true, vaultEverySec: 20, snapshotEverySec: 120,
+        snapshotKeep: 12, persisted: false, folderCopies: 8, savedByVersion: '', firstSeenVersion: APP_VERSION },
       theme: null,
       pageThemes: {},
       showGuides: true,
@@ -1947,6 +2239,7 @@ function logActivity(kind, text) {
 function markDirty(silent) {
   DIRTY = true; VAULT_DIRTY = true; SNAP_DIRTY = true;
   const b = currentBook(); if (b) b.updated = nowISO();
+  try { gdocTouch(); } catch (e) { }
   if (!silent) paintSavePill('dirty');
 }
 function paintSavePill(mode) {
@@ -1974,7 +2267,7 @@ async function saveNow(force) {
     return false;
   } finally { SAVING = false; }
 }
-let autosaveTimer = null, vaultTimer = null, snapTimer = null;
+let autosaveTimer = null, vaultTimer = null, snapTimer = null, FOLDER_TICK = 0;
 function startAutosave() {
   if (autosaveTimer) clearInterval(autosaveTimer);
   if (vaultTimer) clearInterval(vaultTimer);
@@ -1987,7 +2280,11 @@ function startAutosave() {
      the disk on every keystroke — but only when something actually changed */
   const vs = clamp(Number(st.vaultEverySec) || 20, 5, 600);
   vaultTimer = setInterval(() => {
-    if (VAULT_HANDLE && st.autoVault !== false && VAULT_DIRTY) { VAULT_DIRTY = false; vaultWriteNow('autosave'); }
+    if (st.autoVault === false) return;
+    if (!VAULT_DIRTY) return;
+    VAULT_DIRTY = false;
+    if (VAULT_HANDLE) vaultWriteNow('autosave');
+    if (FOLDER_HANDLE) folderWriteNow('autosave', ++FOLDER_TICK % 10 === 0);
   }, vs * 1000);
 
   const ss = clamp(Number(st.snapshotEverySec) || 120, 30, 3600);
@@ -2085,7 +2382,7 @@ document.addEventListener('keydown', (e) => {
 function crashFlush() {
   if (!DIRTY) return;
   try {
-    const snap = Object.assign({}, state, { __seq: SAVE_SEQ + 1, __at: nowISO() });
+    const snap = Object.assign({}, state, { __seq: SAVE_SEQ + 1, __at: nowISO(), __ver: APP_VERSION, __fmt: DATA_FORMAT });
     localStorage.setItem(LS_CRASH, JSON.stringify(snap));
   } catch (_) { }
 }
@@ -2095,7 +2392,11 @@ document.addEventListener('visibilitychange', () => {
   if (document.hidden) {
     crashFlush();
     if (DIRTY) saveNow();
-    if (VAULT_HANDLE && (state.app.storage || {}).autoVault !== false && VAULT_DIRTY) { VAULT_DIRTY = false; vaultWriteNow('tab hidden'); }
+    if ((state.app.storage || {}).autoVault !== false && VAULT_DIRTY) {
+      VAULT_DIRTY = false;
+      if (VAULT_HANDLE) vaultWriteNow('tab hidden');
+      if (FOLDER_HANDLE) folderWriteNow('tab hidden');
+    }
   }
 });
 window.addEventListener('blur', () => { if (DIRTY) saveNow(); });
@@ -2122,6 +2423,7 @@ function render() {
   const host = $('#view');
   applyTheme();
   renderBanner();
+  try { paintLivePill(); } catch (e) { }
   try {
     host.innerHTML = guidePanel(CURRENT_VIEW) + (v.render ? v.render() : '');
   } catch (err) {
@@ -2594,6 +2896,7 @@ const VIEW_META = {
   ideas:      { t: 'Idea Lab',                 e: 'BRAINSTORM',              d: 'Twenty-one brainstorming tools that already know your story.', i: 'sparkles' },
   copilot:    { t: 'AI Writing Co-Pilot',      e: 'UNSTUCK ENGINE',          d: 'Plot brancher, sensory enhancer and clich\u00e9 scanner.', i: 'brain' },
   characters: { t: 'Character Matrix',         e: 'CAST SYSTEM',             d: 'Tiered dossiers for every soul in the story.', i: 'users' },
+  character:  { t: 'Character Profile',        e: 'CAST SYSTEM',             d: 'One character\u2019s whole page \u2014 dossier, ties, appearances and gallery.', i: 'user' },
   network:    { t: 'Relationship Network',     e: 'CAST SYSTEM',             d: 'Node map of allies, rivals, family and secret ties.', i: 'network' },
   sandbox:    { t: 'Character Dialogue Sandbox', e: 'CAST SYSTEM',           d: 'Speak directly with your characters to test their voice.', i: 'message-square' },
   genres:     { t: 'Genre Workspaces',         e: 'WORKSHOP',                d: 'What kind of story are you writing? Deep dossiers per genre.', i: 'compass' },
@@ -2603,6 +2906,7 @@ const VIEW_META = {
   masterclass:{ t: 'Masterclass Writing Library', e: 'VAULT',                d: 'Interactive craft tutorials from the archive.', i: 'graduation-cap' },
   settings:   { t: 'Settings & Appearance',    e: 'SYSTEM',                  d: 'How the app looks, AI providers, storage and privacy.', i: 'settings-2' },
   designer:   { t: 'Book Designer',            e: 'MANUSCRIPT / 05',         d: 'Typeset your book on real pages and save it as a professional PDF.', i: 'book-open' },
+  gdoc:       { t: 'Google Doc Sync',          e: 'SYSTEM',                  d: 'Mirror this book into a Google Doc that keeps itself up to date as you write.', i: 'file-text' },
   storage:    { t: 'Storage & Backups',        e: 'SYSTEM',                  d: 'Where your work is saved, snapshots you can roll back to, and full backups.', i: 'database' },
   exportv:    { t: 'Export & Data Management', e: 'SYSTEM',                  d: 'Backups, manuscripts and portable formats.', i: 'download' }
 };
@@ -2629,6 +2933,7 @@ const NAV_ITEMS = {
   kids:       { i: 'baby', t: "Children's Studio" },
   research:   { i: 'pin', t: 'Research & Lore' },
   masterclass:{ i: 'graduation-cap', t: 'Masterclass Library' },
+  gdoc:       { i: 'file-text', t: 'Google Doc Sync' },
   storage:    { i: 'database', t: 'Storage & Backups' },
   settings:   { i: 'settings-2', t: 'Settings & Appearance' },
   exportv:    { i: 'download', t: 'Export & Data' }
@@ -2636,7 +2941,7 @@ const NAV_ITEMS = {
 /* Where a newly-added page should appear for someone who already customised
    their menu, so new features never land in a random group. */
 const NAV_HOME = {
-  storage: 'g_sys', settings: 'g_sys', exportv: 'g_sys',
+  storage: 'g_sys', settings: 'g_sys', exportv: 'g_sys', gdoc: 'g_sys',
   ideas: 'g_arch', designer: 'g_book', pages: 'g_book',
   profile: 'g_profiles', library: 'g_profiles'
 };
@@ -2649,7 +2954,7 @@ function defaultNav() {
     { id: 'g_cast', label: 'CAST SYSTEM', tone: '', open: true, items: ['characters', 'network', 'sandbox'] },
     { id: 'g_work', label: 'GENRE WORKSPACES', tone: '', open: true, items: ['genres', 'comics', 'kids'] },
     { id: 'g_vault', label: 'VAULT', tone: '', open: true, items: ['research', 'masterclass'] },
-    { id: 'g_sys', label: 'SYSTEM', tone: '', open: true, items: ['storage', 'settings', 'exportv'] }
+    { id: 'g_sys', label: 'SYSTEM', tone: '', open: true, items: ['storage', 'gdoc', 'settings', 'exportv'] }
   ];
 }
 /** Repairs the saved sidebar layout: drops unknown ids, appends any page the
@@ -3009,6 +3314,35 @@ function renderRail() {
         '</div>' +
       '</div>'
     ).join('') +
+
+    /* CHARACTERS — every character in the open book, always one click away.
+       Built from the data rather than the saved menu layout, so a character
+       created five seconds ago is already in the list. */
+    (function () {
+      const cast = (b && b.characters) || [];
+      const open = state.ui.castGroupOpen !== false;
+      return '<div class="rail-group"><div class="rail-label" data-act="castGroupToggle">' +
+        '<span class="gcaret">' + (open ? '\u25be' : '\u25b8') + '</span>' +
+        '<span class="gname">CHARACTERS</span>' +
+        '<span class="badge" style="margin-left:auto">' + cast.length + '</span>' +
+        '<button class="btn xs ghost" data-go="characters" title="The full character matrix">ALL</button></div>' +
+        '<div class="rail-items' + (open ? '' : ' hidden') + '">' +
+        (cast.length
+          ? cast.map(c => {
+              const t = TIERS.find(x => x.id === c.tier) || TIERS[2];
+              return '<div class="navwrap"><button class="navitem' +
+                (CURRENT_VIEW === 'character' && state.ui.viewArg === c.id ? ' active' : '') +
+                '" data-go="character" data-arg="' + c.id + '" title="' + attr((c.role || t.label) + ' \u2014 open their profile page') + '">' +
+                (c.photo ? '<span class="railav"><img src="' + attr(c.photo) + '" alt=""></span>'
+                         : '<span class="railav ph" style="color:' + attr(c.color || 'var(--accent)') + '">' + esc((c.name || '?').charAt(0).toUpperCase()) + '</span>') +
+                '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(c.name || 'Unnamed') + '</span>' +
+                '<span class="badge" style="border-color:' + attr(c.color || 'var(--line)') + '55">' + esc(t.label.split(' ')[0].slice(0, 4).toUpperCase()) + '</span>' +
+                '</button></div>';
+            }).join('')
+          : '<div class="rail-tip">Nobody yet. Everyone you create appears here.</div>') +
+        '<div class="navwrap"><button class="navitem" data-act="charNew" style="color:var(--accent-3)"><i data-lucide="user-plus"></i><span>New Character</span></button></div>' +
+      '</div></div>';
+    })() +
 
     '<div class="rail-group"><div class="rail-label"><span class="gname">SWITCH BOOK</span>' +
       '<button class="btn xs ghost" data-go="library" title="See all my books">ALL</button></div><div class="rail-items">' +
@@ -4530,6 +4864,10 @@ function newCharacter(tier) {
     id: uid('cr'), name: '', tier: tier || 'sup', role: '', aliases: '', age: '', pronouns: '', occupation: '',
     alignment: 'neutral good', appearance: '', motivation: '', need: '', flaws: '', fears: '', secret: '',
     voice: '', mannerisms: '', backstory: '', arc: '', notes: '', photo: '', color: '#23e0ff',
+    origin: '', wound: '', lie: '', arcStart: '', arcBreak: '', arcEnd: '',
+    skills: '', weakness: '', possessions: '', habits: '', catchphrase: '', antiVoice: '',
+    continuity: '', todo: '', quotes: [], gallery: [],
+    cover: '', coverH: 220, coverY: 50, avatarSize: 150, avatarPos: 'left', avatarShape: 'round',
     x: 0, y: 0, chat: [], created: nowISO()
   };
 }
@@ -4558,7 +4896,7 @@ VIEWS.characters = {
 
     (shown.length ? '<div class="grid-auto" style="grid-template-columns:repeat(auto-fill,minmax(212px,1fr))">' + shown.map(c => {
       const tier = TIERS.find(t => t.id === c.tier) || TIERS[2];
-      return '<div class="panel cast-card ' + tier.cls + '" data-act="charOpen" data-id="' + c.id + '">' +
+      return '<div class="panel cast-card ' + tier.cls + '" data-go="character" data-arg="' + c.id + '">' +
         '<div class="cast-photo">' +
           (c.photo ? '<img src="' + attr(c.photo) + '" alt="">' : '<span class="ph">' + esc((c.name || '?').charAt(0).toUpperCase()) + '</span>') +
           '<span class="chip ' + tier.chip + ' cast-tier">' + esc(tier.label.split(' ')[0].toUpperCase()) + '</span>' +
@@ -4572,6 +4910,10 @@ VIEWS.characters = {
             (c.alignment ? '<span class="chip cy">' + esc(c.alignment) + '</span>' : '') +
             '<span class="chip">' + ((b.relationships || []).filter(r => r.a === c.id || r.b === c.id).length) + ' TIES</span>' +
           '</div>' +
+          '<div class="flex gap4 mt10">' +
+            '<button class="btn xs solid" data-go="character" data-arg="' + c.id + '"><i data-lucide="user"></i>OPEN PROFILE</button>' +
+            '<button class="btn xs ghost" data-act="charOpen" data-id="' + c.id + '" title="Quick edit without leaving this page"><i data-lucide="pencil"></i></button>' +
+          '</div>' +
         '</div></div>';
     }).join('') + '</div>'
     : '<div class="panel clip"><div class="panel-bd"><div class="empty"><i data-lucide="users"></i><h4>NO CHARACTERS IN THIS TIER</h4>' +
@@ -4584,6 +4926,7 @@ VIEWS.characters = {
     '</div></div></div>';
   }
 };
+ACTIONS.castGroupToggle = function () { state.ui.castGroupOpen = state.ui.castGroupOpen === false; markDirty(true); renderRail(); icons(); };
 ACTIONS.castFilter = function (el) { state.ui.castFilter = el.getAttribute('data-arg'); markDirty(true); render(); };
 ACTIONS.charNew = function () {
   const b = requireBook(); if (!b) return;
@@ -4592,7 +4935,8 @@ ACTIONS.charNew = function () {
   c.x = 120 + (n % 5) * 150; c.y = 90 + Math.floor(n / 5) * 130;
   b.characters.push(c);
   markDirty();
-  ACTIONS.charOpen({ getAttribute: () => c.id });
+  closeAllModals();
+  go('character', c.id);
 };
 ACTIONS.charOpen = function (el) {
   const id = typeof el === 'string' ? el : el.getAttribute('data-id');
@@ -4650,6 +4994,7 @@ ACTIONS.charOpen = function (el) {
       '</div></div></div>',
     footer:
       '<button class="btn ghost red" data-act="charDelete" data-id="' + c.id + '" style="margin-right:auto"><i data-lucide="trash-2"></i>DELETE</button>' +
+      '<button class="btn ghost" data-act="charFullPage" data-id="' + c.id + '"><i data-lucide="maximize-2"></i>FULL PROFILE PAGE</button>' +
       '<button class="btn ghost" data-act="charInterview" data-id="' + c.id + '"><i data-lucide="help-circle"></i>INTERVIEW QUESTIONS</button>' +
       '<button class="btn violet" data-act="charTalk" data-id="' + c.id + '"><i data-lucide="message-square"></i>TALK TO THEM</button>' +
       '<button class="btn solid" data-act="charSaveClose"><i data-lucide="check"></i>DONE</button>',
@@ -4657,6 +5002,7 @@ ACTIONS.charOpen = function (el) {
   });
 };
 ACTIONS.charSaveClose = function () { closeModal(); };
+ACTIONS.charFullPage = function (el) { closeAllModals(); go('character', el.getAttribute('data-id')); };
 ACTIONS.charPhoto = async function (el) {
   const c = findChar(el.getAttribute('data-id')); if (!c) return;
   const f = await pickFile('image/*'); if (!f) return;
@@ -4679,7 +5025,9 @@ ACTIONS.charDelete = async function (el) {
   if (!ok) return;
   b.characters = b.characters.filter(x => x.id !== id);
   b.relationships = (b.relationships || []).filter(r => r.a !== id && r.b !== id);
-  markDirty(); closeAllModals(); render();
+  markDirty(); closeAllModals();
+  if (CURRENT_VIEW === 'character') go('characters'); else render();
+  toast('Character deleted.', 'warn');
 };
 ACTIONS.charInterview = function (el) {
   const c = findChar(el.getAttribute('data-id')) || {};
@@ -4708,6 +5056,556 @@ ACTIONS.charTalk = function (el) {
   state.ui.sandboxId = el.getAttribute('data-id');
   closeAllModals(); go('sandbox');
 };
+
+
+/* ===========================================================================
+   v7 · CHARACTER PROFILE PAGES
+   Every character gets a real page of their own — a cover picture, a portrait,
+   their whole dossier laid out in tabs, their ties, their gallery, every
+   chapter they appear in, and their own conversation history. The sidebar
+   grows a CHARACTERS group listing all of them so they are always one click
+   away, exactly like the book switcher.
+   ========================================================================= */
+
+const CHAR_TABS = [
+  ['dossier', 'Dossier', 'user'],
+  ['inner', 'Inner Life', 'heart'],
+  ['voice', 'Voice & Dialogue', 'message-square'],
+  ['ties', 'Relationships', 'network'],
+  ['appear', 'Appearances', 'files'],
+  ['gallery', 'Gallery', 'image'],
+  ['notes', 'Notes', 'sticky-note']
+];
+
+function charById(id) {
+  for (const b of state.books) {
+    const c = (b.characters || []).find(x => x.id === id);
+    if (c) return { c: c, b: b };
+  }
+  return null;
+}
+/** Every chapter (and the prologue) whose text names this character. */
+function charAppearances(b, c) {
+  const names = [c.name].concat(String(c.aliases || '').split(/[,;/]/))
+    .map(n => String(n || '').trim()).filter(n => n.length > 2);
+  if (!names.length) return [];
+  const rx = new RegExp('\\b(' + names.map(n => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|') + ')\\b', 'gi');
+  const out = [];
+  const scan = (label, html, goTo, arg) => {
+    const txt = stripHTML(html || '');
+    const hits = txt.match(rx);
+    if (!hits || !hits.length) return;
+    const i = txt.search(rx);
+    const from = Math.max(0, i - 90);
+    out.push({
+      label: label, count: hits.length, go: goTo, arg: arg,
+      snippet: (from ? '…' : '') + txt.slice(from, i + 170).replace(/\s+/g, ' ').trim() + '…'
+    });
+  };
+  scan('Prologue', b.prologue.html, 'prologue', '');
+  (b.chapters || []).forEach((ch, i) => scan(ch.title || 'Chapter ' + (i + 1), ch.html, 'profile', ch.id));
+  return out;
+}
+function charTierMeta(c) { return TIERS.find(t => t.id === c.tier) || TIERS[2]; }
+function charPortrait(c, size) {
+  return c.photo
+    ? '<img src="' + attr(c.photo) + '" alt="" style="width:100%;height:100%;object-fit:cover;display:block">'
+    : '<span style="font-family:var(--font-display);font-size:' + (size || 52) + 'px;color:color-mix(in srgb, var(--accent) 26%, transparent)">' +
+      esc((c.name || '?').charAt(0).toUpperCase()) + '</span>';
+}
+/** A one-line completeness read on a dossier — what is still missing. */
+function charDepth(c) {
+  const want = [
+    ['name', 'a name'], ['role', 'a story role'], ['motivation', 'what they want'],
+    ['need', 'what they need'], ['flaws', 'a flaw'], ['fears', 'a fear'],
+    ['voice', 'a voice'], ['secret', 'a secret'], ['backstory', 'a backstory'], ['arc', 'an arc']
+  ];
+  const missing = want.filter(w => !String(c[w[0]] || '').trim()).map(w => w[1]);
+  return { pct: Math.round(((want.length - missing.length) / want.length) * 100), missing: missing };
+}
+
+VIEWS.character = {
+  render() {
+    const id = state.ui.viewArg || state.ui.charId || '';
+    const hit = charById(id);
+    if (!hit) {
+      return '<div class="panel clip"><div class="panel-bd"><div class="empty"><i data-lucide="user"></i>' +
+        '<h4>NO CHARACTER CHOSEN</h4><div class="fs13 mb14">Pick someone from the CHARACTERS list in the menu, or open the matrix to make a new one.</div>' +
+        '<button class="btn solid" data-go="characters"><i data-lucide="users"></i>OPEN THE CHARACTER MATRIX</button></div></div></div>';
+    }
+    const c = hit.c, b = hit.b;
+    if (b.id !== state.ui.bookId) state.ui.bookId = b.id;
+    const tier = charTierMeta(c);
+    const tab = state.ui.charTab || 'dossier';
+    const rels = (b.relationships || []).filter(r => r.a === c.id || r.b === c.id);
+    const app = charAppearances(b, c);
+    const depth = charDepth(c);
+    const coverH = clamp(Number(c.coverH) || 220, 90, 620);
+    const av = clamp(Number(c.avatarSize) || 150, 70, 300);
+    const pos = c.avatarPos || 'left';
+    const shape = { circle: '50%', round: '18px', square: '0', hex: '0' }[c.avatarShape || 'round'] || '18px';
+
+    const head = '' +
+      '<div class="panel clip mb14" style="overflow:hidden;padding:0">' +
+        '<div class="charcover" style="height:' + coverH + 'px;' +
+          (c.cover ? 'background-image:url(' + JSON.stringify(c.cover).replace(/"/g, '&quot;') + ');background-size:cover;background-position:center ' + (Number(c.coverY) || 50) + '%' : '') + '">' +
+          (!c.cover ? '<div class="charcover-empty"><i data-lucide="image"></i><span>No cover picture yet</span></div>' : '') +
+          '<div class="charcover-tools">' +
+            '<button class="btn xs" data-act="charCoverPick" data-id="' + c.id + '"><i data-lucide="upload"></i>COVER PICTURE / GIF</button>' +
+            (c.cover ? '<button class="btn xs ghost red" data-act="charCoverClear" data-id="' + c.id + '"><i data-lucide="x"></i></button>' : '') +
+          '</div>' +
+        '</div>' +
+        '<div class="charhead" style="justify-content:' + (pos === 'middle' ? 'center' : pos === 'right' ? 'flex-end' : 'flex-start') + '">' +
+          '<div class="charav" style="width:' + av + 'px;height:' + av + 'px;border-radius:' + shape + ';margin-top:-' + Math.round(av / 2.6) + 'px;' +
+            ((c.avatarShape || 'round') === 'hex' ? 'clip-path:polygon(25% 5%,75% 5%,100% 50%,75% 95%,25% 95%,0 50%);' : '') +
+            'border-color:' + attr(c.color || 'var(--accent)') + '">' + charPortrait(c, Math.round(av / 2.6)) + '</div>' +
+          '<div style="flex:1;min-width:0;padding:6px 0">' +
+            '<div class="flex center gap8 wrap"><h2 class="charname">' + esc(c.name || 'Unnamed') + '</h2>' +
+              '<span class="chip ' + tier.chip + '">' + esc(tier.label) + '</span>' +
+              (c.pronouns ? '<span class="chip">' + esc(c.pronouns) + '</span>' : '') + '</div>' +
+            '<div class="fs13 muted mt6">' + esc([c.role, c.occupation, c.age ? 'age ' + c.age : ''].filter(Boolean).join(' · ') || 'No role set yet') + '</div>' +
+            '<div class="flex gap6 mt10 wrap">' +
+              '<span class="chip">' + rels.length + ' TIES</span>' +
+              '<span class="chip">' + app.length + ' APPEARANCE' + (app.length === 1 ? '' : 'S') + '</span>' +
+              '<span class="chip ' + (depth.pct > 70 ? 'lm' : depth.pct > 35 ? 'am' : 'rd') + '">' + depth.pct + '% FILLED IN</span>' +
+              '<span class="chip cy">' + esc(b.title) + '</span>' +
+            '</div>' +
+          '</div>' +
+          '<div class="flex gap6 wrap" style="align-items:flex-start;padding-top:10px">' +
+            '<button class="btn sm" data-act="charTalk" data-id="' + c.id + '"><i data-lucide="message-square"></i>TALK TO THEM</button>' +
+            '<button class="btn sm ghost" data-act="charInterview" data-id="' + c.id + '"><i data-lucide="help-circle"></i>INTERVIEW</button>' +
+            '<button class="btn sm ghost" data-act="charLook" data-id="' + c.id + '"><i data-lucide="palette"></i>LOOK</button>' +
+            '<button class="btn sm ghost" data-go="characters"><i data-lucide="users"></i>ALL CHARACTERS</button>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+
+    const tabs = '<div class="tabs mb14">' + CHAR_TABS.map(t =>
+      '<button class="tab ' + (tab === t[0] ? 'on' : '') + '" data-act="charTab" data-arg="' + t[0] + '">' +
+      '<i data-lucide="' + t[2] + '"></i>' + esc(t[1]) +
+      (t[0] === 'ties' && rels.length ? ' <span class="mono fs10">' + rels.length + '</span>' : '') +
+      (t[0] === 'appear' && app.length ? ' <span class="mono fs10">' + app.length + '</span>' : '') +
+      (t[0] === 'gallery' && (c.gallery || []).length ? ' <span class="mono fs10">' + c.gallery.length + '</span>' : '') +
+      '</button>').join('') + '</div>';
+
+    return '<div data-root="char:' + c.id + '">' + head + tabs +
+      '<div class="grid-auto" style="grid-template-columns:minmax(0,1fr) minmax(250px,310px)">' +
+        '<div>' + (VIEWS.character[tab] || VIEWS.character.dossier)(c, b, { rels: rels, app: app, depth: depth }) + '</div>' +
+        '<div><div style="position:sticky;top:56px">' + charSide(c, b, depth, app) + '</div></div>' +
+      '</div></div>';
+  },
+
+  dossier(c) {
+    return '' +
+    '<div class="panel clip mb14"><div class="panel-hd"><i data-lucide="user"></i><h3>WHO THEY ARE</h3></div><div class="panel-bd">' +
+      '<div class="helpbox mb14"><b>THE FACTS ANYONE MEETING THEM WOULD LEARN</b>' +
+        'Name, what they do, how old they are, what they look like. Everything here saves as you type — there is no save button.</div>' +
+      '<div class="grid-auto g3">' +
+        '<label class="fld"><span class="lb">Name</span><input class="inp" data-model="name" data-rerender value="' + attr(c.name) + '"></label>' +
+        '<label class="fld"><span class="lb">Story role</span><input class="inp" data-model="role" data-rerender value="' + attr(c.role) + '" placeholder="Protagonist / Foil / Antagonist"></label>' +
+        '<label class="fld"><span class="lb">Aliases &amp; nicknames</span><input class="inp" data-model="aliases" value="' + attr(c.aliases) + '" placeholder="Comma separated — used to find them in your chapters"></label>' +
+        '<label class="fld"><span class="lb">Age</span><input class="inp" data-model="age" data-rerender value="' + attr(c.age) + '"></label>' +
+        '<label class="fld"><span class="lb">Pronouns</span><input class="inp" data-model="pronouns" data-rerender value="' + attr(c.pronouns) + '" placeholder="they/them"></label>' +
+        '<label class="fld"><span class="lb">Occupation</span><input class="inp" data-model="occupation" data-rerender value="' + attr(c.occupation) + '"></label>' +
+        '<label class="fld"><span class="lb">Alignment / moral compass</span><input class="inp" data-model="alignment" value="' + attr(c.alignment) + '"></label>' +
+        '<label class="fld"><span class="lb">Home / where they are from</span><input class="inp" data-model="origin" value="' + attr(c.origin || '') + '"></label>' +
+        '<label class="fld"><span class="lb">Cast tier</span><select class="sel" data-model="tier" data-rerender>' +
+          TIERS.map(t => '<option value="' + t.id + '"' + (c.tier === t.id ? ' selected' : '') + '>' + esc(t.label) + '</option>').join('') + '</select></label>' +
+      '</div>' +
+      '<label class="fld"><span class="lb">Appearance &amp; first impression</span>' +
+        '<textarea class="ta" rows="3" data-model="appearance" placeholder="What a stranger notices in the first four seconds.">' + esc(c.appearance) + '</textarea></label>' +
+      '<label class="fld"><span class="lb">Mannerisms &amp; body language</span>' +
+        '<textarea class="ta" rows="3" data-model="mannerisms" placeholder="What their hands do. Where they look when they lie.">' + esc(c.mannerisms) + '</textarea></label>' +
+    '</div></div>' +
+
+    '<div class="panel clip"><div class="panel-hd"><i data-lucide="clock"></i><h3>BEFORE THE STORY STARTED</h3></div><div class="panel-bd">' +
+      '<label class="fld"><span class="lb">Backstory</span>' +
+        '<textarea class="ta" rows="6" data-model="backstory" placeholder="Only what still presses on them today. History a reader never feels is wasted history.">' + esc(c.backstory) + '</textarea></label>' +
+      '<div class="grid-auto g2">' +
+        '<label class="fld"><span class="lb">The wound — what happened to them</span><textarea class="ta" rows="3" data-model="wound" placeholder="The thing they have never got over.">' + esc(c.wound || '') + '</textarea></label>' +
+        '<label class="fld"><span class="lb">The lie they believe because of it</span><textarea class="ta" rows="3" data-model="lie" placeholder="&quot;If I let anyone close, they leave.&quot;">' + esc(c.lie || '') + '</textarea></label>' +
+      '</div>' +
+    '</div></div>';
+  },
+
+  inner(c) {
+    return '' +
+    '<div class="panel clip mb14"><div class="panel-hd"><i data-lucide="heart"></i><h3>WHAT DRIVES THEM</h3></div><div class="panel-bd">' +
+      '<div class="helpbox mb14"><b>THE THREE THAT MATTER MOST</b>' +
+        '<em>Want</em> is what they chase on the page. <em>Need</em> is what the story will make them face. <em>Flaw</em> is what stops them getting either. ' +
+        'Fill in only these three and you can already write them into a scene you have not planned.</div>' +
+      '<div class="grid-auto g2">' +
+        '<label class="fld"><span class="lb">Motivation — what they WANT (external)</span><textarea class="ta" rows="4" data-model="motivation">' + esc(c.motivation) + '</textarea></label>' +
+        '<label class="fld"><span class="lb">Need — what they actually NEED (internal)</span><textarea class="ta" rows="4" data-model="need">' + esc(c.need) + '</textarea></label>' +
+        '<label class="fld"><span class="lb">Flaws &amp; blind spots</span><textarea class="ta" rows="4" data-model="flaws">' + esc(c.flaws) + '</textarea></label>' +
+        '<label class="fld"><span class="lb">Fears</span><textarea class="ta" rows="4" data-model="fears">' + esc(c.fears) + '</textarea></label>' +
+      '</div>' +
+      '<label class="fld"><span class="lb">Secret — what they will not say aloud</span><textarea class="ta" rows="3" data-model="secret">' + esc(c.secret) + '</textarea></label>' +
+    '</div></div>' +
+
+    '<div class="panel clip mb14"><div class="panel-hd"><i data-lucide="trending-up"></i><h3>THEIR ARC</h3></div><div class="panel-bd">' +
+      '<label class="fld"><span class="lb">Start state → end state</span>' +
+        '<textarea class="ta" rows="3" data-model="arc" placeholder="Begins believing X. The story proves Y. Ends choosing Z.">' + esc(c.arc) + '</textarea></label>' +
+      '<div class="grid-auto g3">' +
+        '<label class="fld"><span class="lb">Where they begin</span><textarea class="ta" rows="3" data-model="arcStart" placeholder="The version of them on page one.">' + esc(c.arcStart || '') + '</textarea></label>' +
+        '<label class="fld"><span class="lb">What breaks them open</span><textarea class="ta" rows="3" data-model="arcBreak" placeholder="The moment the lie stops working.">' + esc(c.arcBreak || '') + '</textarea></label>' +
+        '<label class="fld"><span class="lb">Where they end</span><textarea class="ta" rows="3" data-model="arcEnd" placeholder="What they choose, and what it costs.">' + esc(c.arcEnd || '') + '</textarea></label>' +
+      '</div>' +
+    '</div></div>' +
+
+    '<div class="panel clip"><div class="panel-hd"><i data-lucide="list-checks"></i><h3>DETAIL THAT MAKES THEM REAL</h3></div><div class="panel-bd">' +
+      '<div class="grid-auto g2">' +
+        '<label class="fld"><span class="lb">What they are good at</span><textarea class="ta" rows="3" data-model="skills">' + esc(c.skills || '') + '</textarea></label>' +
+        '<label class="fld"><span class="lb">What they are hopeless at</span><textarea class="ta" rows="3" data-model="weakness">' + esc(c.weakness || '') + '</textarea></label>' +
+        '<label class="fld"><span class="lb">What they carry / wear / own</span><textarea class="ta" rows="3" data-model="possessions" placeholder="One object with no practical use tells a reader more than a paragraph.">' + esc(c.possessions || '') + '</textarea></label>' +
+        '<label class="fld"><span class="lb">Habits, vices, comforts</span><textarea class="ta" rows="3" data-model="habits">' + esc(c.habits || '') + '</textarea></label>' +
+      '</div>' +
+    '</div></div>';
+  },
+
+  voice(c) {
+    const chat = c.chat || [];
+    return '' +
+    '<div class="panel clip mb14"><div class="panel-hd"><i data-lucide="mic"></i><h3>HOW THEY SPEAK</h3></div><div class="panel-bd">' +
+      '<div class="helpbox mb14"><b>THIS IS WHAT THE DIALOGUE SANDBOX READS</b>' +
+        'The more specific you are here, the more they sound like themselves when you talk to them.</div>' +
+      '<label class="fld"><span class="lb">Voice — diction, rhythm, verbal tics</span>' +
+        '<textarea class="ta" rows="4" data-model="voice" placeholder="Clipped. Never uses contractions. Answers questions with questions.">' + esc(c.voice) + '</textarea></label>' +
+      '<div class="grid-auto g2">' +
+        '<label class="fld"><span class="lb">Words and phrases they use</span><textarea class="ta" rows="3" data-model="catchphrase">' + esc(c.catchphrase || '') + '</textarea></label>' +
+        '<label class="fld"><span class="lb">Words they would never use</span><textarea class="ta" rows="3" data-model="antiVoice">' + esc(c.antiVoice || '') + '</textarea></label>' +
+      '</div>' +
+    '</div></div>' +
+
+    '<div class="panel clip mb14"><div class="panel-hd"><i data-lucide="quote"></i><h3>LINES THEY HAVE SAID</h3><span style="flex:1"></span>' +
+      '<button class="btn xs" data-act="charQuoteAdd" data-id="' + c.id + '"><i data-lucide="plus"></i>ADD A LINE</button></div><div class="panel-bd">' +
+      ((c.quotes || []).length
+        ? (c.quotes || []).map((q, i) => '<div class="flex between center gap8 mb6" style="padding:9px 11px;border:1px solid var(--line);background:var(--bg-panel)">' +
+            '<div style="flex:1;min-width:0"><div class="fs13" style="color:var(--txt);font-style:italic">“' + esc(q.text) + '”</div>' +
+            (q.where ? '<div class="mono fs10 faint mt6">' + esc(q.where) + '</div>' : '') + '</div>' +
+            '<button class="btn xs ghost red" data-act="charQuoteDel" data-id="' + c.id + '" data-i="' + i + '"><i data-lucide="trash-2"></i></button></div>').join('')
+        : '<div class="empty" style="padding:18px"><i data-lucide="quote"></i><h4>NO LINES YET</h4>' +
+          '<div class="fs12">Keep the lines that sound most like them. When you are writing a new scene, read these first.</div></div>') +
+    '</div></div>' +
+
+    '<div class="panel clip"><div class="panel-hd"><i data-lucide="message-square"></i><h3>CONVERSATIONS WITH THEM</h3><span style="flex:1"></span>' +
+      '<button class="btn xs" data-act="charTalk" data-id="' + c.id + '"><i data-lucide="message-square"></i>OPEN THE SANDBOX</button>' +
+      (chat.length ? '<button class="btn xs ghost red" data-act="charChatClear" data-id="' + c.id + '">CLEAR</button>' : '') + '</div><div class="panel-bd">' +
+      (chat.length
+        ? chat.slice(-24).map(m => '<div class="mb6" style="padding:8px 11px;border:1px solid var(--line);background:' +
+            (m.who === 'you' ? 'transparent' : 'color-mix(in srgb, var(--accent) 7%, transparent)') + '">' +
+            '<div class="mono fs10 faint">' + (m.who === 'you' ? 'YOU' : esc((c.name || 'THEM').toUpperCase())) + '</div>' +
+            '<div class="fs13" style="color:var(--txt)">' + esc(m.text) + '</div></div>').join('')
+        : '<div class="empty" style="padding:18px"><i data-lucide="message-square"></i><h4>YOU HAVE NOT SPOKEN YET</h4>' +
+          '<div class="fs12 mb14">Ask them something and see whether the answer sounds like the person you have described.</div>' +
+          '<button class="btn solid" data-act="charTalk" data-id="' + c.id + '">TALK TO THEM</button></div>') +
+    '</div></div>';
+  },
+
+  ties(c, b, x) {
+    const rels = x.rels;
+    return '' +
+    '<div class="panel clip mb14"><div class="panel-hd"><i data-lucide="network"></i><h3>WHO THEY KNOW</h3><span style="flex:1"></span>' +
+      '<button class="btn xs" data-act="relNew" data-from="' + c.id + '"><i data-lucide="plus"></i>ADD A TIE</button>' +
+      '<button class="btn xs ghost" data-go="network"><i data-lucide="network"></i>MAP</button></div><div class="panel-bd">' +
+      '<div class="helpbox mb14"><b>A CHARACTER IS DEFINED BY WHO THEY ARE STANDING NEXT TO</b>' +
+        'Every tie you record here also draws a line on the Relationship Network map.</div>' +
+      (rels.length
+        ? '<div class="grid-auto g2">' + rels.map(r => {
+            const other = findChar(r.a === c.id ? r.b : r.a);
+            const rt = REL_TYPES.find(t => t.id === r.type) || REL_TYPES[0];
+            return '<div class="optcard" style="border-color:' + rt.color + '55">' +
+              '<div class="flex center gap8">' +
+                '<span class="charav sm" style="width:42px;height:42px;border-radius:12px;flex:0 0 42px">' + (other ? charPortrait(other, 16) : '?') + '</span>' +
+                '<div style="min-width:0;flex:1"><div class="fs13" style="color:var(--txt)">' + esc(other ? (other.name || 'Unnamed') : 'Missing character') + '</div>' +
+                '<span class="chip" style="color:' + rt.color + ';border-color:' + rt.color + '66">' + esc(rt.label) + '</span></div>' +
+              '</div>' +
+              (r.note ? '<div class="fs12 muted mt6">' + esc(r.note) + '</div>' : '') +
+              '<div class="flex gap4 mt10">' +
+                (other ? '<button class="btn xs ghost" data-go="character" data-arg="' + other.id + '">OPEN THEIR PAGE</button>' : '') +
+                '<button class="btn xs ghost red" data-act="relDelete" data-id="' + r.id + '"><i data-lucide="trash-2"></i></button>' +
+              '</div></div>';
+          }).join('') + '</div>'
+        : '<div class="empty" style="padding:20px"><i data-lucide="network"></i><h4>NO TIES RECORDED</h4>' +
+          '<div class="fs13 mb14">Who do they love, owe, fear or lie to? Those four questions produce most of a plot.</div>' +
+          '<button class="btn solid" data-act="relNew" data-from="' + c.id + '">ADD THE FIRST TIE</button></div>') +
+    '</div></div>' +
+
+    '<div class="panel clip"><div class="panel-hd"><i data-lucide="users"></i><h3>THE REST OF THE CAST</h3></div><div class="panel-bd">' +
+      '<div class="fs12 muted mb10">Click anyone to open their page. Press <em>Add a tie</em> above to connect them.</div>' +
+      '<div class="flex gap6 wrap">' +
+        (b.characters || []).filter(o => o.id !== c.id).map(o =>
+          '<button class="btn xs ghost" data-go="character" data-arg="' + o.id + '">' + esc(o.name || 'Unnamed') + '</button>').join('') +
+        (((b.characters || []).length < 2) ? '<span class="fs12 faint">Nobody else in this book yet.</span>' : '') +
+      '</div>' +
+    '</div></div>';
+  },
+
+  appear(c, b, x) {
+    const app = x.app;
+    return '<div class="panel clip"><div class="panel-hd"><i data-lucide="files"></i><h3>WHERE THEY TURN UP</h3></div><div class="panel-bd">' +
+      '<div class="helpbox mb14"><b>FOUND BY READING YOUR ACTUAL CHAPTERS</b>' +
+        'The app searches your prologue and every chapter for this character’s name and any aliases you listed. ' +
+        'It updates itself as you write — nothing to maintain.' +
+        (!String(c.name || '').trim() ? ' <strong class="t-am">Give them a name first.</strong>' : '') + '</div>' +
+      (app.length
+        ? app.map(a => '<div class="mb10" style="padding:11px 13px;border:1px solid var(--line);background:var(--bg-panel)">' +
+            '<div class="flex between center gap8 wrap"><strong class="fs13" style="color:var(--txt)">' + esc(a.label) + '</strong>' +
+            '<div class="flex gap6 center"><span class="chip">' + a.count + ' MENTION' + (a.count === 1 ? '' : 'S') + '</span>' +
+            '<button class="btn xs ghost" data-act="charGoTo" data-v="' + a.go + '" data-arg="' + attr(a.arg) + '">GO THERE</button></div></div>' +
+            '<div class="fs12 muted mt6" style="font-style:italic">' + esc(a.snippet) + '</div></div>').join('')
+        : '<div class="empty" style="padding:22px"><i data-lucide="files"></i><h4>NOT IN THE MANUSCRIPT YET</h4>' +
+          '<div class="fs13">Once their name appears in your prologue or any chapter, every scene they are in is listed here with the line it happens on.</div></div>') +
+    '</div></div>';
+  },
+
+  gallery(c) {
+    const g = c.gallery || [];
+    return '<div class="panel clip"><div class="panel-hd"><i data-lucide="image"></i><h3>PICTURES OF THEM</h3><span style="flex:1"></span>' +
+      '<button class="btn xs" data-act="charGalAdd" data-id="' + c.id + '"><i data-lucide="plus"></i>ADD A PICTURE</button>' +
+      '<button class="btn xs ghost" data-act="charGalUrl" data-id="' + c.id + '"><i data-lucide="link"></i>FROM A LINK</button></div><div class="panel-bd">' +
+      '<div class="helpbox mb14"><b>REFERENCE ART, CASTING IDEAS, MOOD SHOTS</b>' +
+        'Photos and animated GIFs both work. Any picture here can become their portrait or the cover of this page in one click.</div>' +
+      (g.length
+        ? '<div class="gal stack">' + g.map((im, i) => '<figure>' +
+            '<img src="' + attr(im.src) + '" loading="lazy">' +
+            '<figcaption>' + esc(im.caption || 'Untitled') + '</figcaption>' +
+            '<div class="flex gap4 mt6" style="padding:0 6px 6px">' +
+              '<button class="btn xs ghost" data-act="charGalCaption" data-id="' + c.id + '" data-i="' + i + '" title="Give it a caption"><i data-lucide="pencil"></i></button>' +
+              '<button class="btn xs ghost" data-act="charGalPortrait" data-id="' + c.id + '" data-i="' + i + '" title="Use as their portrait"><i data-lucide="user"></i></button>' +
+              '<button class="btn xs ghost" data-act="charGalCover" data-id="' + c.id + '" data-i="' + i + '" title="Use as the cover of this page"><i data-lucide="panel-top"></i></button>' +
+              '<button class="btn xs ghost red" data-act="charGalDel" data-id="' + c.id + '" data-i="' + i + '"><i data-lucide="trash-2"></i></button>' +
+            '</div></figure>').join('') + '</div>'
+        : '<div class="dropzone" data-act="charGalAdd" data-id="' + c.id + '"><i data-lucide="image-plus"></i>' +
+          '<div><strong>No pictures yet</strong></div><div class="fs12">Press add, or drop an image here</div></div>') +
+    '</div></div>';
+  },
+
+  notes(c) {
+    return '<div class="panel clip"><div class="panel-hd"><i data-lucide="sticky-note"></i><h3>ANYTHING ELSE</h3></div><div class="panel-bd">' +
+      '<div class="helpbox mb14"><b>THE DRAWER</b>Half-formed ideas, continuity you must not forget, things to fix in the next draft.</div>' +
+      '<label class="fld"><span class="lb">Free notes</span><textarea class="ta" rows="14" data-model="notes">' + esc(c.notes) + '</textarea></label>' +
+      '<div class="grid-auto g2">' +
+        '<label class="fld"><span class="lb">Continuity — must stay true</span><textarea class="ta" rows="4" data-model="continuity" placeholder="Left-handed. Scar above the right eye. Cannot swim.">' + esc(c.continuity || '') + '</textarea></label>' +
+        '<label class="fld"><span class="lb">To fix in the next draft</span><textarea class="ta" rows="4" data-model="todo">' + esc(c.todo || '') + '</textarea></label>' +
+      '</div>' +
+    '</div></div>';
+  },
+
+  mount() { }
+};
+
+function charSide(c, b, depth, app) {
+  return '' +
+  '<div class="panel clip mb14"><div class="panel-hd"><i data-lucide="gauge"></i><h3>HOW FLESHED OUT</h3></div><div class="panel-bd">' +
+    '<div class="flex between center mb6"><span class="fs13">Dossier</span><strong class="' + (depth.pct > 70 ? 't-lm' : depth.pct > 35 ? 't-am' : 't-rd') + '">' + depth.pct + '%</strong></div>' +
+    '<div class="bar mb10"><i style="width:' + Math.max(2, depth.pct) + '%"></i></div>' +
+    (depth.missing.length
+      ? '<div class="fs12 muted">Still missing: ' + esc(depth.missing.join(', ')) + '.</div>'
+      : '<div class="fs12 t-lm">Everything that matters is filled in. This character can carry a scene.</div>') +
+  '</div></div>' +
+
+  '<div class="panel clip mb14"><div class="panel-hd"><i data-lucide="image"></i><h3>PORTRAIT</h3></div><div class="panel-bd">' +
+    '<div style="aspect-ratio:3/4;border:1px solid var(--line-hard);background:var(--void);display:grid;place-items:center;overflow:hidden">' +
+      charPortrait(c, 44) + '</div>' +
+    '<div class="flex gap4 mt6 wrap">' +
+      '<button class="btn xs" data-act="charPhoto" data-id="' + c.id + '"><i data-lucide="upload"></i>UPLOAD</button>' +
+      '<button class="btn xs ghost" data-act="charPhotoUrl" data-id="' + c.id + '"><i data-lucide="link"></i>LINK</button>' +
+      (c.photo ? '<button class="btn xs ghost red" data-act="charPhotoClear" data-id="' + c.id + '"><i data-lucide="x"></i></button>' : '') +
+    '</div>' +
+    '<label class="fld mt10"><span class="lb">Their colour on the network map</span><input type="color" data-model="color" data-rerender value="' + attr(c.color || '#23e0ff') + '"></label>' +
+  '</div></div>' +
+
+  '<div class="panel clip mb14"><div class="panel-hd"><i data-lucide="sparkles"></i><h3>NEED A HAND?</h3></div><div class="panel-bd">' +
+    '<div class="fs12 muted mb10">These read this character and your book before they answer.</div>' +
+    '<button class="btn sm w100 mb6" data-act="charAI" data-id="' + c.id + '" data-kind="flesh"><i data-lucide="wand-2"></i>FLESH THEM OUT</button>' +
+    '<button class="btn sm w100 mb6 ghost" data-act="charAI" data-id="' + c.id + '" data-kind="voice"><i data-lucide="mic"></i>SUGGEST A VOICE</button>' +
+    '<button class="btn sm w100 mb6 ghost" data-act="charAI" data-id="' + c.id + '" data-kind="secret"><i data-lucide="eye-off"></i>GIVE THEM A SECRET</button>' +
+    '<button class="btn sm w100 ghost" data-act="charAI" data-id="' + c.id + '" data-kind="arc"><i data-lucide="trending-up"></i>SHAPE THEIR ARC</button>' +
+  '</div></div>' +
+
+  '<div class="panel clip"><div class="panel-hd"><i data-lucide="settings-2"></i><h3>THIS PAGE</h3></div><div class="panel-bd">' +
+    '<button class="btn sm w100 mb6 ghost" data-act="charLook" data-id="' + c.id + '"><i data-lucide="palette"></i>COVER &amp; PORTRAIT SIZE</button>' +
+    '<button class="btn sm w100 mb6 ghost" data-act="charDup" data-id="' + c.id + '"><i data-lucide="copy"></i>DUPLICATE THIS CHARACTER</button>' +
+    '<button class="btn sm w100 ghost red" data-act="charDelete" data-id="' + c.id + '"><i data-lucide="trash-2"></i>DELETE THEM</button>' +
+  '</div></div>';
+}
+
+/* ------------------------------- actions -------------------------------- */
+ACTIONS.charTab = function (el) { state.ui.charTab = el.getAttribute('data-arg'); markDirty(true); render(); };
+ACTIONS.charPage = function (el) { go('character', el.getAttribute('data-id')); };
+ACTIONS.charGoTo = function (el) {
+  const v = el.getAttribute('data-v'), a = el.getAttribute('data-arg');
+  if (v === 'profile' && a) { state.ui.feedOpen = a; go('profile'); }
+  else go(v);
+};
+ACTIONS.charCoverPick = async function (el) {
+  const h = charById(el.getAttribute('data-id')); if (!h) return;
+  const f = await pickFile('image/*,image/gif'); if (!f) return;
+  h.c.cover = f.data; markDirty(); render();
+};
+ACTIONS.charCoverClear = function (el) {
+  const h = charById(el.getAttribute('data-id')); if (!h) return;
+  h.c.cover = ''; markDirty(); render();
+};
+ACTIONS.charLook = function (el) {
+  const h = charById(el.getAttribute('data-id')); if (!h) return;
+  const c = h.c;
+  openModal({
+    title: 'HOW THIS PAGE LOOKS', icon: 'palette', size: 'narrow',
+    body: '<div data-root="char:' + c.id + '">' +
+      '<div class="helpbox mb14"><b>THE SAME CONTROLS AS A BOOK PROFILE</b>Cover height, where the portrait sits, how big it is and what shape it takes.</div>' +
+      '<label class="fld"><span class="lb">Cover height — <b class="t-cy">' + (Number(c.coverH) || 220) + 'px</b></span>' +
+        '<input type="range" min="90" max="620" data-model="coverH" data-rerender value="' + (Number(c.coverH) || 220) + '"></label>' +
+      '<label class="fld"><span class="lb">Reframe the cover up or down</span>' +
+        '<input type="range" min="0" max="100" data-model="coverY" data-rerender value="' + (Number(c.coverY) || 50) + '"></label>' +
+      '<label class="fld"><span class="lb">Portrait size — <b class="t-cy">' + (Number(c.avatarSize) || 150) + 'px</b></span>' +
+        '<input type="range" min="70" max="300" data-model="avatarSize" data-rerender value="' + (Number(c.avatarSize) || 150) + '"></label>' +
+      '<label class="fld"><span class="lb">Portrait position</span><select class="sel" data-model="avatarPos" data-rerender>' +
+        [['left', 'Left'], ['middle', 'Middle'], ['right', 'Right']].map(o => '<option value="' + o[0] + '"' + ((c.avatarPos || 'left') === o[0] ? ' selected' : '') + '>' + o[1] + '</option>').join('') +
+      '</select></label>' +
+      '<label class="fld"><span class="lb">Portrait shape</span><select class="sel" data-model="avatarShape" data-rerender>' +
+        [['round', 'Rounded square'], ['circle', 'Circle'], ['square', 'Square'], ['hex', 'Hexagon']].map(o => '<option value="' + o[0] + '"' + ((c.avatarShape || 'round') === o[0] ? ' selected' : '') + '>' + o[1] + '</option>').join('') +
+      '</select></label></div>',
+    footer: '<button class="btn solid" data-modal-close>DONE</button>'
+  });
+};
+ACTIONS.charQuoteAdd = async function (el) {
+  const h = charById(el.getAttribute('data-id')); if (!h) return;
+  const t = await promptDlg('A LINE THEY SAID', 'The line itself', '');
+  if (!t || !t.trim()) return;
+  const w = await promptDlg('WHERE IS IT FROM?', 'Chapter, scene, or leave blank', '');
+  h.c.quotes = h.c.quotes || [];
+  h.c.quotes.push({ text: t.trim(), where: (w || '').trim() });
+  markDirty(); render();
+};
+ACTIONS.charQuoteDel = function (el) {
+  const h = charById(el.getAttribute('data-id')); if (!h) return;
+  (h.c.quotes || []).splice(Number(el.getAttribute('data-i')), 1);
+  markDirty(); render();
+};
+ACTIONS.charChatClear = async function (el) {
+  const h = charById(el.getAttribute('data-id')); if (!h) return;
+  if (!(await confirmDlg('CLEAR CONVERSATION', '<p>Delete every message you have exchanged with <strong>' + esc(h.c.name || 'them') + '</strong>?</p>'))) return;
+  h.c.chat = []; markDirty(); render();
+};
+ACTIONS.charGalAdd = async function (el) {
+  const h = charById(el.getAttribute('data-id')); if (!h) return;
+  const fs = await pickFilesRaw('image/*,image/gif');
+  if (!fs || !fs.length) return;
+  h.c.gallery = h.c.gallery || [];
+  for (const f of fs) h.c.gallery.push({ id: uid('cg'), src: await readFileAsDataURL(f), caption: f.name.replace(/\.[^.]+$/, '') });
+  markDirty(); render();
+  toast(fs.length + ' picture' + (fs.length === 1 ? '' : 's') + ' added.', 'ok');
+};
+ACTIONS.charGalUrl = async function (el) {
+  const h = charById(el.getAttribute('data-id')); if (!h) return;
+  const v = await promptDlg('PICTURE FROM A LINK', 'Direct image or GIF address', '');
+  if (!v || !v.trim()) return;
+  h.c.gallery = h.c.gallery || [];
+  h.c.gallery.push({ id: uid('cg'), src: v.trim(), caption: '' });
+  markDirty(); render();
+};
+ACTIONS.charGalCaption = async function (el) {
+  const h = charById(el.getAttribute('data-id')); if (!h) return;
+  const i = Number(el.getAttribute('data-i')); const im = (h.c.gallery || [])[i]; if (!im) return;
+  const v = await promptDlg('CAPTION', 'What is this picture?', im.caption || '');
+  if (v == null) return;
+  im.caption = v.trim(); markDirty(); render();
+};
+ACTIONS.charGalPortrait = function (el) {
+  const h = charById(el.getAttribute('data-id')); if (!h) return;
+  const im = (h.c.gallery || [])[Number(el.getAttribute('data-i'))]; if (!im) return;
+  h.c.photo = im.src; markDirty(); render(); toast('Portrait updated.', 'ok');
+};
+ACTIONS.charGalCover = function (el) {
+  const h = charById(el.getAttribute('data-id')); if (!h) return;
+  const im = (h.c.gallery || [])[Number(el.getAttribute('data-i'))]; if (!im) return;
+  h.c.cover = im.src; markDirty(); render(); toast('Cover picture updated.', 'ok');
+};
+ACTIONS.charGalDel = function (el) {
+  const h = charById(el.getAttribute('data-id')); if (!h) return;
+  (h.c.gallery || []).splice(Number(el.getAttribute('data-i')), 1);
+  markDirty(); render();
+};
+ACTIONS.charDup = function (el) {
+  const h = charById(el.getAttribute('data-id')); if (!h) return;
+  const copy = clone(h.c);
+  copy.id = uid('cr'); copy.name = (h.c.name || 'Unnamed') + ' (copy)'; copy.chat = [];
+  copy.x = (h.c.x || 0) + 40; copy.y = (h.c.y || 0) + 40;
+  h.b.characters.push(copy);
+  markDirty(); go('character', copy.id);
+  toast('Character duplicated.', 'ok');
+};
+/* AI help that already knows the book and the person. */
+ACTIONS.charAI = async function (el) {
+  const h = charById(el.getAttribute('data-id')); if (!h) return;
+  const c = h.c, b = h.b, kind = el.getAttribute('data-kind');
+  const ask = {
+    flesh: 'Suggest concrete, specific detail this character is missing — appearance, habits, one telling possession, and one contradiction. Six short bullet points.',
+    voice: 'Describe exactly how this character speaks: diction, sentence length, rhythm, what they avoid saying, and two example lines of their dialogue.',
+    secret: 'Give this character three possible secrets, each one that would complicate the plot if it came out. One line each, plus who it would hurt.',
+    arc: 'Propose a character arc: where they begin, the lie they believe, the moment it breaks, and where they end. Four short paragraphs.'
+  }[kind] || 'Suggest how to develop this character.';
+  const profile = ['Name: ' + (c.name || 'unnamed'), 'Role: ' + (c.role || '—'), 'Tier: ' + charTierMeta(c).label,
+    'Wants: ' + (c.motivation || '—'), 'Needs: ' + (c.need || '—'), 'Flaws: ' + (c.flaws || '—'),
+    'Fears: ' + (c.fears || '—'), 'Secret: ' + (c.secret || '—'), 'Voice: ' + (c.voice || '—'),
+    'Backstory: ' + (c.backstory || '—'), 'Arc: ' + (c.arc || '—')].join('\n');
+  openModal({
+    title: 'THINKING ABOUT ' + ((c.name || 'THEM').toUpperCase()), icon: 'wand-2', size: '',
+    body: '<div id="charAIOut" class="prose-c"><div class="mono fs11 faint">working…</div></div>',
+    footer: '<button class="btn ghost" data-act="charAICopy">COPY</button><button class="btn solid" data-modal-close>CLOSE</button>'
+  });
+  const out = await aiComplete({
+    system: 'You are a novelist and character coach. Be concrete and specific. Never pad, never explain yourself.',
+    user: 'Here is the book:\n' + bookBrief(b) + '\n\nHere is the character:\n' + profile + '\n\n' + ask,
+    maxTokens: 700,
+    fallback: () => localCharIdeas(kind, c, b)
+  });
+  window.__charAI = out;
+  const host = $('#charAIOut');
+  if (host) host.innerHTML = String(out || 'Nothing came back.').split(/\n{2,}/).map(p =>
+    '<p>' + esc(p).replace(/\n/g, '<br>') + '</p>').join('');
+  icons();
+};
+ACTIONS.charAICopy = function () { copyText(window.__charAI || ''); };
+
+/* Offline stand-in so every AI button on this page does something useful with
+   no API key at all — built from what the writer has already written down. */
+function localCharIdeas(kind, c, b) {
+  const nm = c.name || 'They';
+  const want = c.motivation || 'something they will not name out loud';
+  const flaw = c.flaws || 'a habit of solving the wrong problem first';
+  const fear = c.fears || 'being seen clearly';
+  const g = (GENRES.find(x => x.id === b.genre) || {}).name || 'this story';
+  if (kind === 'voice') {
+    return 'A voice is three decisions, not a description.\n\n' +
+      '1 · LENGTH. Does ' + nm + ' answer in one clause or three? People who are frightened get shorter. People who are hiding something get longer.\n\n' +
+      '2 · WHAT THEY REFUSE TO SAY. ' + nm + ' fears ' + fear + ' — so name the two words they will talk around all book. That absence IS the voice.\n\n' +
+      '3 · ONE TIC, USED SPARINGLY. A repeated construction ("The thing is —"), an odd formality, a profession bleeding into their metaphors.\n\n' +
+      'Try writing the same line three ways: as they would say it to a stranger, to the person they love, and to themselves. The one that surprises you is the real voice.';
+  }
+  if (kind === 'secret') {
+    return 'Three secrets that would cost ' + nm + ' something if they came out:\n\n' +
+      '· A secret about the past — ' + nm + ' was present when something went wrong and did nothing. Costs them the trust of whoever they most want to keep.\n\n' +
+      '· A secret about the present — ' + nm + ' is already doing the thing they publicly condemn, because it is the only route to ' + want + '. Costs them their own story about themselves.\n\n' +
+      '· A secret about someone else — ' + nm + ' knows a truth that would free one character and destroy another, and has chosen silence. Costs them the moral high ground the moment it surfaces.\n\n' +
+      'Pick the one you least want to write. That is usually the one the book needs.';
+  }
+  if (kind === 'arc') {
+    return 'BEGINS · ' + nm + ' believes that getting ' + want + ' will settle everything, and organises their whole life around it. The reader should like them and see the crack.\n\n' +
+      'THE LIE · Underneath: ' + (c.lie || 'that they are only worth what they can provide') + '. It was true once. It is not true now.\n\n' +
+      'BREAKS · The midpoint takes ' + want + ' away, or gives it to them in a form that is worthless. ' + flaw + ' is what makes that happen — not bad luck.\n\n' +
+      'ENDS · ' + nm + ' chooses the thing they actually needed over the thing they wanted, and pays a real price for it. If the price is not real, the arc is decoration.';
+  }
+  return 'Concrete detail that would make ' + nm + ' real on the page in ' + g + ':\n\n' +
+    '· ONE OBJECT with no practical use that they will not travel without. Say why in half a line, never in full.\n' +
+    '· A PHYSICAL DEFAULT — what their hands do when they are waiting. Reuse it exactly three times in the book.\n' +
+    '· A CONTRADICTION. They are careful about ' + (c.occupation || 'their work') + ' and reckless about ' + (c.origin ? 'home' : 'their own body') + '. Characters are believable in the gap between two settings.\n' +
+    '· AN OPINION nobody asked for, that they will state in full at a bad moment.\n' +
+    '· HOW THEY EAT. It is the fastest way to show class, upbringing and self-control without saying any of those words.\n' +
+    '· WHAT THEY ARE WRONG ABOUT, and who has already told them so. Given ' + flaw + ', they did not listen.';
+}
 
 /* ======================= RELATIONSHIP NETWORK ============================ */
 VIEWS.network = {
@@ -7385,19 +8283,99 @@ ACTIONS.impPick = async function () {
       : Array.isArray(data.books) ? data.books
       : Array.isArray(data) ? data : null;
     if (!incomingBooks) { toast('No RAVENBANE project data found in that file.', 'err'); return; }
+    window.__import = data;
     openModal({
       title: 'RESTORE FROM BACKUP', icon: 'upload', size: 'narrow',
-      body: '<div class="prose-c"><p>Found <strong>' + incomingBooks.length + '</strong> project(s) in <code>' + esc(f.name) + '</code>' +
-        (data.exported ? ', exported ' + esc(new Date(data.exported).toLocaleString()) : '') + '.</p>' +
-        '<ul><li><strong>Merge</strong> — add these projects alongside your current ' + state.books.length + '.</li>' +
-        '<li><strong>Replace</strong> — wipe everything currently in the vault and restore exactly.</li></ul></div>',
+      body: importComparison(data, f.name, incomingBooks.length),
       footer: '<button class="btn ghost" data-modal-close>CANCEL</button>' +
-              '<button class="btn" data-act="impMerge"><i data-lucide="plus"></i>MERGE</button>' +
-              '<button class="btn solid red" data-act="impReplace"><i data-lucide="refresh-cw"></i>REPLACE ALL</button>'
+              '<button class="btn" data-act="impMerge"><i data-lucide="plus"></i>ADD AS EXTRA COPIES</button>' +
+              '<button class="btn solid" data-act="impSmart"><i data-lucide="git-merge"></i>MERGE, NEWEST WINS</button>' +
+              '<button class="btn ghost red" data-act="impReplace"><i data-lucide="refresh-cw"></i>REPLACE ALL</button>'
     });
-    window.__import = data;
   }
 };
+/* A plain-English side-by-side of the file you are opening and the work that
+   is already here — which is newer, which build wrote it, how much is in it. */
+function importComparison(data, fname, nBooks) {
+  const v = verifyBackup(data);
+  const inT = payloadTime(data);
+  const myT = state.__at ? new Date(state.__at).getTime() : 0;
+  const inV = payloadVersion(data) || 'an earlier build';
+  const newer = inT && inT > myT;
+  const inWords = (data.stats && data.stats.words) || null;
+  const myWords = state.books.reduce((n, b) => n + bookWords(b), 0);
+  const fmtT = (t) => t ? new Date(t).toLocaleString() : 'unknown';
+  return '' +
+    '<div class="helpbox mb14"><b>NOTHING CHANGES UNTIL YOU PICK ONE</b>' +
+      'The file has been read and checked. Compare it with what is open right now, then choose.</div>' +
+    '<div class="grid-auto g2 mb14">' +
+      '<div class="optcard ' + (newer ? 'tone1' : 'tone2') + '">' +
+        '<div class="mono fs10 faint">THE FILE' + (newer ? ' · NEWER' : '') + '</div>' +
+        '<div class="fs13" style="color:var(--txt);word-break:break-all">' + esc(fname || 'backup') + '</div>' +
+        '<div class="fs12 muted mt6">' + nBooks + ' book(s)' + (inWords !== null ? ' · ' + fmt(inWords) + ' words' : '') + '</div>' +
+        '<div class="fs12 muted">Saved ' + esc(fmtT(inT)) + '</div>' +
+        '<div class="fs12 muted">Written by version ' + esc(inV) + '</div>' +
+        '<div class="fs12 muted">Integrity <strong class="' + (v.checksum === 'MISMATCH' ? 't-rd' : 't-lm') + '">' + esc(v.checksum) + '</strong></div>' +
+      '</div>' +
+      '<div class="optcard ' + (newer ? 'tone2' : 'tone1') + '">' +
+        '<div class="mono fs10 faint">OPEN RIGHT NOW' + (!newer && myT ? ' · NEWER' : '') + '</div>' +
+        '<div class="fs13" style="color:var(--txt)">This app</div>' +
+        '<div class="fs12 muted mt6">' + state.books.length + ' book(s) · ' + fmt(myWords) + ' words</div>' +
+        '<div class="fs12 muted">Saved ' + esc(fmtT(myT)) + '</div>' +
+        '<div class="fs12 muted">Running version ' + APP_VERSION + '</div>' +
+      '</div>' +
+    '</div>' +
+    (payloadVersion(data) && verCmp(payloadVersion(data), APP_VERSION) > 0
+      ? '<div class="panel mb14" style="padding:11px;border-color:color-mix(in srgb, var(--c-amber) 45%, transparent)">' +
+        '<strong class="t-am fs13">This file was saved by a newer version of the app (' + esc(payloadVersion(data)) + ').</strong>' +
+        '<div class="fs12 muted mt6">It will still open, and anything the newer version added is carried through untouched rather than thrown away. ' +
+        'Where you can, run the newer app file instead.</div></div>'
+      : '') +
+    '<div class="prose-c fs13"><ul>' +
+      '<li><strong>Add as extra copies</strong> — everything in the file arrives alongside your books as separate projects. Nothing is overwritten.</li>' +
+      '<li><strong>Merge, newest wins</strong> — books that exist on both sides are matched up and the more recently edited one is kept. Books only in the file are added. <em>This is the safe one when you are moving between machines or app versions.</em></li>' +
+      '<li><strong>Replace all</strong> — throw away what is here and restore the file exactly.</li>' +
+    '</ul></div>';
+}
+
+/* Merge by identity, keeping whichever side was edited last. Books that only
+   exist on one side always survive — this can never lose a project. */
+ACTIONS.impSmart = async function () {
+  const data = window.__import; if (!data) return;
+  const incoming = ((data.state && data.state.books) || data.books || (Array.isArray(data) ? data : [])).map(bk => migrateBook(clone(bk)));
+  if (!incoming.length) { toast('There are no books in that file.', 'warn'); return; }
+  await snapshotTake('Before merging a backup', true);
+
+  const tm = (b) => { const t = new Date(b.updated || b.created || 0).getTime(); return isNaN(t) ? 0 : t; };
+  let added = 0, replaced = 0, kept = 0;
+  incoming.forEach(inc => {
+    const i = state.books.findIndex(b => b.id === inc.id ||
+      (b.title && inc.title && b.title.trim().toLowerCase() === inc.title.trim().toLowerCase()));
+    if (i < 0) { state.books.push(inc); added++; return; }
+    if (tm(inc) > tm(state.books[i])) { inc.id = state.books[i].id; state.books[i] = inc; replaced++; }
+    else kept++;
+  });
+
+  /* app-wide settings follow whichever payload is newer, so a machine that has
+     been used more recently keeps its theme, menu layout and AI setup. */
+  const incState = data.state || null;
+  if (incState && payloadTime(data) > (state.__at ? new Date(state.__at).getTime() : 0)) {
+    const merged = migrateState(Object.assign({}, incState, { books: [] }));
+    merged.books = state.books;
+    merged.ui = state.ui;
+    merged.ui.bookId = state.ui.bookId;
+    state = merged;
+  }
+  if (!state.books.length) seedStarterBook();
+  if (!state.ui.bookId || !state.books.some(b => b.id === state.ui.bookId)) state.ui.bookId = state.books[0].id;
+  normaliseNav();
+  DIRTY = true; await saveNow(true);
+  if (VAULT_HANDLE) vaultWriteNow('merged');
+  if (FOLDER_HANDLE) folderWriteNow('merged', true);
+  renderBrand(); closeAllModals(); render();
+  toast(added + ' added · ' + replaced + ' updated to the newer copy · ' + kept + ' already newer here.', 'ok', 'MERGED');
+};
+
 ACTIONS.impMerge = function () {
   const data = window.__import; if (!data) return;
   const books = (data.state && data.state.books) || data.books || [];
@@ -7407,80 +8385,67 @@ ACTIONS.impMerge = function () {
     if (state.books.some(x => x.title === c.title)) c.title = c.title + ' (imported)';
     state.books.push(c);
   });
-  markDirty(); saveNow(true); closeModal(); render();
-  toast(books.length + ' project(s) merged into the vault.', 'ok', 'RESTORED');
+  markDirty(); saveNow(true);
+  if (FOLDER_HANDLE) folderWriteNow('imported', true);
+  closeAllModals(); render();
+  toast(books.length + ' project(s) added alongside what you had.', 'ok', 'RESTORED');
 };
 ACTIONS.impReplace = async function () {
   const data = window.__import; if (!data) return;
-  const ok = await confirmDlg('REPLACE EVERYTHING', '<p class="t-rd">This destroys the current vault contents and restores the backup exactly.</p>', true);
+  const ok = await confirmDlg('REPLACE EVERYTHING',
+    '<p class="t-rd">This destroys the current vault contents and restores the backup exactly.</p>' +
+    '<p class="t-am">A snapshot of what you have right now is taken first, so it is reversible from Storage &amp; Backups.</p>', true);
   if (!ok) return;
+  await snapshotTake('Before restoring a backup', true);
   if (data.state) state = migrateState(data.state);
   else { state = migrateState(Object.assign(defaultState(), { books: (data.books || data).map(migrateBook) })); }
+  if (!state.books.length) seedStarterBook();
   state.ui.bookId = (state.books[0] || {}).id || '';
+  normaliseNav();
   DIRTY = true; await saveNow(true);
+  if (VAULT_HANDLE) vaultWriteNow('restored');
+  if (FOLDER_HANDLE) folderWriteNow('restored', true);
   renderBrand(); closeAllModals(); go('dashboard');
   toast('Vault restored from backup.', 'ok', 'RESTORED');
 };
 
 /* ============================ MIGRATION ================================== */
+/* Books are rebuilt against the current template with deepDefaults, so a book
+   saved by ANY build keeps every field it had — including ones this build has
+   never heard of — while gaining anything new the template introduced. */
 function migrateBook(bk) {
   const t = newBook(bk.title || 'Untitled Manuscript');
-  const out = Object.assign(t, bk);
-  out.cover = Object.assign(clone(t.cover), bk.cover || {});
-  out.cover.front = Object.assign(clone(t.cover.front), (bk.cover || {}).front || {});
-  out.cover.back = Object.assign(clone(t.cover.back), (bk.cover || {}).back || {});
-  out.cover.spine = Object.assign(clone(t.cover.spine), (bk.cover || {}).spine || {});
-  out.titlePage = Object.assign(clone(t.titlePage), bk.titlePage || {});
-  out.dedication = Object.assign(clone(t.dedication), bk.dedication || {});
-  out.prologue = Object.assign(clone(t.prologue), bk.prologue || {});
+  const out = deepDefaults(bk, t);
   out.prologue.moodboard = out.prologue.moodboard || [];
-  out.outline = Object.assign(clone(t.outline), bk.outline || {});
-  out.comic = Object.assign(clone(t.comic), bk.comic || {});
-  out.kids = Object.assign(clone(t.kids), bk.kids || {});
-  out.research = Object.assign(clone(t.research), bk.research || {});
-  out.masterclass = Object.assign(clone(t.masterclass), bk.masterclass || {});
-  out.profile = Object.assign(clone(t.profile), bk.profile || {});
   out.profile.cover = migrateBanner((bk.profile || {}).cover);
   if (!(bk.profile || {}).cover) out.profile.cover.h = 300;
-  out.about = Object.assign(clone(t.about), bk.about || {});
-  out.slideshow = Object.assign(clone(t.slideshow), bk.slideshow || {});
   out.slideshow.slides = (out.slideshow.slides || []).filter(x => x && x.src);
-  out.lore = bk.lore || [];
   out.gallery = (bk.gallery || []).filter(x => x && x.src);
-  out.ideas = bk.ideas || [];
-  out.design = bk.design ? Object.assign(newDesign(), bk.design) : null;
-  out.theme = bk.theme || null;
-  out.pageThemes = bk.pageThemes || {};
+  out.design = bk.design ? deepDefaults(bk.design, newDesign()) : null;
   out.banners = {};
   Object.keys(bk.banners || {}).forEach(k => { out.banners[k] = migrateBanner(bk.banners[k]); });
   if (!out.banners.profile) out.banners.profile = newBanner(0);
-  out.chapters = (bk.chapters || []).map(c => Object.assign(newChapter(1), c));
-  out.characters = (bk.characters || []).map(c => Object.assign(newCharacter('sup'), c));
-  out.relationships = bk.relationships || [];
-  out.activity = bk.activity || [];
+  out.chapters = (bk.chapters || []).map(c => deepDefaults(c, newChapter(1)));
+  out.characters = (bk.characters || []).map(c => deepDefaults(c, newCharacter('sup')));
   if (!out.id) out.id = uid('bk');
   return out;
 }
+/* The whole saved project, rebuilt against this build's template. deepDefaults
+   is what makes updating safe in both directions: a save from an older build
+   picks up everything new, and a save from a NEWER build keeps every field it
+   brought with it even though this build cannot yet display them. */
 function migrateState(loaded) {
   const d = defaultState();
-  const s = Object.assign(d, loaded || {});
-  s.app = Object.assign(clone(d.app), loaded.app || {});
-  s.app.ai = Object.assign(clone(d.app.ai), (loaded.app || {}).ai || {});
-  s.app.ai.keys = Object.assign(clone(d.app.ai.keys), ((loaded.app || {}).ai || {}).keys || {});
-  s.app.ai.model = Object.assign(clone(d.app.ai.model), ((loaded.app || {}).ai || {}).model || {});
-  s.app.ai.templates = Object.assign(clone(d.app.ai.templates), ((loaded.app || {}).ai || {}).templates || {});
+  const s = deepDefaults(loaded || {}, d);
   s.app.globalBanner = migrateBanner((loaded.app || {}).globalBanner);
-  s.app.theme = (loaded.app || {}).theme || null;
-  s.app.pageThemes = (loaded.app || {}).pageThemes || {};
   s.app.showGuides = (loaded.app || {}).showGuides !== false;
-  s.app.photoLayout = (loaded.app || {}).photoLayout || 'right';
-  s.app.storage = Object.assign(clone(d.app.storage), (loaded.app || {}).storage || {});
-  s.ui = Object.assign(clone(d.ui), loaded.ui || {});
   s.ui.lastEdited = s.ui.lastEdited || {};
   s.ui.helpClosed = s.ui.helpClosed || {};
   s.ui.shelf = Object.assign({ q: '', sort: 'updated', view: 'grid' }, s.ui.shelf || {});
   s.ui.shelf.q = '';
   s.books = (loaded.books || []).map(migrateBook);
+  /* remember which build wrote this so the app can say so out loud */
+  s.app.storage.savedByVersion = (loaded.__ver || (loaded.app && loaded.app.storage && loaded.app.storage.savedByVersion) || '');
   return s;
 }
 
@@ -8003,6 +8968,18 @@ const VIEW_HELP = {
   copilot: { one: 'Your writing assistant. It reads what you have already written and suggests what could happen next.',
     steps: ['Choose which passage it should read.', 'Press <strong>Suggest Next Plot Move</strong> for three different directions.', 'Press <strong>Insert into Story</strong> on the one you like — it appears highlighted in your text.', 'Then press <strong>Keep</strong> to make it permanent or <strong>Undo</strong> to remove it.'],
     tips: ['It works offline out of the box. Add an API key in AI Engine Settings for full prose generation.', 'The Cliché Scanner finds tired phrases and repeated words across a whole chapter.'] },
+  character: { one: 'One character\u2019s own page \u2014 everything about them in one place, and it saves as you type.',
+    steps: [
+      'Give them a <strong>cover picture</strong> and a <strong>portrait</strong>. Animated GIFs work for both.',
+      'Work through the tabs: <strong>Dossier</strong> is the facts, <strong>Inner Life</strong> is what drives them, <strong>Voice</strong> is how they talk.',
+      '<strong>Relationships</strong> records who they know \u2014 every tie also appears on the network map.',
+      '<strong>Appearances</strong> finds them in your actual chapters by name, and updates itself as you write.'
+    ],
+    tips: [
+      'Every character you make is listed in the <strong>CHARACTERS</strong> group in the menu, so they are always one click away.',
+      'The percentage at the top tells you what is still blank. Above 70% and they can carry a scene you have not planned.',
+      'The buttons on the right read this character and your book before they suggest anything \u2014 they work offline too.'
+    ] },
   characters: { one: 'Everyone in your story, sorted into tiers the way a TV show sorts its cast.',
     steps: ['Press <strong>New Character</strong> and fill in the dossier.', 'Set their <strong>tier</strong>: Primary Lead, Co-Lead, Supporting or Minor.', 'The important boxes are <em>Wants</em>, <em>Flaws</em> and <em>Voice</em> — those three make a character usable in a scene.', 'Press <strong>Talk to Them</strong> to test their voice in conversation.'], tips: ['Stuck on a character? Press <em>Interview Questions</em> for ten questions that expose who they are.'] },
   network: { one: 'A map of who knows who — allies, rivals, family, secrets — drawn as dots and lines you can drag around.',
@@ -8054,6 +9031,21 @@ const VIEW_HELP = {
       'Manuscript Submission is the format agents ask for: Courier, double spaced, one-inch margins.',
       'Inner margin is the one next to the spine — it needs to be wider than the outer one on a printed book.',
       'While writing, press the open-book button in any editor toolbar to see just that chapter as live pages.'
+    ]
+  },
+  gdoc: {
+    one: 'Turn this book into a Google Doc that keeps itself up to date while you write.',
+    steps: [
+      'Paste your own <strong>Google OAuth Client ID</strong> into the box (there is a three-minute guide behind <em>How this works</em>).',
+      'Press <strong>Connect my Google account</strong> and approve the two permissions.',
+      'Press <strong>Create the Google Doc</strong>. Your book appears in your Drive, typeset like a novel.',
+      'Leave <strong>live updating</strong> on and the Doc follows what you type — the red badge in the top bar flashes while it is on.'
+    ],
+    tips: [
+      'Google will not sign in to a page opened straight off your disk. If that is you, the page tells you the one command that fixes it.',
+      'Every book gets its own Doc, and each keeps its own “last updated” time.',
+      'The Doc copies your <strong>Book Designer</strong> settings — trim size, typeface, leading, indents — so it looks like the finished book.',
+      'The sign-in token stays in this tab\u2019s memory. It is never written into your vault or your backups.'
     ]
   },
   storage: {
@@ -9488,6 +10480,8 @@ VIEWS.storage = {
   render() {
     const st = state.app.storage;
     const vaultName = (VAULT_HANDLE && VAULT_HANDLE.name) || st.vaultName || '';
+    const folderName = (FOLDER_HANDLE && FOLDER_HANDLE.name) || st.folderName || '';
+    const fbadge = { ready: ['lm', 'CONNECTED'], 'needs-permission': ['am', 'NEEDS PERMISSION'], error: ['rd', 'WRITE FAILED'], none: ['', 'NOT SET UP'], unsupported: ['', 'NOT AVAILABLE HERE'] }[FOLDER_STATUS] || ['', 'NOT SET UP'];
     const words = state.books.reduce((n, b) => n + bookWords(b), 0);
     const badge = { ready: ['lm', 'CONNECTED'], 'needs-permission': ['am', 'NEEDS PERMISSION'], error: ['rd', 'WRITE FAILED'], none: ['', 'NOT SET UP'], unsupported: ['', 'NOT AVAILABLE HERE'] }[VAULT_STATUS] || ['', 'NOT SET UP'];
 
@@ -9539,6 +10533,43 @@ VIEWS.storage = {
             '</div>' : '') +
           '</div></div>' +
 
+        /* ---------------- personal storage folder ---------------- */
+        '<div class="panel clip mb14"><div class="panel-hd"><i data-lucide="folder"></i><h3>YOUR PERSONAL STORAGE FOLDER</h3><span style="flex:1"></span>' +
+          '<span class="chip ' + fbadge[0] + '">' + fbadge[1] + '</span></div>' +
+          '<div class="panel-bd">' +
+            '<div class="helpbox mb14"><b>A WHOLE FOLDER THAT LOOKS AFTER ITSELF</b>' +
+              'Instead of one file, hand the app a folder — Documents, Dropbox, OneDrive, a memory stick. It keeps ' +
+              '<code>ravenbane-vault.json</code> in there permanently up to date, and drops dated copies into a ' +
+              '<code>backups</code> sub-folder as you go. <strong>This is what makes updating the app painless:</strong> ' +
+              'download a newer version, delete the old one, press <em>Choose a folder</em> and point at the same folder. ' +
+              'The app reads the newest thing inside and carries straight on.</div>' +
+
+            (!HAS_FSD
+              ? '<div class="panel" style="padding:12px;border-color:color-mix(in srgb, var(--c-amber) 45%, transparent)">' +
+                '<div class="flex center gap8 mb6"><i data-lucide="alert-triangle" style="width:16px;height:16px;color:var(--c-amber)"></i>' +
+                '<strong class="t-am">This browser cannot open a folder</strong></div>' +
+                '<div class="fs13 muted">Folder storage needs Chrome, Edge, Opera or Brave. Everything above still works — use ' +
+                '<strong>Download a full backup</strong> and keep the file wherever you like.</div></div>'
+              : (folderName
+                ? '<div class="flex between center wrap gap10" style="padding:12px;border:1px solid var(--line-hard);background:color-mix(in srgb, var(--accent) 6%, transparent)">' +
+                  '<div style="min-width:0"><div class="mono fs10 faint">SAVING INTO THE FOLDER</div>' +
+                  '<div style="font-family:var(--font-display);font-size:15px;color:var(--txt);word-break:break-all">' + esc(folderName) + '/</div>' +
+                  '<div class="mono fs10 faint mt6">LAST WRITTEN ' + (FOLDER_LAST ? esc(timeAgo(FOLDER_LAST)) : 'not yet') + '</div></div>' +
+                  '<div class="flex gap6 wrap">' +
+                    (FOLDER_STATUS === 'needs-permission' ? '<button class="btn amber" data-act="folderReconnect"><i data-lucide="key"></i>RECONNECT</button>' : '') +
+                    '<button class="btn" data-act="folderWriteNow"><i data-lucide="hard-drive-download"></i>WRITE NOW</button>' +
+                    '<button class="btn" data-act="folderBrowse"><i data-lucide="list"></i>WHAT IS IN IT</button>' +
+                    '<button class="btn ghost" data-act="folderChoose"><i data-lucide="folder"></i>CHANGE FOLDER</button>' +
+                    '<button class="btn ghost red" data-act="folderForget"><i data-lucide="x"></i>DISCONNECT</button>' +
+                  '</div></div>' +
+                  '<label class="fld mt14" style="max-width:320px" data-root="app" data-sub="storage"><span class="lb">Dated copies to keep in <code>backups/</code></span>' +
+                    '<input class="inp" type="number" min="2" max="60" data-model="folderCopies" data-live="storageLive" value="' + attr(st.folderCopies) + '">' +
+                    '<span class="hint">One is written roughly every ten automatic saves. Older ones are recycled.</span></label>'
+                : '<div class="flex gap6 wrap">' +
+                  '<button class="btn solid lg" data-act="folderChoose"><i data-lucide="folder-plus"></i>CHOOSE A FOLDER</button>' +
+                  '</div>')) +
+          '</div></div>' +
+
         /* ---------------- backup file ---------------- */
         '<div class="panel clip mb14"><div class="panel-hd"><i data-lucide="file-json"></i><h3>BACKUP FILE</h3></div>' +
           '<div class="panel-bd">' +
@@ -9585,6 +10616,7 @@ VIEWS.storage = {
         '<div class="panel clip mb14"><div class="panel-hd"><i data-lucide="shield-check"></i><h3>HOW SAFE IS MY WORK?</h3></div>' +
           '<div class="panel-bd">' +
             safetyRow('Vault file on your disk', VAULT_STATUS === 'ready', VAULT_STATUS === 'ready' ? 'Written automatically to ' + esc(vaultName) : 'Not set up — this is the one that survives everything') +
+            safetyRow('Personal storage folder', FOLDER_STATUS === 'ready', FOLDER_STATUS === 'ready' ? 'Live copy plus dated backups inside ' + esc(folderName) + '/' : 'Not set up — the easiest way to survive app updates') +
             safetyRow('Working copy in the browser', true, 'Saved every ' + (state.app.autosaveSec || 5) + ' seconds, with a write-ahead record') +
             safetyRow('Power-cut protection', true, 'An interrupted save can never corrupt your data, and the last keystrokes are flushed as the tab closes') +
             safetyRow('Snapshot history', true, '<span id="snapCount">…</span> snapshots you can roll back to') +
@@ -9598,11 +10630,36 @@ VIEWS.storage = {
             '<div class="bar mb10"><i id="stgBar" style="width:2%"></i></div>' +
             '<div class="hint">Pictures are what fill this up. If you run low, the vault file has no such limit.</div>' +
           '</div></div>' +
+        '<div class="panel clip mb14"><div class="panel-hd"><i data-lucide="refresh-cw"></i><h3>UPDATING THE APP</h3></div>' +
+          '<div class="panel-bd">' +
+            '<div class="flex between center mb6"><span class="fs13">This copy</span><span class="chip cy">v' + APP_VERSION + '</span></div>' +
+            '<div class="flex between center mb6"><span class="fs13">Data format</span><span class="chip">' + DATA_FORMAT + '</span></div>' +
+            '<div class="flex between center mb10"><span class="fs13">Your data was written by</span><span class="chip ' +
+              (st.savedByVersion && verCmp(st.savedByVersion, APP_VERSION) > 0 ? 'am' : '') + '">v' + esc(st.savedByVersion || APP_VERSION) + '</span></div>' +
+            (st.savedByVersion && verCmp(st.savedByVersion, APP_VERSION) > 0
+              ? '<div class="fs12 t-am mb10">You are running an older app file than the one that last saved this project. Everything the newer version added has been kept, but run the newer file if you can.</div>' : '') +
+            '<div class="helpbox mb10"><b>YOUR WORK IS NOT INSIDE THE APP FILE</b>' +
+              'The <code>.html</code> file is just the program. Your books live in your vault file, your storage folder and this browser\'s database — ' +
+              'so replacing the program with a newer one never touches them.</div>' +
+            '<div class="prose-c fs13"><h5>To move to a newer version</h5><ol>' +
+              '<li>Download the newer <code>.html</code> file.</li>' +
+              '<li>Delete the old one — or just stop opening it.</li>' +
+              '<li>Open the new one and, if you use a vault file or a storage folder, point it at the same one. That is the whole job.</li>' +
+              '<li>If the browser has forgotten everything, press <strong>Restore from a backup</strong> and pick your latest file.</li>' +
+            '</ol>' +
+            '<h5>What update-proof actually means here</h5><ul>' +
+              '<li>Every save is stamped with the version that wrote it and when.</li>' +
+              '<li>When two copies exist, <strong>the one written most recently wins</strong> — never the one that happens to be local.</li>' +
+              '<li>Opening data from a <em>newer</em> build keeps fields this build has never heard of instead of stripping them, so nothing is destroyed by going backwards.</li>' +
+              '<li>Opening data from an <em>older</em> build fills in everything new with sensible defaults and leaves your content alone.</li>' +
+              '<li><strong>Merge, newest wins</strong> compares book by book, so two half-updated machines can be reconciled without losing either side.</li>' +
+            '</ul></div>' +
+          '</div></div>' +
         '<div class="panel clip tone-red"><div class="panel-hd"><i data-lucide="alert-triangle"></i><h3>MOVING TO A NEW COMPUTER</h3></div>' +
           '<div class="panel-bd prose-c fs13"><ol>' +
-            '<li>Press <strong>Download a full backup</strong> (or just copy your vault file).</li>' +
-            '<li>Put that one file on the new machine.</li>' +
-            '<li>Open this app there and press <strong>Restore from a backup</strong> — or <strong>Open an existing vault file</strong>.</li>' +
+            '<li>Press <strong>Download a full backup</strong> (or just copy your vault file / storage folder).</li>' +
+            '<li>Put it on the new machine.</li>' +
+            '<li>Open this app there and press <strong>Restore from a backup</strong>, <strong>Open an existing vault file</strong>, or <strong>Choose a folder</strong>.</li>' +
             '<li>Everything is back, exactly as it was.</li>' +
           '</ol></div></div>' +
       '</div></div>' +
@@ -9695,6 +10752,839 @@ ACTIONS.snapPin = async function (el) {
 ACTIONS.snapDel = async function (el) {
   await idbDel(el.getAttribute('data-id'), DB_SNAPS);
   render();
+};
+
+
+/* ===========================================================================
+   v7 · GOOGLE DOCS LIVE SYNC
+   Connect a Google account, press one button, and this book becomes a real
+   Google Doc that keeps itself up to date while you type — typeset the same
+   way the Book Designer typesets it, so the Doc is as elegant as the page.
+
+   HOW IT WORKS, HONESTLY
+   · Google's sign-in only works on a page served over http:// or https://.
+     A file opened straight off the disk has no web origin for Google to trust,
+     so the app detects that and tells you the one-line fix instead of failing
+     silently.
+   · You supply your own OAuth Client ID from Google Cloud. Nothing is shipped
+     inside this file, and the token lives in memory only — never saved, never
+     sent anywhere but google.com.
+   · The Doc is rewritten in full on each push (Docs has no diff API worth
+     trusting), so pushes are debounced and throttled rather than per keystroke.
+   ========================================================================= */
+
+const GOOGLE_SCOPES = 'https://www.googleapis.com/auth/documents https://www.googleapis.com/auth/drive.file';
+let GTOKEN = null;              /* { token, expires } — memory only */
+let GCLIENT = null;             /* GIS token client */
+let GIS_LOADED = false;
+let GSYNC_STATE = 'idle';       /* idle | syncing | ok | error */
+let GSYNC_MSG = '';
+let GDOC_DIRTY = false;
+let GDOC_TIMER = null;
+let GDOC_LASTPUSH = 0;
+
+function gdocOf(b) {
+  if (!b.gdoc) b.gdoc = { id: '', url: '', title: '', live: false, lastSync: '', lastError: '', lastWords: 0, pushes: 0, hash: '' };
+  return b.gdoc;
+}
+/** Can this copy of the app talk to Google at all, and if not, exactly why. */
+function googleCapability() {
+  const proto = location.protocol;
+  if (proto === 'file:') {
+    return { ok: false, code: 'origin', why: 'This page was opened straight from a file on your disk.' };
+  }
+  if (proto !== 'http:' && proto !== 'https:') {
+    return { ok: false, code: 'origin', why: 'This page is not being served over http or https.' };
+  }
+  if (!navigator.onLine) return { ok: false, code: 'offline', why: 'You are offline.' };
+  if (!String((state.app.google || {}).clientId || '').trim()) {
+    return { ok: false, code: 'clientid', why: 'No Google OAuth Client ID has been entered yet.' };
+  }
+  return { ok: true };
+}
+function googleOrigin() { return location.origin; }
+
+/** Loads Google Identity Services on demand — never at boot, so the app still
+    starts instantly with no network at all. */
+function gLoadGis() {
+  if (GIS_LOADED && window.google && window.google.accounts) return Promise.resolve(true);
+  return new Promise((resolve, reject) => {
+    const existing = document.getElementById('gisScript');
+    if (existing && window.google && window.google.accounts) { GIS_LOADED = true; return resolve(true); }
+    const s = document.createElement('script');
+    s.id = 'gisScript';
+    s.src = 'https://accounts.google.com/gsi/client';
+    s.async = true; s.defer = true;
+    s.onload = () => { GIS_LOADED = true; resolve(true); };
+    s.onerror = () => reject(new Error('Could not load Google sign-in. Check your connection.'));
+    document.head.appendChild(s);
+    setTimeout(() => { if (!GIS_LOADED) reject(new Error('Google sign-in did not load in time.')); }, 12000);
+  });
+}
+function gTokenValid() { return !!(GTOKEN && GTOKEN.token && GTOKEN.expires > Date.now() + 20000); }
+
+/** Ask Google for an access token. `silent` avoids showing the consent popup. */
+function gRequestToken(silent) {
+  return new Promise(async (resolve, reject) => {
+    try {
+      await gLoadGis();
+      const cid = String((state.app.google || {}).clientId || '').trim();
+      if (!cid) return reject(new Error('No Client ID.'));
+      if (!GCLIENT || GCLIENT.__cid !== cid) {
+        GCLIENT = google.accounts.oauth2.initTokenClient({
+          client_id: cid,
+          scope: GOOGLE_SCOPES,
+          callback: (r) => {
+            if (r && r.access_token) {
+              GTOKEN = { token: r.access_token, expires: Date.now() + ((Number(r.expires_in) || 3600) * 1000) };
+              state.app.google.connected = true;
+              markDirty();
+              resolve(GTOKEN.token);
+            } else reject(new Error((r && r.error_description) || 'Google did not return a token.'));
+          },
+          error_callback: (e) => reject(new Error((e && (e.message || e.type)) || 'Sign-in was cancelled.'))
+        });
+        GCLIENT.__cid = cid;
+      } else {
+        GCLIENT.callback = (r) => {
+          if (r && r.access_token) {
+            GTOKEN = { token: r.access_token, expires: Date.now() + ((Number(r.expires_in) || 3600) * 1000) };
+            resolve(r.access_token);
+          } else reject(new Error((r && r.error_description) || 'Google did not return a token.'));
+        };
+        GCLIENT.error_callback = (e) => reject(new Error((e && (e.message || e.type)) || 'Sign-in was cancelled.'));
+      }
+      GCLIENT.requestAccessToken({ prompt: silent ? '' : 'consent' });
+    } catch (e) { reject(e); }
+  });
+}
+async function gToken(interactive) {
+  if (gTokenValid()) return GTOKEN.token;
+  try { return await gRequestToken(true); }
+  catch (e) {
+    if (!interactive) throw e;
+    return await gRequestToken(false);
+  }
+}
+/** Authorised fetch with one silent-refresh retry on a 401. */
+async function gFetch(url, opts, retried) {
+  const tok = await gToken(!retried);
+  const r = await fetch(url, Object.assign({}, opts, {
+    headers: Object.assign({ 'Authorization': 'Bearer ' + tok, 'Content-Type': 'application/json' }, (opts || {}).headers || {})
+  }));
+  if (r.status === 401 && !retried) { GTOKEN = null; return gFetch(url, opts, true); }
+  if (!r.ok) {
+    let detail = '';
+    try { const j = await r.json(); detail = (j.error && (j.error.message || j.error.status)) || ''; } catch (e) { }
+    throw new Error('Google said ' + r.status + (detail ? ': ' + detail : ''));
+  }
+  return r.json();
+}
+
+/* ----------------------- novel typesetting for Docs ----------------------
+   The Doc is built as a list of paragraphs, each carrying the same intent the
+   Book Designer uses on the page: title page, dedication, chapter openings
+   that start a new page, justified indented body, centred scene breaks.
+   ------------------------------------------------------------------------ */
+const GFONT_MAP = {
+  '"Playfair Display",Georgia,serif': 'Playfair Display',
+  'Georgia,"Times New Roman",serif': 'Georgia',
+  '"Times New Roman",Times,serif': 'Times New Roman',
+  '"Cinzel",Georgia,serif': 'Cinzel',
+  '"Inter",system-ui,sans-serif': 'Inter',
+  '"Special Elite",Courier,monospace': 'Special Elite',
+  '"Courier New",Courier,monospace': 'Courier New'
+};
+function gFontName(css) { return GFONT_MAP[css] || String(css || '').split(',')[0].replace(/["']/g, '').trim() || 'Georgia'; }
+
+/** Pull the inline runs (bold / italic / underline) out of one block element. */
+function gRunsOf(el) {
+  let text = '';
+  const runs = [];
+  const walk = (node, fmt) => {
+    if (node.nodeType === 3) {
+      const t = node.textContent.replace(/\s+/g, ' ');
+      if (!t) return;
+      if (fmt.b || fmt.i || fmt.u) runs.push({ start: text.length, len: t.length, b: fmt.b, i: fmt.i, u: fmt.u });
+      text += t;
+      return;
+    }
+    if (node.nodeType !== 1) return;
+    const tag = node.tagName.toLowerCase();
+    if (tag === 'br') { text += ' '; return; }
+    const next = {
+      b: fmt.b || tag === 'b' || tag === 'strong',
+      i: fmt.i || tag === 'i' || tag === 'em',
+      u: fmt.u || tag === 'u'
+    };
+    Array.from(node.childNodes).forEach(c => walk(c, next));
+  };
+  Array.from(el.childNodes).forEach(c => walk(c, { b: false, i: false, u: false }));
+  return { text: text.replace(/\s+/g, ' ').trim(), runs: runs };
+}
+
+/** Turn one chapter's HTML into Doc paragraphs. */
+function gBlocksFromHTML(html, d, push) {
+  const holder = document.createElement('div');
+  holder.innerHTML = html || '';
+  holder.querySelectorAll('script,style').forEach(n => n.remove());
+  Array.from(holder.childNodes).forEach(n => {
+    if (n.nodeType === 3) {
+      const t = n.textContent.trim();
+      if (t) push({ text: t, kind: 'body' });
+      return;
+    }
+    if (n.nodeType !== 1) return;
+    const tag = n.tagName.toLowerCase();
+    if (tag === 'hr') { push({ text: d.sceneBreak || '* * *', kind: 'scene' }); return; }
+    if (tag === 'figure') {
+      const im = n.querySelector('img'), cp = n.querySelector('figcaption');
+      const src = im ? String(im.getAttribute('src') || '') : '';
+      const cap = cp ? cp.textContent.trim() : '';
+      push({ text: cap ? '[ picture — ' + cap + ' ]' : '[ picture ]', kind: 'figure', img: /^https?:\/\//i.test(src) ? src : '' });
+      return;
+    }
+    if (tag === 'ul' || tag === 'ol') {
+      Array.from(n.querySelectorAll('li')).forEach(li => {
+        const r = gRunsOf(li);
+        if (r.text) push({ text: r.text, runs: r.runs, kind: 'list', ordered: tag === 'ol' });
+      });
+      return;
+    }
+    const r = gRunsOf(n);
+    if (!r.text) { push({ text: '', kind: 'blank' }); return; }
+    if (tag === 'h1' || tag === 'h2') push({ text: r.text, runs: r.runs, kind: 'h2' });
+    else if (tag === 'h3' || tag === 'h4') push({ text: r.text, runs: r.runs, kind: 'h3' });
+    else if (tag === 'blockquote') push({ text: r.text, runs: r.runs, kind: 'quote' });
+    else push({ text: r.text, runs: r.runs, kind: 'body' });
+  });
+}
+
+/** The whole book, as Doc paragraphs, in reading order. */
+function gBookBlocks(b) {
+  const d = b.design || newDesign();
+  const out = [];
+  const push = (x) => out.push(Object.assign({ runs: [], kind: 'body' }, x));
+
+  if (d.frontMatter !== false) {
+    push({ text: b.title || 'Untitled', kind: 'title' });
+    if (b.subtitle) push({ text: b.subtitle, kind: 'subtitle' });
+    push({ text: '', kind: 'blank' });
+    if (b.author) push({ text: b.author, kind: 'author' });
+    if (b.logline) { push({ text: '', kind: 'blank' }); push({ text: b.logline, kind: 'logline' }); }
+  }
+  if (d.dedication !== false && b.dedication && b.dedication.text) {
+    push({ text: b.dedication.text, kind: 'dedication', newPage: true });
+  }
+  if (b.prologue && stripHTML(b.prologue.html || '').trim()) {
+    push({ text: b.prologue.title || 'Prologue', kind: 'chapter', newPage: true });
+    gBlocksFromHTML(b.prologue.html, d, push);
+  }
+  (b.chapters || []).forEach((c, i) => {
+    const heading = (c.title && c.title.trim()) ? c.title.trim() : 'Chapter ' + (i + 1);
+    push({ text: heading, kind: 'chapter', newPage: d.chapterNewPage !== false });
+    if (stripHTML(c.html || '').trim()) gBlocksFromHTML(c.html, d, push);
+    else push({ text: '[ this chapter has not been written yet ]', kind: 'figure' });
+  });
+  if (b.dedication && b.dedication.ack) {
+    push({ text: 'Acknowledgements', kind: 'chapter', newPage: true });
+    push({ text: b.dedication.ack, kind: 'body' });
+  }
+  /* Docs cannot end on an empty paragraph cleanly — trim any trailing blanks. */
+  while (out.length && out[out.length - 1].kind === 'blank') out.pop();
+  return out;
+}
+
+/** Blocks → { text, requests } ready for documents:batchUpdate. */
+function gBuildRequests(b, blocks, docEnd) {
+  const d = b.design || newDesign();
+  const trim = trimOf(d.trim);
+  const pt = (inches) => Math.round(inches * 72);
+  const fontName = gFontName(d.font);
+  const size = Number(d.size) || 11;
+  const align = { justify: 'JUSTIFIED', left: 'START', center: 'CENTER' }[d.align] || 'JUSTIFIED';
+  const text = blocks.map(x => x.text).join('\n');
+  const reqs = [];
+
+  /* 1 · clear whatever is in the document now */
+  if (docEnd > 2) reqs.push({ deleteContentRange: { range: { startIndex: 1, endIndex: docEnd - 1 } } });
+  /* 2 · put the whole book in as plain text */
+  reqs.push({ insertText: { location: { index: 1 }, text: text } });
+
+  const L = text.length;
+  const bodyEnd = 1 + L;
+  /* 3 · page geometry — the same trim size and margins as the Book Designer */
+  reqs.push({
+    updateDocumentStyle: {
+      documentStyle: {
+        pageSize: { width: { magnitude: pt(trim[2]), unit: 'PT' }, height: { magnitude: pt(trim[3]), unit: 'PT' } },
+        marginTop: { magnitude: pt(Number(d.mTop) || 0.75), unit: 'PT' },
+        marginBottom: { magnitude: pt(Number(d.mBottom) || 0.75), unit: 'PT' },
+        marginLeft: { magnitude: pt(Number(d.mInner) || 0.85), unit: 'PT' },
+        marginRight: { magnitude: pt(Number(d.mOuter) || 0.6), unit: 'PT' }
+      },
+      fields: 'pageSize,marginTop,marginBottom,marginLeft,marginRight'
+    }
+  });
+  if (L < 1) return { text: text, requests: reqs };
+
+  const whole = { startIndex: 1, endIndex: bodyEnd };
+  /* 4 · the body style everything inherits */
+  reqs.push({
+    updateParagraphStyle: {
+      range: whole,
+      paragraphStyle: {
+        namedStyleType: 'NORMAL_TEXT',
+        alignment: align,
+        lineSpacing: Math.round((Number(d.leading) || 1.5) * 100),
+        indentFirstLine: { magnitude: Math.round((Number(d.indent) || 0) * size), unit: 'PT' },
+        spaceBelow: { magnitude: Math.round((Number(d.paraGap) || 0) * size), unit: 'PT' },
+        spaceAbove: { magnitude: 0, unit: 'PT' },
+        pageBreakBefore: false
+      },
+      fields: 'namedStyleType,alignment,lineSpacing,indentFirstLine,spaceBelow,spaceAbove,pageBreakBefore'
+    }
+  });
+  reqs.push({
+    updateTextStyle: {
+      range: whole,
+      textStyle: {
+        weightedFontFamily: { fontFamily: fontName },
+        fontSize: { magnitude: size, unit: 'PT' },
+        bold: false, italic: false, underline: false,
+        foregroundColor: { color: { rgbColor: hexToRgb01(d.inkColor || '#14161a') } }
+      },
+      fields: 'weightedFontFamily,fontSize,bold,italic,underline,foregroundColor'
+    }
+  });
+
+  /* 5 · per-paragraph overrides, computed against the text we just inserted */
+  let cursor = 1;
+  const runReqs = [];
+  const bulletRanges = [];
+  blocks.forEach((blk, i) => {
+    const start = cursor;
+    const end = start + blk.text.length;
+    cursor = end + 1;                       /* the newline that ends it */
+    const pEnd = Math.min(end + 1, bodyEnd);
+    if (pEnd <= start) return;              /* an empty last paragraph */
+    const range = { startIndex: start, endIndex: pEnd };
+
+    const P = (ps, fields) => reqs.push({ updateParagraphStyle: { range: range, paragraphStyle: ps, fields: fields } });
+    const T = (ts, fields) => reqs.push({ updateTextStyle: { range: { startIndex: start, endIndex: Math.min(end, bodyEnd) }, textStyle: ts, fields: fields } });
+    if (end <= start && blk.kind !== 'blank') return;
+
+    switch (blk.kind) {
+      case 'title':
+        P({ namedStyleType: 'TITLE', alignment: 'CENTER', spaceAbove: { magnitude: 120, unit: 'PT' }, indentFirstLine: { magnitude: 0, unit: 'PT' } },
+          'namedStyleType,alignment,spaceAbove,indentFirstLine');
+        T({ weightedFontFamily: { fontFamily: fontName }, fontSize: { magnitude: Math.round(size * 2.6), unit: 'PT' }, bold: false },
+          'weightedFontFamily,fontSize,bold');
+        break;
+      case 'subtitle':
+        P({ namedStyleType: 'SUBTITLE', alignment: 'CENTER', indentFirstLine: { magnitude: 0, unit: 'PT' } }, 'namedStyleType,alignment,indentFirstLine');
+        T({ weightedFontFamily: { fontFamily: fontName }, fontSize: { magnitude: Math.round(size * 1.25), unit: 'PT' }, italic: true },
+          'weightedFontFamily,fontSize,italic');
+        break;
+      case 'author':
+        P({ alignment: 'CENTER', spaceAbove: { magnitude: 46, unit: 'PT' }, indentFirstLine: { magnitude: 0, unit: 'PT' } }, 'alignment,spaceAbove,indentFirstLine');
+        T({ fontSize: { magnitude: Math.round(size * 1.15), unit: 'PT' } }, 'fontSize');
+        break;
+      case 'logline':
+        P({ alignment: 'CENTER', indentFirstLine: { magnitude: 0, unit: 'PT' } }, 'alignment,indentFirstLine');
+        T({ italic: true, fontSize: { magnitude: Math.round(size * 0.95), unit: 'PT' } }, 'italic,fontSize');
+        break;
+      case 'dedication':
+        P({ alignment: 'CENTER', pageBreakBefore: true, spaceAbove: { magnitude: 150, unit: 'PT' }, indentFirstLine: { magnitude: 0, unit: 'PT' } },
+          'alignment,pageBreakBefore,spaceAbove,indentFirstLine');
+        T({ italic: true }, 'italic');
+        break;
+      case 'chapter':
+        P({
+          namedStyleType: 'HEADING_1',
+          alignment: d.opener === 'left' ? 'START' : 'CENTER',
+          pageBreakBefore: !!blk.newPage,
+          spaceAbove: { magnitude: blk.newPage ? 60 : 30, unit: 'PT' },
+          spaceBelow: { magnitude: 24, unit: 'PT' },
+          indentFirstLine: { magnitude: 0, unit: 'PT' }
+        }, 'namedStyleType,alignment,pageBreakBefore,spaceAbove,spaceBelow,indentFirstLine');
+        T({
+          weightedFontFamily: { fontFamily: fontName },
+          fontSize: { magnitude: Math.round(size * (d.opener === 'big-number' ? 2 : 1.55)), unit: 'PT' },
+          bold: d.opener !== 'ornament',
+          foregroundColor: { color: { rgbColor: hexToRgb01(d.inkColor || '#14161a') } }
+        }, 'weightedFontFamily,fontSize,bold,foregroundColor');
+        break;
+      case 'h2':
+        P({ namedStyleType: 'HEADING_2', alignment: 'START', indentFirstLine: { magnitude: 0, unit: 'PT' }, spaceAbove: { magnitude: 18, unit: 'PT' } },
+          'namedStyleType,alignment,indentFirstLine,spaceAbove');
+        T({ weightedFontFamily: { fontFamily: fontName }, fontSize: { magnitude: Math.round(size * 1.3), unit: 'PT' }, bold: true },
+          'weightedFontFamily,fontSize,bold');
+        break;
+      case 'h3':
+        P({ namedStyleType: 'HEADING_3', alignment: 'START', indentFirstLine: { magnitude: 0, unit: 'PT' } }, 'namedStyleType,alignment,indentFirstLine');
+        T({ weightedFontFamily: { fontFamily: fontName }, fontSize: { magnitude: Math.round(size * 1.12), unit: 'PT' }, bold: true },
+          'weightedFontFamily,fontSize,bold');
+        break;
+      case 'quote':
+        P({ alignment: 'START', indentStart: { magnitude: 34, unit: 'PT' }, indentEnd: { magnitude: 34, unit: 'PT' }, indentFirstLine: { magnitude: 0, unit: 'PT' } },
+          'alignment,indentStart,indentEnd,indentFirstLine');
+        T({ italic: true }, 'italic');
+        break;
+      case 'scene':
+        P({ alignment: 'CENTER', spaceAbove: { magnitude: 16, unit: 'PT' }, spaceBelow: { magnitude: 16, unit: 'PT' }, indentFirstLine: { magnitude: 0, unit: 'PT' } },
+          'alignment,spaceAbove,spaceBelow,indentFirstLine');
+        break;
+      case 'figure':
+        P({ alignment: 'CENTER', indentFirstLine: { magnitude: 0, unit: 'PT' }, spaceAbove: { magnitude: 12, unit: 'PT' }, spaceBelow: { magnitude: 12, unit: 'PT' } },
+          'alignment,indentFirstLine,spaceAbove,spaceBelow');
+        T({ italic: true, fontSize: { magnitude: Math.round(size * 0.9), unit: 'PT' } }, 'italic,fontSize');
+        break;
+      case 'list':
+        P({ alignment: 'START', indentFirstLine: { magnitude: 0, unit: 'PT' }, indentStart: { magnitude: 26, unit: 'PT' } }, 'alignment,indentFirstLine,indentStart');
+        bulletRanges.push({ range: range, ordered: !!blk.ordered });
+        break;
+      case 'blank':
+        break;
+      default:
+        /* the first paragraph after a heading is not indented, as in print */
+        if (i > 0 && (blocks[i - 1].kind === 'chapter' || blocks[i - 1].kind === 'scene' || blocks[i - 1].kind === 'h2'))
+          P({ indentFirstLine: { magnitude: 0, unit: 'PT' } }, 'indentFirstLine');
+    }
+    /* inline bold / italic, capped so a huge book cannot blow the request limit */
+    if (blk.runs && blk.runs.length && runReqs.length < 1200) {
+      blk.runs.forEach(r => {
+        const rs = start + r.start, re = Math.min(rs + r.len, bodyEnd);
+        if (re <= rs) return;
+        runReqs.push({
+          updateTextStyle: {
+            range: { startIndex: rs, endIndex: re },
+            textStyle: { bold: !!r.b, italic: !!r.i, underline: !!r.u },
+            fields: 'bold,italic,underline'
+          }
+        });
+      });
+    }
+  });
+  bulletRanges.forEach(bl => reqs.push({
+    createParagraphBullets: {
+      range: bl.range,
+      bulletPreset: bl.ordered ? 'NUMBERED_DECIMAL_ALPHA_ROMAN' : 'BULLET_DISC_CIRCLE_SQUARE'
+    }
+  }));
+  return { text: text, requests: reqs.concat(runReqs) };
+}
+function hexToRgb01(hex) {
+  const h = String(hex || '#000').replace('#', '');
+  const f = h.length === 3 ? h.split('').map(c => c + c).join('') : h.padEnd(6, '0');
+  return { red: parseInt(f.slice(0, 2), 16) / 255, green: parseInt(f.slice(2, 4), 16) / 255, blue: parseInt(f.slice(4, 6), 16) / 255 };
+}
+
+/* ------------------------------ the sync loop ---------------------------- */
+async function gdocCreate(b) {
+  const g = gdocOf(b);
+  const title = (b.title || 'Untitled') + (b.author ? ' — ' + b.author : '');
+  const doc = await gFetch('https://docs.googleapis.com/v1/documents', {
+    method: 'POST', body: JSON.stringify({ title: title })
+  });
+  g.id = doc.documentId;
+  g.title = title;
+  g.url = 'https://docs.google.com/document/d/' + doc.documentId + '/edit';
+  g.pushes = 0; g.hash = '';
+  markDirty();
+  return g;
+}
+/** Rewrite the whole Doc so it matches the manuscript exactly. */
+async function gdocPush(b, reason, force) {
+  const g = gdocOf(b);
+  if (!g.id) throw new Error('This book has no Google Doc yet.');
+  const blocks = gBookBlocks(b);
+  const preview = blocks.map(x => x.text).join('\n');
+  const h = hashString(preview + '|' + JSON.stringify(b.design || {}));
+  if (!force && h === g.hash) { GSYNC_STATE = 'ok'; GSYNC_MSG = 'Already up to date'; return false; }
+
+  GSYNC_STATE = 'syncing'; GSYNC_MSG = 'Writing to Google Docs…'; paintLivePill();
+  try {
+    const cur = await gFetch('https://docs.googleapis.com/v1/documents/' + encodeURIComponent(g.id) + '?fields=body(content(endIndex))');
+    const content = (cur.body && cur.body.content) || [];
+    const docEnd = content.length ? content[content.length - 1].endIndex : 2;
+    const built = gBuildRequests(b, blocks, docEnd);
+
+    /* Docs is happier with several modest batches than one enormous one. */
+    const CH = 400;
+    const head = built.requests.slice(0, 2);          /* delete + insert must go first, together */
+    const rest = built.requests.slice(2);
+    await gFetch('https://docs.googleapis.com/v1/documents/' + encodeURIComponent(g.id) + ':batchUpdate',
+      { method: 'POST', body: JSON.stringify({ requests: head }) });
+    for (let i = 0; i < rest.length; i += CH) {
+      await gFetch('https://docs.googleapis.com/v1/documents/' + encodeURIComponent(g.id) + ':batchUpdate',
+        { method: 'POST', body: JSON.stringify({ requests: rest.slice(i, i + CH) }) });
+    }
+    g.hash = h;
+    g.lastSync = nowISO();
+    g.lastError = '';
+    g.lastWords = bookWords(b);
+    g.pushes = (g.pushes || 0) + 1;
+    GDOC_LASTPUSH = Date.now();
+    GSYNC_STATE = 'ok'; GSYNC_MSG = 'Up to date';
+    markDirty();
+    paintLivePill();
+    if (CURRENT_VIEW === 'gdoc') paintGdocStamp();
+    return true;
+  } catch (e) {
+    g.lastError = String(e.message || e);
+    GSYNC_STATE = 'error'; GSYNC_MSG = g.lastError;
+    paintLivePill();
+    if (CURRENT_VIEW === 'gdoc') paintGdocStamp();
+    throw e;
+  }
+}
+/** Called from markDirty — notes that the open book has moved on. */
+function gdocTouch() {
+  const b = currentBook();
+  if (!b || !b.gdoc || !b.gdoc.live || !b.gdoc.id) return;
+  GDOC_DIRTY = true;
+  paintLivePill();
+}
+function startGdocLoop() {
+  if (GDOC_TIMER) clearInterval(GDOC_TIMER);
+  GDOC_TIMER = setInterval(async () => {
+    if (!GDOC_DIRTY) return;
+    const b = currentBook();
+    if (!b || !b.gdoc || !b.gdoc.live || !b.gdoc.id) return;
+    const gap = clamp(Number((state.app.google || {}).minSeconds) || 12, 5, 300) * 1000;
+    if (Date.now() - GDOC_LASTPUSH < gap) return;
+    if (GSYNC_STATE === 'syncing') return;
+    GDOC_DIRTY = false;
+    try { await gdocPush(b, 'live'); }
+    catch (e) {
+      /* one failure should not spin forever — turn live off and say why */
+      b.gdoc.live = false;
+      markDirty();
+      toast('Live updating stopped: ' + String(e.message || e), 'err', 'GOOGLE DOC');
+      if (CURRENT_VIEW === 'gdoc') render();
+    }
+  }, 3000);
+}
+/** The flashing red LIVE badge in the top bar. */
+function paintLivePill() {
+  const el = $('#livePill'); if (!el) return;
+  const b = currentBook();
+  const g = b && b.gdoc;
+  if (!g || !g.live || !g.id) { el.style.display = 'none'; return; }
+  el.style.display = '';
+  const st = GSYNC_STATE === 'syncing' ? 'syncing' : GSYNC_STATE === 'error' ? 'error' : GDOC_DIRTY ? 'pending' : 'ok';
+  el.className = 'livepill ' + st;
+  el.querySelector('.lptxt').textContent =
+    st === 'syncing' ? 'UPDATING…' : st === 'error' ? 'LIVE FAILED' : st === 'pending' ? 'LIVE · CHANGES QUEUED' : 'LIVE UPDATING';
+  el.title = st === 'error'
+    ? 'The last update to your Google Doc failed: ' + (g.lastError || '') + ' — click for details'
+    : 'This book is mirrored into a Google Doc. Last update ' + (g.lastSync ? timeAgo(g.lastSync) : 'not yet') + '. Click for details.';
+}
+function paintGdocStamp() {
+  const b = currentBook(); if (!b) return;
+  const g = gdocOf(b);
+  const el = $('#gdocStamp');
+  if (el) el.innerHTML = g.lastSync
+    ? '<strong class="t-lm">' + esc(new Date(g.lastSync).toLocaleString()) + '</strong> <span class="faint">(' + esc(timeAgo(g.lastSync)) + ')</span>'
+    : '<span class="t-am">never</span>';
+  const c = $('#gdocCount'); if (c) c.textContent = fmt(g.pushes || 0);
+  const w = $('#gdocWords'); if (w) w.textContent = fmt(g.lastWords || 0);
+  const s = $('#gdocState');
+  if (s) {
+    const st = GSYNC_STATE === 'syncing' ? ['am', 'WRITING TO GOOGLE…'] : GSYNC_STATE === 'error' ? ['rd', 'FAILED'] :
+      GDOC_DIRTY ? ['am', 'CHANGES WAITING'] : g.lastSync ? ['lm', 'UP TO DATE'] : ['', 'NOT SENT YET'];
+    s.className = 'chip ' + st[0]; s.textContent = st[1];
+  }
+}
+
+/* --------------------------------- actions -------------------------------- */
+ACTIONS.gConnect = async function () {
+  const cap = googleCapability();
+  if (!cap.ok) { ACTIONS.gHelp(); return; }
+  try {
+    await gToken(true);
+    state.app.google.connected = true;
+    markDirty(); render();
+    toast('Google account connected. This tab can now create and update Docs.', 'ok', 'CONNECTED');
+  } catch (e) { toast(String(e.message || e), 'err', 'GOOGLE'); }
+};
+ACTIONS.gDisconnect = function () {
+  GTOKEN = null; GCLIENT = null;
+  state.app.google.connected = false;
+  markDirty(); render();
+  toast('Disconnected. The token was only ever held in memory, and it is gone.', 'warn');
+};
+ACTIONS.gdocCreate = async function () {
+  const b = requireBook(); if (!b) return;
+  const cap = googleCapability();
+  if (!cap.ok) { ACTIONS.gHelp(); return; }
+  try {
+    toast('Creating the Google Doc…', 'ok');
+    await gdocCreate(b);
+    await gdocPush(b, 'first', true);
+    b.gdoc.live = true;
+    markDirty(); render(); paintLivePill();
+    toast('Your book is now a Google Doc, and it is updating live.', 'ok', 'GOOGLE DOC READY');
+  } catch (e) { toast(String(e.message || e), 'err', 'GOOGLE'); render(); }
+};
+ACTIONS.gdocLink = async function () {
+  const b = requireBook(); if (!b) return;
+  const v = await promptDlg('LINK AN EXISTING GOOGLE DOC', 'Paste the Doc address or its ID', '');
+  if (!v || !v.trim()) return;
+  const m = String(v).match(/\/document\/d\/([a-zA-Z0-9_-]+)/);
+  const id = m ? m[1] : v.trim();
+  const g = gdocOf(b);
+  g.id = id; g.url = 'https://docs.google.com/document/d/' + id + '/edit'; g.hash = '';
+  markDirty(); render();
+  toast('Linked. Press “Update it now” to write your book into it — this replaces whatever is in that Doc.', 'warn');
+};
+ACTIONS.gdocPushNow = async function () {
+  const b = requireBook(); if (!b) return;
+  try { await gdocPush(b, 'manual', true); render(); toast('Google Doc updated.', 'ok'); }
+  catch (e) { toast(String(e.message || e), 'err', 'GOOGLE'); render(); }
+};
+ACTIONS.gdocLive = function (el) {
+  const b = requireBook(); if (!b) return;
+  const g = gdocOf(b);
+  g.live = el.type === 'checkbox' ? el.checked : !g.live;
+  if (g.live && !g.id) { g.live = false; toast('Create the Google Doc first.', 'warn'); }
+  if (g.live) { GDOC_DIRTY = true; toast('Live updating is on. The Doc follows what you type.', 'ok'); }
+  else toast('Live updating is off. The Doc stays exactly as it is until you press update.', 'warn');
+  markDirty(); render(); paintLivePill();
+};
+ACTIONS.gdocOpen = function () {
+  const b = currentBook(); const g = b && b.gdoc;
+  if (g && g.url) window.open(g.url, '_blank', 'noopener');
+};
+ACTIONS.gdocUnlink = async function () {
+  const b = requireBook(); if (!b) return;
+  const ok = await confirmDlg('STOP USING THIS GOOGLE DOC',
+    '<p>This book will stop updating <strong>' + esc((b.gdoc || {}).title || 'the Doc') + '</strong>.</p>' +
+    '<p>The Doc itself is left in your Google Drive exactly as it is — nothing is deleted.</p>');
+  if (!ok) return;
+  b.gdoc = { id: '', url: '', title: '', live: false, lastSync: '', lastError: '', lastWords: 0, pushes: 0, hash: '' };
+  markDirty(); render(); paintLivePill();
+};
+ACTIONS.gdocPreview = function () {
+  const b = requireBook(); if (!b) return;
+  const blocks = gBookBlocks(b);
+  const kindLabel = { title: 'Title', subtitle: 'Subtitle', author: 'Byline', logline: 'Logline', dedication: 'Dedication',
+    chapter: 'Chapter opening (new page)', h2: 'Heading', h3: 'Sub-heading', quote: 'Block quote', scene: 'Scene break',
+    figure: 'Picture placeholder', list: 'List item', body: 'Body', blank: '' };
+  openModal({
+    title: 'WHAT WILL LAND IN THE DOC', icon: 'file-text', size: 'wide',
+    body: '<div class="helpbox mb14"><b>THE SAME TYPESETTING AS THE BOOK DESIGNER</b>' +
+      'Trim size, margins, typeface, size, leading and first-line indent are copied from your Book Designer settings, so the Doc opens looking like the book.</div>' +
+      '<div style="max-height:56vh;overflow:auto;border:1px solid var(--line);padding:12px;background:var(--bg-panel)">' +
+      blocks.slice(0, 260).map(x => '<div class="flex gap8" style="padding:3px 0;border-bottom:1px solid var(--line)">' +
+        '<span class="mono fs10 faint" style="flex:0 0 150px">' + esc(kindLabel[x.kind] || x.kind) + '</span>' +
+        '<span class="fs12" style="flex:1;min-width:0;color:var(--txt)">' + esc(x.text.slice(0, 150) || '—') + '</span></div>').join('') +
+      (blocks.length > 260 ? '<div class="mono fs11 faint mt10">…and ' + (blocks.length - 260) + ' more paragraphs</div>' : '') +
+      '</div>',
+    footer: '<button class="btn solid" data-modal-close>CLOSE</button>'
+  });
+};
+ACTIONS.gHelp = function () {
+  const cap = googleCapability();
+  const org = location.origin;
+  openModal({
+    title: 'CONNECTING GOOGLE DOCS', icon: 'help-circle', size: '',
+    body:
+      (cap.ok ? '<div class="helpbox mb14"><b>YOU ARE READY</b>Everything Google needs is in place. Press <em>Connect my Google account</em>.</div>'
+        : '<div class="panel mb14" style="padding:12px;border-color:color-mix(in srgb, var(--c-amber) 45%, transparent)">' +
+          '<strong class="t-am fs13">Not possible yet — ' + esc(cap.why) + '</strong></div>') +
+      (cap.code === 'origin'
+        ? '<div class="prose-c fs13"><h5>Why a file on your disk cannot sign in</h5>' +
+          '<p>Google will only hand a sign-in token to a page with a real web address. A page opened with a double-click has ' +
+          'the address <code>file://…</code>, which Google treats as belonging to nobody, and refuses. This is Google’s rule, not this app’s — ' +
+          'no web page opened from a disk can sign in to Google, ever.</p>' +
+          '<h5>The fix takes one line</h5>' +
+          '<p>Serve this file from your own machine instead of opening it directly. In a terminal, in the folder holding this file:</p>' +
+          '<pre style="white-space:pre-wrap;user-select:all">python3 -m http.server 8080</pre>' +
+          '<p>…then open <code>http://localhost:8080/</code> and click this file. Everything else in the app behaves exactly the same — ' +
+          'same data, same vault file, same books. Only now Google will talk to it.</p></div>'
+        : '') +
+      '<div class="prose-c fs13"><h5>Getting a Client ID (once, about three minutes)</h5><ol>' +
+        '<li>Go to <code>console.cloud.google.com</code> and make a project (any name).</li>' +
+        '<li>Under <strong>APIs &amp; Services → Library</strong>, enable the <strong>Google Docs API</strong> and the <strong>Google Drive API</strong>.</li>' +
+        '<li>Under <strong>OAuth consent screen</strong>, choose <em>External</em>, fill in the three required boxes, and add your own Google address under <strong>Test users</strong>.</li>' +
+        '<li>Under <strong>Credentials → Create credentials → OAuth client ID</strong>, choose <strong>Web application</strong>.</li>' +
+        '<li>Add this exact address under <strong>Authorised JavaScript origins</strong>:<br>' +
+          '<code style="user-select:all">' + esc(org === 'null' ? 'http://localhost:8080' : org) + '</code></li>' +
+        '<li>Copy the Client ID it gives you and paste it into the box on this page.</li>' +
+      '</ol>' +
+      '<h5>What the app can and cannot do with it</h5><ul>' +
+        '<li>It asks for two permissions: create and edit Docs, and see only the files it created. It cannot read the rest of your Drive.</li>' +
+        '<li>The sign-in token is kept in memory for this tab only. It is never written to your vault, your backup, or anywhere else.</li>' +
+        '<li>Your Client ID <em>is</em> saved with your settings so you do not have to paste it again. A Client ID is not a secret.</li>' +
+        '<li>Pictures you have placed inside chapters appear in the Doc as a marked placeholder line unless they are hosted at a public web address — ' +
+          'Google will not accept an image pasted in as data.</li>' +
+      '</ul></div>',
+    footer: '<button class="btn solid" data-modal-close>GOT IT</button>'
+  });
+};
+
+/* ------------------------------- the page -------------------------------- */
+VIEWS.gdoc = {
+  render() {
+    const b = requireBook(); if (!b) return noBookPanel();
+    const g = gdocOf(b);
+    const G = state.app.google || (state.app.google = { clientId: '', minSeconds: 12, connected: false });
+    const cap = googleCapability();
+    const linked = !!g.id;
+
+    return '' +
+    '<div class="grid-auto" style="grid-template-columns:minmax(0,1.3fr) minmax(280px,360px)">' +
+      '<div>' +
+
+        '<div class="panel clip mb14 ' + (linked && g.live ? '' : 'tone-red') + '">' +
+          '<div class="panel-hd"><i data-lucide="file-text"></i><h3>THIS BOOK AS A GOOGLE DOC</h3><span style="flex:1"></span>' +
+            (linked && g.live ? '<span class="livepill inline ok"><span class="lpdot"></span><span class="lptxt">LIVE UPDATING</span></span>' :
+             linked ? '<span class="chip am">LINKED, NOT LIVE</span>' : '<span class="chip">NOT SET UP</span>') +
+          '</div>' +
+          '<div class="panel-bd">' +
+            '<div class="helpbox mb14"><b>A SECOND COPY THAT KEEPS ITSELF CURRENT</b>' +
+              'Press one button and <strong>' + esc(b.title) + '</strong> becomes a real Google Doc in your Drive — laid out as a novel, ' +
+              'not as a wall of text. Leave <em>live updating</em> on and the Doc follows what you type in here, so you can hand someone a link ' +
+              'and they always see the latest draft.</div>' +
+
+            (!cap.ok
+              ? '<div class="panel mb14" style="padding:13px;border-color:color-mix(in srgb, var(--c-amber) 50%, transparent)">' +
+                '<div class="flex center gap8 mb6"><i data-lucide="alert-triangle" style="width:16px;height:16px;color:var(--c-amber)"></i>' +
+                '<strong class="t-am">' + esc(
+                  cap.code === 'origin' ? 'Google sign-in cannot run from a file opened off your disk'
+                  : cap.code === 'offline' ? 'You are offline'
+                  : 'One thing left to do') + '</strong></div>' +
+                '<div class="fs13 muted mb10">' + esc(cap.why) +
+                  (cap.code === 'origin'
+                    ? ' Google only issues sign-in tokens to pages with a real web address. Serve this file from your own machine — one command — and everything here works.'
+                    : cap.code === 'clientid' ? ' Paste your own Google OAuth Client ID below; it takes about three minutes to create one.' : '') +
+                '</div>' +
+                (cap.code === 'origin'
+                  ? '<div class="mono fs12" style="padding:9px 11px;border:1px solid var(--line-hard);background:var(--void);user-select:all">' +
+                    'python3 -m http.server 8080' +
+                    '</div><div class="fs12 muted mt6">Run that in the folder holding this file, then open <code>http://localhost:8080/</code>. ' +
+                    'Your books, vault file and settings are all exactly the same there.</div>' : '') +
+                '<button class="btn sm mt10" data-act="gHelp"><i data-lucide="help-circle"></i>SHOW ME THE WHOLE SET-UP</button>' +
+                '</div>'
+              : '') +
+
+            '<label class="fld"><span class="lb">Your Google OAuth Client ID' +
+              (G.clientId ? ' <span class="chip lm">SET</span>' : ' <span class="chip am">NEEDED</span>') + '</span>' +
+              '<input class="inp mono" data-root="app" data-sub="google" data-model="clientId" data-rerender ' +
+                'placeholder="1234567890-abcdefg.apps.googleusercontent.com" value="' + attr(G.clientId || '') + '">' +
+              '<span class="hint">Created once in Google Cloud Console. It is not a secret and it is saved with your settings. ' +
+              'Authorised JavaScript origin must be <code>' + esc(location.origin === 'null' ? 'http://localhost:8080' : location.origin) + '</code>.</span></label>' +
+
+            '<div class="flex gap6 wrap mb14">' +
+              (G.connected
+                ? '<span class="chip lm">GOOGLE ACCOUNT CONNECTED</span><button class="btn sm ghost red" data-act="gDisconnect"><i data-lucide="log-out"></i>DISCONNECT</button>'
+                : '<button class="btn solid" data-act="gConnect"' + (cap.ok ? '' : ' disabled') + '><i data-lucide="log-in"></i>CONNECT MY GOOGLE ACCOUNT</button>') +
+              '<button class="btn ghost sm" data-act="gHelp"><i data-lucide="help-circle"></i>HOW THIS WORKS</button>' +
+            '</div>' +
+
+            (linked
+              ? '<div style="padding:13px;border:1px solid var(--line-hard);background:color-mix(in srgb, var(--accent) 6%, transparent)">' +
+                '<div class="mono fs10 faint">THE DOC FOR THIS BOOK</div>' +
+                '<div style="font-family:var(--font-display);font-size:15px;color:var(--txt);word-break:break-all">' + esc(g.title || b.title) + '</div>' +
+                '<div class="mono fs10 faint mt6" style="word-break:break-all">' + esc(g.url) + '</div>' +
+                '<div class="flex gap6 wrap mt10">' +
+                  '<button class="btn sm solid" data-act="gdocOpen"><i data-lucide="external-link"></i>OPEN IT IN GOOGLE DOCS</button>' +
+                  '<button class="btn sm" data-act="gdocPushNow"><i data-lucide="upload-cloud"></i>UPDATE IT NOW</button>' +
+                  '<button class="btn sm ghost" data-act="gdocPreview"><i data-lucide="list"></i>WHAT WILL LAND IN IT</button>' +
+                  '<button class="btn sm ghost red" data-act="gdocUnlink"><i data-lucide="unlink"></i>STOP USING IT</button>' +
+                '</div></div>'
+              : '<div class="flex gap6 wrap">' +
+                '<button class="btn solid lg" data-act="gdocCreate"' + (cap.ok && G.connected ? '' : ' disabled') + '><i data-lucide="file-plus"></i>CREATE THE GOOGLE DOC</button>' +
+                '<button class="btn lg" data-act="gdocLink"' + (cap.ok && G.connected ? '' : ' disabled') + '><i data-lucide="link"></i>USE A DOC I ALREADY HAVE</button>' +
+                '</div>') +
+          '</div></div>' +
+
+        /* ---- live updating ---- */
+        '<div class="panel clip mb14"><div class="panel-hd"><i data-lucide="radio"></i><h3>LIVE UPDATING</h3><span style="flex:1"></span>' +
+          (linked && g.live ? '<span class="livepill inline ok"><span class="lpdot"></span><span class="lptxt">ON</span></span>' : '<span class="chip">OFF</span>') +
+        '</div><div class="panel-bd">' +
+          '<div class="helpbox mb14"><b>WHAT “LIVE” ACTUALLY MEANS HERE</b>' +
+            'While it is on, every change you make is queued and written into the Doc a few seconds later — you do not press anything. ' +
+            'It is not literally per-keystroke: Google rewrites the whole document on each update, so sending one on every letter would be ' +
+            'thrown out by Google within a minute. A short pause between updates is what makes it reliable. ' +
+            'The red badge in the top bar flashes whenever live updating is on, and tells you the moment the last update landed.</div>' +
+          '<label class="flex center gap8 fs13 mb14"><input type="checkbox" data-act="gdocLive"' + (g.live ? ' checked' : '') + (linked ? '' : ' disabled') + '> ' +
+            '<span>Keep the Google Doc updated while I write</span></label>' +
+          '<div class="grid-auto g2" data-root="app" data-sub="google">' +
+            '<label class="fld" style="margin:0"><span class="lb">Wait at least this long between updates</span>' +
+              '<select class="sel" data-model="minSeconds" data-rerender>' +
+                [[5, 'every 5 seconds — fastest'], [12, 'every 12 seconds (recommended)'], [30, 'every 30 seconds'],
+                 [60, 'every minute'], [300, 'every 5 minutes']].map(o =>
+                  '<option value="' + o[0] + '"' + (Number(G.minSeconds || 12) === o[0] ? ' selected' : '') + '>' + o[1] + '</option>').join('') +
+              '</select><span class="hint">A change is only sent when something actually changed, so an idle book costs nothing.</span></label>' +
+            '<div><div class="lb">Right now</div><div id="gdocState" class="chip">…</div>' +
+              '<div class="fs12 muted mt6">Turn this off any time — the Doc simply stops changing.</div></div>' +
+          '</div>' +
+        '</div></div>' +
+
+        /* ---- what the doc will look like ---- */
+        '<div class="panel clip"><div class="panel-hd"><i data-lucide="book-open"></i><h3>HOW THE DOC IS LAID OUT</h3>' +
+          '<span style="flex:1"></span><button class="btn xs ghost" data-go="designer"><i data-lucide="settings-2"></i>CHANGE THE DESIGN</button></div>' +
+          '<div class="panel-bd">' +
+            '<div class="helpbox mb14"><b>IT COPIES YOUR BOOK DESIGNER SETTINGS</b>' +
+              'Whatever the Book Designer is set to is what the Doc becomes — so the Doc is as elegant as the printed page, not a text dump.</div>' +
+            '<div class="grid-auto g3">' +
+              miniStat('Trim size', esc(trimOf((b.design || newDesign()).trim)[1].split('—')[0].trim())) +
+              miniStat('Typeface', esc(gFontName((b.design || newDesign()).font))) +
+              miniStat('Body size', ((b.design || newDesign()).size) + ' pt') +
+              miniStat('Leading', ((b.design || newDesign()).leading) + '×') +
+              miniStat('First-line indent', ((b.design || newDesign()).indent) + ' em') +
+              miniStat('Alignment', esc((b.design || newDesign()).align)) +
+            '</div>' +
+            '<div class="prose-c fs13 mt14"><ul>' +
+              '<li>Title page centred, with the byline and logline underneath, on its own page.</li>' +
+              '<li>Dedication centred and italic, on its own page.</li>' +
+              '<li>Every chapter starts on a new page with a real Heading 1, so Google’s document outline works.</li>' +
+              '<li>Body text justified with your first-line indent; the paragraph after a heading or scene break is flush, as in print.</li>' +
+              '<li>Bold, italics, quotes, headings and lists you used while writing all carry across.</li>' +
+              '<li>Scene breaks appear as your chosen mark, centred.</li>' +
+              '<li>Pictures placed inside chapters become a marked line — Google will not take an image pasted in as data.</li>' +
+            '</ul></div>' +
+          '</div></div>' +
+      '</div>' +
+
+      /* ---------------- right column ---------------- */
+      '<div><div style="position:sticky;top:12px">' +
+        '<div class="panel clip mb14"><div class="panel-hd"><i data-lucide="clock"></i><h3>LAST UPDATE</h3></div><div class="panel-bd">' +
+          '<div class="lb">This book’s Doc was last written</div>' +
+          '<div id="gdocStamp" class="fs13 mb14">…</div>' +
+          '<div class="grid-auto g2">' +
+            '<div><div class="lb">Updates sent</div><div class="mono" id="gdocCount" style="font-size:20px;color:var(--accent)">0</div></div>' +
+            '<div><div class="lb">Words in the Doc</div><div class="mono" id="gdocWords" style="font-size:20px;color:var(--accent)">0</div></div>' +
+          '</div>' +
+          (g.lastError ? '<div class="fs12 t-rd mt10">Last error: ' + esc(g.lastError) + '</div>' : '') +
+        '</div></div>' +
+
+        '<div class="panel clip mb14"><div class="panel-hd"><i data-lucide="shield"></i><h3>WHAT LEAVES THIS APP</h3></div><div class="panel-bd prose-c fs12"><ul>' +
+          '<li>Only the book you have linked, and only when an update is sent.</li>' +
+          '<li>It goes straight from your browser to <code>docs.googleapis.com</code>. There is no server in between.</li>' +
+          '<li>The sign-in token lives in this tab’s memory. It is never saved to your vault or your backups.</li>' +
+          '<li>The app asks only to create and edit its own Docs. It cannot see the rest of your Drive.</li>' +
+          '<li>Turning live updating off, or closing the tab, stops everything immediately.</li>' +
+        '</ul></div></div>' +
+
+        '<div class="panel clip"><div class="panel-hd"><i data-lucide="list"></i><h3>ALL YOUR BOOKS</h3></div><div class="panel-bd">' +
+          '<div class="fs12 muted mb10">Each book gets its own Doc. Switch book to set one up.</div>' +
+          state.books.map(bk => {
+            const bg = bk.gdoc || {};
+            return '<div class="flex between center gap8 mb6" style="padding:8px 10px;border:1px solid var(--line)">' +
+              '<div style="min-width:0;flex:1"><div class="fs13" style="color:var(--txt);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(bk.title) + '</div>' +
+              '<div class="mono fs10 faint">' + (bg.id ? (bg.live ? 'live · ' : 'linked · ') + (bg.lastSync ? esc(timeAgo(bg.lastSync)) : 'never sent') : 'no doc') + '</div></div>' +
+              (bk.id === b.id ? '<span class="chip cy">OPEN</span>' : '<button class="btn xs ghost" data-act="switchBook" data-id="' + bk.id + '">OPEN</button>') +
+            '</div>';
+          }).join('') +
+        '</div></div>' +
+      '</div></div>' +
+    '</div>';
+  },
+  mount() { paintGdocStamp(); paintLivePill(); }
 };
 
 /* ---------------------------- quick settings ----------------------------- */
@@ -10867,6 +12757,22 @@ function seedStarterBook() {
   state.books.push(b);
   state.ui.bookId = b.id;
 }
+/* Shown when the data on disk was written by a build newer than this one. */
+function versionModal(wroteIt) {
+  openModal({
+    title: 'THIS DATA CAME FROM A NEWER VERSION', icon: 'refresh-cw', size: 'narrow', closeOnScrim: false,
+    body: '<div class="helpbox mb14"><b>EVERYTHING OPENED, NOTHING WAS THROWN AWAY</b>' +
+      'Your project was last saved by <strong>version ' + esc(wroteIt) + '</strong>. The app file you are running is ' +
+      '<strong>version ' + APP_VERSION + '</strong>.</div>' +
+      '<div class="prose-c fs13"><p>Anything the newer version added has been carried through untouched even though this build ' +
+      'cannot show it yet, so going back to the newer app file loses nothing.</p>' +
+      '<ul><li><strong>' + state.books.length + '</strong> book(s), <strong>' + fmt(state.books.reduce((n, b) => n + bookWords(b), 0)) + '</strong> words are here.</li>' +
+      '<li>If you have a newer <code>.html</code> file somewhere, open that one instead.</li>' +
+      '<li>If you meant to go back a version, carry on — it is safe.</li></ul></div>',
+    footer: '<button class="btn ghost" data-go="storage" data-modal-close><i data-lucide="database"></i>STORAGE &amp; BACKUPS</button>' +
+      '<button class="btn solid" data-modal-close>CARRY ON</button>'
+  });
+}
 function welcomeModal() {
   openModal({
     title: 'RAVENBANE · ARCHITECT — GRID ONLINE', icon: 'sparkles', size: '',
@@ -10886,9 +12792,36 @@ function welcomeModal() {
       '<li>Autosave writes every ' + (state.app.autosaveSec || 5) + ' seconds — but export a JSON backup from <strong>Export &amp; Data</strong> before you close the browser for the night.</li></ul>' +
       '</div>',
     footer: '<button class="btn ghost" data-act="loadDemo"><i data-lucide="sparkles"></i>LOAD DEMO PROJECT</button>' +
+            '<button class="btn" data-act="bringAcross" style="margin-right:auto"><i data-lucide="upload"></i>I ALREADY HAVE WORK — BRING IT ACROSS</button>' +
             '<button class="btn solid red" data-modal-close><i data-lucide="zap"></i>ENTER THE GRID</button>'
   });
 }
+/* First run of a fresh copy of the app — the three ways to get your existing
+   work into it. This is the other half of "updating never loses anything". */
+ACTIONS.bringAcross = function () {
+  openModal({
+    title: 'BRING YOUR WORK ACROSS', icon: 'upload', size: '',
+    body: '<div class="helpbox mb14"><b>YOU HAVE OPENED A FRESH COPY OF THE APP</b>' +
+      'That is all this file is — the program. Your books live in your vault file, your storage folder, or a backup you downloaded. ' +
+      'Point this copy at any one of them and you are straight back where you were.</div>' +
+      '<div class="grid-auto g2">' +
+        '<div class="optcard tone1"><strong class="fs13" style="color:var(--txt)">I USE A STORAGE FOLDER</strong>' +
+          '<div class="fs12 muted mt6">The app reads the newest file in it — including the dated copies in <code>backups/</code> — and carries on.</div>' +
+          '<button class="btn w100 mt10' + (HAS_FSD ? ' solid' : ' ghost') + '" data-act="folderChoose"' + (HAS_FSD ? '' : ' disabled') + '><i data-lucide="folder-plus"></i>CHOOSE MY FOLDER</button></div>' +
+        '<div class="optcard tone2"><strong class="fs13" style="color:var(--txt)">I USE A VAULT FILE</strong>' +
+          '<div class="fs12 muted mt6">One file that holds everything. Open it and this copy starts writing into it too.</div>' +
+          '<button class="btn w100 mt10' + (HAS_FSA ? ' solid' : ' ghost') + '" data-act="vaultOpen"><i data-lucide="database"></i>OPEN MY VAULT FILE</button></div>' +
+        '<div class="optcard tone3"><strong class="fs13" style="color:var(--txt)">I HAVE A BACKUP FILE</strong>' +
+          '<div class="fs12 muted mt6">Any <code>.json</code> backup this app has ever produced, from any version.</div>' +
+          '<button class="btn w100 mt10" data-act="impPick"><i data-lucide="upload"></i>UPLOAD A BACKUP</button></div>' +
+        '<div class="optcard"><strong class="fs13" style="color:var(--txt)">NOTHING TO BRING</strong>' +
+          '<div class="fs12 muted mt6">Start clean. You can set up a folder or vault file at any time from Storage &amp; Backups.</div>' +
+          '<button class="btn w100 mt10 ghost" data-modal-close>START FRESH</button></div>' +
+      '</div>' +
+      (!HAS_FSD && !HAS_FSA ? '<div class="fs12 t-am mt14">This browser cannot open files or folders directly — Firefox and Safari do not support it yet. Uploading a backup works everywhere.</div>' : ''),
+    footer: '<button class="btn ghost" data-modal-close>CLOSE</button>'
+  });
+};
 ACTIONS.loadDemo = function () {
   const b = newBook('The Ashfall Protocol');
   b.author = 'V. Ravenbane';
@@ -11047,7 +12980,15 @@ function paintVaultPill() {
     none: ['', 'NO VAULT FILE', 'Click to choose a file on your computer that this app saves into automatically'],
     unsupported: ['', 'BROWSER SAVE', 'This browser cannot write to a file directly — use Download Backup instead']
   };
-  const m = map[VAULT_STATUS] || map.none;
+  let m = map[VAULT_STATUS] || map.none;
+  if (VAULT_STATUS !== 'ready' && FOLDER_HANDLE) {
+    const fmap = {
+      ready: ['lm', 'FOLDER ON', 'Your work is being written into the folder “' + FOLDER_HANDLE.name + '”'],
+      'needs-permission': ['am', 'FOLDER PAUSED', 'Click to give the browser permission to write into your storage folder again'],
+      error: ['rd', 'FOLDER ERROR', 'The last write into your storage folder failed — click to look']
+    };
+    m = fmap[FOLDER_STATUS] || m;
+  }
   el.className = 'chip ' + m[0];
   el.title = m[2];
   el.textContent = m[1];
@@ -11072,11 +13013,15 @@ function recoveredModal(from) {
 async function boot() {
   await storageInit();
   const res = await storageLoad();
-  let first = false, recovered = null;
+  let first = false, recovered = null, upgraded = null, downgraded = null;
   if (res && res.data) {
     try {
+      const wroteIt = res.data.__ver || '';
       state = migrateState(res.data);
       if (res.recovered) recovered = res.from;
+      if (wroteIt && verCmp(wroteIt, APP_VERSION) < 0) upgraded = wroteIt;
+      if (wroteIt && verCmp(wroteIt, APP_VERSION) > 0) downgraded = wroteIt;
+      state.app.storage.savedByVersion = APP_VERSION;
     } catch (e) { console.error('Migration failed, starting clean.', e); state = defaultState(); first = true; }
   } else { first = true; }
 
@@ -11146,8 +13091,17 @@ async function boot() {
 
   requestPersistence().then(p => { state.app.storage.persisted = !!p; });
   paintVaultPill();
+  startGdocLoop();
+  paintLivePill();
   if (recovered) setTimeout(() => recoveredModal(recovered), 500);
   else if (first) setTimeout(welcomeModal, 400);
+  else if (downgraded) setTimeout(() => versionModal(downgraded, false), 500);
+  else if (upgraded) {
+    /* a silent, successful upgrade — say so once, then get out of the way */
+    setTimeout(() => toast('Updated from v' + upgraded + ' to v' + APP_VERSION + '. All ' + state.books.length +
+      ' project(s) carried over untouched.', 'ok', 'UP TO DATE'), 700);
+    markDirty();
+  }
   console.log('%cRAVENBANE · ARCHITECT online — engine: ' + ENGINE, 'color:#23e0ff;font-family:monospace');
 }
 
