@@ -6,6 +6,12 @@ creation suite in a single self-contained HTML file.
 ## Running it
 
 Open `index.html` in any modern browser. There is no build step, no install, no server.
+
+One optional exception: **Google Doc Sync** needs the file served over http rather than
+opened off the disk, because Google will not sign in to a `file://` page. If you want
+that feature, run `python3 -m http.server 8080` in this folder and open
+`http://localhost:8080/`. Everything else is identical either way.
+
 ## Never losing your work
 
 Open **Storage & Backups** and press **Choose where to save**. Pick any file on your
@@ -15,6 +21,12 @@ pictures, settings, even your menu layout.
 
 Move that file to another machine, open the app there, press **Open an existing vault
 file**, and you are exactly where you left off — no accounts, no sync service, no install.
+
+Or hand it a **whole folder** instead. It keeps `ravenbane-vault.json` in there
+permanently current and rotates dated copies into a `backups` sub-folder. That is
+also what makes updating painless: download a newer version of the app, delete the
+old one, press *Choose a folder* and point at the same folder — it reads the newest
+thing inside and carries on.
 
 Underneath it there are three more layers:
 
@@ -26,6 +38,25 @@ Underneath it there are three more layers:
   survives even a killed tab.
 
 Backups carry a checksum and are verified before anything is restored.
+
+### Updating without losing anything
+
+Your work is not inside the `.html` file — that file is only the program. Every save,
+snapshot and backup is stamped with the version that wrote it and the moment it was
+written, and the app uses those stamps to do the right thing:
+
+- Data from an **older** version gains everything the new one added, and nothing it
+  already had is touched.
+- Data from a **newer** version still opens, and fields this build has never heard of
+  are carried through rather than stripped — so going backwards a version destroys
+  nothing.
+- When two copies exist, **the one written most recently wins**, judged by the clock
+  rather than by a counter that only means anything on one machine.
+- **Merge, newest wins** compares book by book, so two half-updated machines reconcile
+  without either side losing work.
+
+So the whole upgrade is: download the new file, delete the old one, point it back at
+your vault file or storage folder.
 
 > Saving straight into a file needs Chrome, Edge, Opera or Brave. Firefox and Safari do not
 > support it yet — there, use **Download a full backup**, which produces exactly the same file.
@@ -53,6 +84,38 @@ Every book gets its own social-media style page, second in the menu:
 - **Paragraph markers.** Put the cursor in any paragraph and press *Tag paragraph* to mark the exact line where the story turns. Every mark is listed in the **Story Map** beside the feed and jumps you straight there.
 - **Six tabs you can reorder** — drag any tab to move it: Chapters · About This Book (series, comps, POV, tense, setting, themes, warnings, pitch, synopsis, production plan, plus a completeness checklist) · Cast · World & Lore · Gallery · Notes.
 - **A real photo album.** Add photos or GIFs, give each a title, description and tags, and click one for a full-screen viewer with the details beside the picture (or underneath — your choice). Every image used elsewhere in the book is gathered underneath, one click from being copied into the album. Any photo can be made the book's cover or profile picture.
+
+### The cast, one page each
+
+A **CHARACTERS** group in the menu lists everyone in the open book, portrait and all.
+Click any of them for their own page: a cover picture, a portrait you can size, shape
+and position, and seven tabs — Dossier, Inner Life, Voice & Dialogue, Relationships,
+Appearances, Gallery, Notes. A gauge tells you what is still blank, four AI buttons
+read the character *and* the book before suggesting anything (and work offline), and
+**Appearances** finds them in your actual prologue and chapters by name, updating
+itself as you write.
+
+### Pictures inside the prose
+
+The picture button in any editor drops a photo or animated GIF **at the text cursor** —
+mid-chapter, between two paragraphs, wherever you are. Upload it, paste a link, or
+reuse anything already in the book. Click a placed picture to set its width, put it
+left, centre, right or full width, and give it a caption. Figures carry through the
+Book Designer's pagination, the exported HTML book and the Markdown manuscript.
+
+### A Google Doc that keeps itself current
+
+Open **Google Doc Sync**, connect your Google account and this book becomes a real Doc
+in your Drive — typeset from your Book Designer settings, so it opens looking like the
+book rather than a wall of text: title page, dedication, chapters on new pages as real
+headings, justified body with your indent, scene breaks, bold and italics intact.
+Leave live updating on and the Doc follows what you write, with a flashing red **LIVE
+UPDATING** badge in the top bar and a last-updated time for every book.
+
+> Google only issues sign-in tokens to pages with a real web address, so this needs the
+> app served over `http://` or `https://` rather than opened straight off the disk — the
+> page detects that and gives you the one command that fixes it. You supply your own
+> OAuth Client ID; the sign-in token lives in the tab's memory and is never saved.
 
 ### Making it yours
 
@@ -112,7 +175,9 @@ Every page opens with a plain-English guide: one sentence on what the page is, a
 | **Vault** | Draggable moodboard canvas, external reference library, and six in-depth masterclass craft lessons. |
 | **Book Designer** | Your book typeset on real pages — eight print templates, trim sizes, margins, drop caps, running heads, page numbers — previewed live and exported as a proper PDF. |
 | **Idea Lab** | Twenty-one brainstorming tools that read your book first, plus a Story Advisor that works out what you should write next. |
-| **Storage** | Vault file on your own disk, write-ahead saves, snapshot history, verified backups. |
+| **Characters** | Every character listed in the menu, each with a full profile page: cover, portrait, dossier, inner life, voice, ties, appearances, gallery, notes. |
+| **Google Doc Sync** | This book mirrored into a live-updating Google Doc, typeset from your Book Designer settings. |
+| **Storage** | Vault file or storage folder on your own disk, write-ahead saves, snapshot history, verified backups, version-stamped and update-proof. |
 | **Export** | JSON backup/restore, clean HTML book, Markdown manuscript, printable manuscript, full story bible, cast sheet, comic script and children's dummy book. |
 
 ## AI providers

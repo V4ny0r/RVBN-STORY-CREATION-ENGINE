@@ -5433,7 +5433,6 @@ function charSide(c, b, depth, app) {
 
 /* ------------------------------- actions -------------------------------- */
 ACTIONS.charTab = function (el) { state.ui.charTab = el.getAttribute('data-arg'); markDirty(true); render(); };
-ACTIONS.charPage = function (el) { go('character', el.getAttribute('data-id')); };
 ACTIONS.charGoTo = function (el) {
   const v = el.getAttribute('data-v'), a = el.getAttribute('data-arg');
   if (v === 'profile' && a) { state.ui.feedOpen = a; go('profile'); }
@@ -9174,6 +9173,10 @@ VIEWS.profile = {
         '<button class="btn solid" data-act="feedAdd"><i data-lucide="plus"></i>WRITE A NEW CHAPTER</button>' +
         '<button class="btn ghost" data-act="profEdit"><i data-lucide="pencil"></i>EDIT PROFILE</button>' +
         '<button class="btn ghost" data-act="themeEdit"><i data-lucide="palette"></i>CUSTOMISE LOOK</button>' +
+        '<button class="btn ghost" data-go="gdoc" title="Mirror this book into a Google Doc that keeps itself up to date">' +
+          ((b.gdoc && b.gdoc.live && b.gdoc.id)
+            ? '<span class="lpdot" style="margin-right:2px"></span>GOOGLE DOC · LIVE'
+            : '<i data-lucide="file-text"></i>GOOGLE DOC') + '</button>' +
         '<button class="btn ghost" data-go="library"><i data-lucide="library"></i>ALL MY BOOKS' +
           (state.books.length > 1 ? ' <span class="badge">' + state.books.length + '</span>' : '') + '</button>' +
       '</div>' +
@@ -11166,13 +11169,15 @@ function gBuildRequests(b, blocks, docEnd) {
       });
     }
   });
-  bulletRanges.forEach(bl => reqs.push({
+  /* bullets go last: turning a paragraph into a list item can shift the
+     indices after it, so every index-based style must already be applied. */
+  const bulletReqs = bulletRanges.map(bl => ({
     createParagraphBullets: {
       range: bl.range,
       bulletPreset: bl.ordered ? 'NUMBERED_DECIMAL_ALPHA_ROMAN' : 'BULLET_DISC_CIRCLE_SQUARE'
     }
   }));
-  return { text: text, requests: reqs.concat(runReqs) };
+  return { text: text, requests: reqs.concat(runReqs, bulletReqs) };
 }
 function hexToRgb01(hex) {
   const h = String(hex || '#000').replace('#', '');
@@ -11347,7 +11352,9 @@ ACTIONS.gdocPushNow = async function () {
 ACTIONS.gdocLive = function (el) {
   const b = requireBook(); if (!b) return;
   const g = gdocOf(b);
-  g.live = el.type === 'checkbox' ? el.checked : !g.live;
+  /* a pure toggle: the delegated click handler calls preventDefault(), so a
+     checkbox's own state is not something to read back from. */
+  g.live = !g.live;
   if (g.live && !g.id) { g.live = false; toast('Create the Google Doc first.', 'warn'); }
   if (g.live) { GDOC_DIRTY = true; toast('Live updating is on. The Doc follows what you type.', 'ok'); }
   else toast('Live updating is off. The Doc stays exactly as it is until you press update.', 'warn');
@@ -13021,7 +13028,6 @@ async function boot() {
       if (res.recovered) recovered = res.from;
       if (wroteIt && verCmp(wroteIt, APP_VERSION) < 0) upgraded = wroteIt;
       if (wroteIt && verCmp(wroteIt, APP_VERSION) > 0) downgraded = wroteIt;
-      state.app.storage.savedByVersion = APP_VERSION;
     } catch (e) { console.error('Migration failed, starting clean.', e); state = defaultState(); first = true; }
   } else { first = true; }
 
