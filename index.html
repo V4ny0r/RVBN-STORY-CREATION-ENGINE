@@ -1034,6 +1034,27 @@ label.fld > .hint{ margin-top:3px; }
 @media(max-width:820px){ .wrap3d{ flex-direction:column; } .wrap3d .w3-spine{ flex:0 0 44px; }
   .wrap3d .w3-spine span{ writing-mode:horizontal-tb; transform:none; padding:0; } }
 
+
+/* ------------------- pictures placed inside the prose -------------------- */
+.rte figure.ed-fig{ margin:1.1em auto; padding:0; max-width:100%; }
+.rte figure.ed-fig img{ width:100%; display:block; border:1px solid var(--line); margin:0; cursor:pointer; }
+.rte figure.ed-fig figcaption{ font-size:.78em; text-align:center; color:var(--txt-faint); margin-top:.4em; font-style:italic; }
+.rte figure.ed-fig[data-align="center"]{ margin-left:auto; margin-right:auto; }
+.rte figure.ed-fig[data-align="full"]{ width:100% !important; margin-left:0; margin-right:0; }
+.rte figure.ed-fig[data-align="left"]{ float:left; margin:.3em 1.2em .8em 0; }
+.rte figure.ed-fig[data-align="right"]{ float:right; margin:.3em 0 .8em 1.2em; }
+.rte figure.ed-fig[data-w="15"]{ width:15% } .rte figure.ed-fig[data-w="20"]{ width:20% }
+.rte figure.ed-fig[data-w="25"]{ width:25% } .rte figure.ed-fig[data-w="30"]{ width:30% }
+.rte figure.ed-fig[data-w="35"]{ width:35% } .rte figure.ed-fig[data-w="40"]{ width:40% }
+.rte figure.ed-fig[data-w="45"]{ width:45% } .rte figure.ed-fig[data-w="50"]{ width:50% }
+.rte figure.ed-fig[data-w="55"]{ width:55% } .rte figure.ed-fig[data-w="60"]{ width:60% }
+.rte figure.ed-fig[data-w="65"]{ width:65% } .rte figure.ed-fig[data-w="70"]{ width:70% }
+.rte figure.ed-fig[data-w="75"]{ width:75% } .rte figure.ed-fig[data-w="80"]{ width:80% }
+.rte figure.ed-fig[data-w="85"]{ width:85% } .rte figure.ed-fig[data-w="90"]{ width:90% }
+.rte figure.ed-fig[data-w="95"]{ width:95% } .rte figure.ed-fig[data-w="100"]{ width:100% }
+.rte img:hover{ outline:2px solid var(--accent); outline-offset:2px; }
+.rte::after{ content:''; display:block; clear:both; }
+
 </style>
 </head>
 <body>
@@ -3778,13 +3799,122 @@ ACTIONS.edCmd = function (el) {
   else document.execCommand(cmd, false, null);
   ed.dispatchEvent(new Event('input'));
 };
-ACTIONS.edImage = async function (el) {
+/* Pictures and GIFs can go anywhere in the prose. They are inserted at the
+   cursor as a <figure> so alignment, width and a caption travel with them. */
+ACTIONS.edImage = function (el) {
   const id = el.getAttribute('data-ed');
-  const f = await pickFile('image/*'); if (!f) return;
-  const ed = focusEditor(id); if (!ed) return;
-  document.execCommand('insertHTML', false, '<img src="' + attr(f.data) + '" alt="scene art" />');
+  saveRange();
+  window.__edTarget = id;
+  const b = currentBook();
+  const pool = b ? (b.gallery || []).concat(collectBookImages(b)) : [];
+  openModal({
+    title: 'PUT A PICTURE HERE', icon: 'image-plus', size: pool.length ? 'wide' : '',
+    body:
+      '<div class="helpbox mb14"><b>DROPPED IN AT YOUR CURSOR</b>' +
+        'The picture is placed exactly where the text cursor was — mid-chapter, between two paragraphs, anywhere. ' +
+        '<strong>Animated GIFs keep animating.</strong> Once it is in, click it to change how wide it is, which side it sits on, or to add a caption.</div>' +
+      '<div class="flex gap6 wrap mb14">' +
+        '<button class="btn solid" data-act="edImgUpload"><i data-lucide="upload"></i>UPLOAD A PICTURE / GIF</button>' +
+        '<button class="btn" data-act="edImgUrl"><i data-lucide="link"></i>FROM A LINK</button>' +
+      '</div>' +
+      (pool.length
+        ? '<div class="lb">…or reuse one already in this book</div><div class="gal">' +
+          pool.slice(0, 60).map((im, i) => '<figure data-act="edImgPool" data-i="' + i + '" style="cursor:pointer">' +
+            '<img src="' + attr(im.src) + '" loading="lazy"><figcaption>' + esc(im.title || 'Untitled') + '</figcaption></figure>').join('') + '</div>'
+        : '')
+  });
+  window.__edPool = pool;
+};
+function edInsertFigure(src, caption) {
+  const id = window.__edTarget;
+  const ed = focusEditor(id);
+  if (!ed) { toast('Open a chapter first.', 'warn'); return; }
+  const fig = '<figure class="ed-fig" data-align="center" data-w="70">' +
+    '<img src="' + attr(src) + '" alt="' + attr(caption || '') + '">' +
+    (caption ? '<figcaption>' + esc(caption) + '</figcaption>' : '') +
+    '</figure><p><br></p>';
+  document.execCommand('insertHTML', false, fig);
   ed.dispatchEvent(new Event('input'));
-  toast('Inline image embedded.', 'ok');
+  closeAllModals();
+  toast('Picture placed. Click it to resize, move it or add a caption.', 'ok');
+}
+ACTIONS.edImgUpload = async function () {
+  const f = await pickFile('image/*,image/gif'); if (!f) return;
+  edInsertFigure(f.data, '');
+};
+ACTIONS.edImgUrl = async function () {
+  const v = await promptDlg('PICTURE FROM A LINK', 'Direct image or GIF address', '');
+  if (!v || !v.trim()) return;
+  edInsertFigure(v.trim(), '');
+};
+ACTIONS.edImgPool = function (el) {
+  const im = (window.__edPool || [])[Number(el.getAttribute('data-i'))]; if (!im) return;
+  edInsertFigure(im.src, '');
+};
+/* Clicking a picture inside any editor opens its options. */
+document.addEventListener('click', (e) => {
+  const img = e.target.closest('.rte img');
+  if (!img) return;
+  e.preventDefault();
+  edImageOptions(img);
+});
+function edImageOptions(img) {
+  const fig = img.closest('figure.ed-fig');
+  const cap = fig ? fig.querySelector('figcaption') : null;
+  window.__edImg = img;
+  const align = fig ? (fig.getAttribute('data-align') || 'center') : 'center';
+  const w = fig ? Number(fig.getAttribute('data-w') || 70) : 100;
+  openModal({
+    title: 'PICTURE OPTIONS', icon: 'image', size: 'narrow',
+    body:
+      '<img src="' + attr(img.getAttribute('src')) + '" style="width:100%;max-height:230px;object-fit:contain;border:1px solid var(--line);background:var(--void)">' +
+      '<label class="fld mt10"><span class="lb">Width — <b id="fgW" class="t-cy">' + w + '%</b> of the text column</span>' +
+        '<input type="range" id="figW" min="15" max="100" value="' + w + '"></label>' +
+      '<label class="fld"><span class="lb">Position</span><select class="sel" id="figA">' +
+        [['left', 'Left, text wraps around it'], ['center', 'Centred on its own'], ['right', 'Right, text wraps around it'], ['full', 'Full width, on its own']]
+          .map(o => '<option value="' + o[0] + '"' + (align === o[0] ? ' selected' : '') + '>' + o[1] + '</option>').join('') +
+      '</select></label>' +
+      '<label class="fld"><span class="lb">Caption (optional)</span>' +
+        '<input class="inp" id="figC" value="' + attr(cap ? cap.textContent : '') + '" placeholder="Shown underneath in smaller type"></label>',
+    footer: '<button class="btn ghost red" data-act="figDelete" style="margin-right:auto"><i data-lucide="trash-2"></i>REMOVE</button>' +
+            '<button class="btn solid" data-act="figApply">APPLY</button>',
+    onMount: (r) => {
+      const wi = $('#figW', r);
+      wi.addEventListener('input', () => { $('#fgW', r).textContent = wi.value + '%'; });
+    }
+  });
+}
+ACTIONS.figApply = function () {
+  const img = window.__edImg; if (!img) return;
+  const ed = img.closest('.rte');
+  let fig = img.closest('figure.ed-fig');
+  if (!fig) {
+    fig = document.createElement('figure');
+    fig.className = 'ed-fig';
+    img.parentNode.insertBefore(fig, img);
+    fig.appendChild(img);
+  }
+  fig.setAttribute('data-align', $('#figA').value);
+  fig.setAttribute('data-w', $('#figW').value);
+  const capTxt = $('#figC').value.trim();
+  let cap = fig.querySelector('figcaption');
+  if (capTxt) {
+    if (!cap) { cap = document.createElement('figcaption'); fig.appendChild(cap); }
+    cap.textContent = capTxt;
+    img.setAttribute('alt', capTxt);
+  } else if (cap) cap.remove();
+  closeModal();
+  if (ed) ed.dispatchEvent(new Event('input'));
+  toast('Picture updated.', 'ok');
+};
+ACTIONS.figDelete = function () {
+  const img = window.__edImg; if (!img) return;
+  const ed = img.closest('.rte');
+  const fig = img.closest('figure.ed-fig');
+  (fig || img).remove();
+  closeModal();
+  if (ed) ed.dispatchEvent(new Event('input'));
+  toast('Picture removed.', 'warn');
 };
 ACTIONS.edPaper = function (el) { const ed = document.getElementById(el.getAttribute('data-ed')); if (ed) { ed.classList.toggle('paper'); el.classList.toggle('on'); } };
 ACTIONS.edFocus = function (el) { const ed = document.getElementById(el.getAttribute('data-ed')); if (ed) { ed.classList.toggle('focus-mode'); el.classList.toggle('on'); } };
@@ -6986,6 +7116,11 @@ function manuscriptHTML(b, opts) {
     'p{margin:0 0 1.05em;text-align:justify;hyphens:auto}' +
     'blockquote{border-left:3px solid #c9bfa8;margin:1.4em 0;padding-left:1.2em;font-style:italic;color:#4a4436}' +
     'img{max-width:100%;height:auto;display:block;margin:1.4em auto;border:1px solid #ddd7cb}' +
+    'figure{margin:1.4em auto;padding:0;max-width:100%}figure img{margin:0;width:100%}' +
+    'figure figcaption{font-family:Inter,sans-serif;font-size:12px;text-align:center;color:#8a7f6a;font-style:italic;margin-top:.5em}' +
+    'figure[data-align="left"]{float:left;margin:.3em 1.4em .9em 0}figure[data-align="right"]{float:right;margin:.3em 0 .9em 1.4em}' +
+    'figure[data-align="full"]{width:100%!important}.mspage:after{content:"";display:block;clear:both}' +
+    'figure[data-w="15"]{width:15%}' + 'figure[data-w="20"]{width:20%}' + 'figure[data-w="25"]{width:25%}' + 'figure[data-w="30"]{width:30%}' + 'figure[data-w="35"]{width:35%}' + 'figure[data-w="40"]{width:40%}' + 'figure[data-w="45"]{width:45%}' + 'figure[data-w="50"]{width:50%}' + 'figure[data-w="55"]{width:55%}' + 'figure[data-w="60"]{width:60%}' + 'figure[data-w="65"]{width:65%}' + 'figure[data-w="70"]{width:70%}' + 'figure[data-w="75"]{width:75%}' + 'figure[data-w="80"]{width:80%}' + 'figure[data-w="85"]{width:85%}' + 'figure[data-w="90"]{width:90%}' + 'figure[data-w="95"]{width:95%}' + 'figure[data-w="100"]{width:100%}' + ''+
     'hr{border:0;text-align:center;margin:2.6em 0}hr:after{content:"* * *";letter-spacing:.6em;color:#a0977f}' +
     '.imprint{font-family:Inter,sans-serif;font-size:11px;letter-spacing:3px;text-transform:uppercase;color:#8a7f6a}' +
     '.ff-serif{font-family:"Playfair Display",serif}.ff-sans{font-family:Inter,sans-serif}.ff-scifi{font-family:Orbitron,sans-serif}' +
@@ -7003,7 +7138,19 @@ function manuscriptMarkdown(b) {
   if (b.logline) out.push('> ' + b.logline, '');
   out.push('---', '');
   if (b.dedication.text) out.push('### Dedication', '', b.dedication.text, '', '---', '');
-  const html2md = (html) => stripHTML(String(html || '').replace(/<\/(p|div|h2|h3|blockquote|li)>/gi, '\n\n').replace(/<br\s*\/?>/gi, '\n').replace(/<li>/gi, '- ')).replace(/\n{3,}/g, '\n\n').trim();
+  /* Pictures placed inside the prose become real Markdown images so nothing
+     the writer put in the chapter is silently dropped on export. */
+  const html2md = (html) => {
+    const d = document.createElement('div'); d.innerHTML = String(html || '');
+    const swap = (node, alt, src) => node.parentNode.replaceChild(
+      document.createTextNode('\n\n![' + (alt || 'picture') + '](' + (src || '') + ')\n\n'), node);
+    d.querySelectorAll('figure').forEach(f => {
+      const im = f.querySelector('img'), cp = f.querySelector('figcaption');
+      swap(f, cp ? cp.textContent : '', im ? im.getAttribute('src') : '');
+    });
+    d.querySelectorAll('img').forEach(im => swap(im, im.getAttribute('alt'), im.getAttribute('src')));
+    return stripHTML(d.innerHTML.replace(/<\/(p|div|h2|h3|blockquote|li)>/gi, '\n\n').replace(/<br\s*\/?>/gi, '\n').replace(/<li>/gi, '- ')).replace(/\n{3,}/g, '\n\n').trim();
+  };
   if (b.prologue.html) out.push('## Prologue', '', html2md(b.prologue.html), '', '---', '');
   (b.chapters || []).forEach((c, i) => {
     out.push('## ' + (c.title || 'Chapter ' + (i + 1)), '');
@@ -9700,7 +9847,18 @@ function chapterNodes(html, d) {
     if (n.nodeType !== 1) return;
     const tag = n.tagName.toLowerCase();
     if (tag === 'hr') { nodes.push('<p class="bk-break">' + esc(d.sceneBreak || '* * *') + '</p>'); return; }
-    if (tag === 'img') { nodes.push('<figure class="bk-fig"><img src="' + attr(n.getAttribute('src') || '') + '" alt=""></figure>'); return; }
+    if (tag === 'img') { nodes.push('<figure class="bk-fig" style="width:100%"><img src="' + attr(n.getAttribute('src') || '') + '" alt=""></figure>'); return; }
+    if (tag === 'figure') {
+      const im = n.querySelector('img'); if (!im) return;
+      const cp = n.querySelector('figcaption');
+      const al = n.getAttribute('data-align') || 'center';
+      const wd = clamp(Number(n.getAttribute('data-w') || 70), 10, 100);
+      const style = 'width:' + wd + '%;' + (al === 'left' ? 'float:left;margin:.2em 1em .6em 0;' :
+        al === 'right' ? 'float:right;margin:.2em 0 .6em 1em;' : 'margin:1em auto;');
+      nodes.push('<figure class="bk-fig" style="' + style + '"><img src="' + attr(im.getAttribute('src') || '') + '" alt="">' +
+        (cp ? '<figcaption>' + esc(cp.textContent) + '</figcaption>' : '') + '</figure>');
+      return;
+    }
     const inner = n.innerHTML;
     if (!stripHTML(inner).trim() && !n.querySelector('img')) return;
     if (tag === 'h2' || tag === 'h3') nodes.push('<h3 class="bk-h">' + inner + '</h3>');
@@ -9736,6 +9894,7 @@ function paginate(b, d, opts) {
     '.bk-gauge .bk-h{font-size:1.08em;margin:1.3em 0 .5em;text-indent:0;}' +
     '.bk-gauge .bk-list{margin:0 0 .8em 1.4em;text-indent:0;}' +
     '.bk-gauge .bk-fig{margin:1em 0;} .bk-gauge .bk-fig img{max-width:100%;display:block;}' +
+    '.bk-gauge .bk-fig figcaption{font-size:.72em;margin-top:.35em;}' +
     '.bk-gauge .bk-drop{float:left;font-size:3.1em;line-height:.82;padding:.05em .08em 0 0;}' +
     '.bk-gauge .bk-open{margin:0 0 1.6em;text-indent:0;}' +
     '.bk-gauge .bk-open.ctr{padding-top:1.6in;} .bk-gauge .bk-open.big{padding-top:1.1in;}' +
@@ -9826,6 +9985,7 @@ function bookCSS(d, forPrint) {
     '.bk-page .bk-list{margin:0 0 .8em 1.4em;text-indent:0;text-align:left;}' +
     '.bk-page .bk-fig{margin:1em 0;text-indent:0;}' +
     '.bk-page .bk-fig img{max-width:100%;display:block;margin:0 auto;}' +
+    '.bk-page .bk-fig figcaption{font-size:.72em;text-align:center;opacity:.72;margin-top:.35em;font-style:italic;}' +
     '.bk-drop{float:left;font-size:3.1em;line-height:.82;padding:.05em .08em 0 0;font-weight:700;}' +
     '.bk-open{margin:0 0 1.6em;text-indent:0;}' +
     '.bk-open.ctr{text-align:center;padding-top:1.6in;}' +
