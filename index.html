@@ -555,6 +555,13 @@ input[type=checkbox]{ accent-color:#23e0ff; width:15px; height:15px; cursor:poin
 .cover-preview{ aspect-ratio:2/3; background:var(--surface-2); border:1px solid var(--line); position:relative; overflow:hidden;
   display:flex; flex-direction:column; box-shadow:0 20px 50px rgba(0,0,0,.7); }
 .cover-preview img.art{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
+.cover-preview.draggable-art{ cursor:grab; touch-action:none; }
+.cover-preview.draggable-art.dragging{ cursor:grabbing; }
+.cover-preview.draggable-art .cvr-txt{ cursor:grab; }
+.cover-preview.draggable-art::after{ content:'DRAG THE PICTURE TO MOVE IT'; position:absolute; left:0; right:0; top:0; z-index:7;
+  padding:4px 0; text-align:center; font-family:var(--font-mono); font-size:8px; letter-spacing:1.4px;
+  color:var(--txt); background:rgba(3,6,12,.62); opacity:0; transition:opacity .16s; pointer-events:none; }
+.cover-preview.draggable-art:hover::after{ opacity:1; }
 .cover-preview .cvr-scrim{ position:absolute; inset:0; }
 .cover-preview .cvr-txt{ position:relative; z-index:3; padding:22px; height:100%; display:flex; flex-direction:column; }
 .trimguide{ position:absolute; inset:14px; border:1px dashed color-mix(in srgb, var(--accent-2) 55%, transparent); z-index:6; pointer-events:none; }
@@ -1147,8 +1154,10 @@ label.fld > .hint{ margin-top:3px; }
 
     <!-- --------------------------- MAIN -------------------------- -->
     <main class="main">
-      <div id="bannerHost"></div>
       <div class="main-scroll" id="mainScroll">
+        <!-- the banner lives INSIDE the scroller so it sits at the top of the
+             page and scrolls away, instead of hanging over the content -->
+        <div id="bannerHost"></div>
         <div class="view-pad" id="view"></div>
       </div>
     </main>
@@ -2118,10 +2127,11 @@ function newBook(title) {
     updated: nowISO(),
     goalWords: 80000,
     gdoc: { id: '', url: '', title: '', live: false, lastSync: '', lastError: '', lastWords: 0, pushes: 0, hash: '' },
+    format: 'novel',            /* novel | childrens | comic — what this project IS */
     banners: { profile: newBanner(0) },   /* the profile has its own cover picture */
     cover: {
-      front: { art: '', title: '', subtitle: '', author: '', font: 'ff-scifi', size: 40, align: 'center', color: '#eafcff', shadow: true, scrim: 55, position: 'bottom', sketchNotes: '' },
-      back: { art: '', blurb: '', tagline: '', bio: '', font: 'ff-serif', size: 15, color: '#e6f2f8', scrim: 70, isbn: '978-0-0000000-0-0', price: '$24.99', showBarcode: true, sketchNotes: '' },
+      front: { art: '', artX: 50, artY: 50, artZoom: 100, title: '', subtitle: '', author: '', font: 'ff-scifi', size: 40, align: 'center', color: '#eafcff', shadow: true, scrim: 55, position: 'bottom', sketchNotes: '' },
+      back: { art: '', artX: 50, artY: 50, artZoom: 100, blurb: '', tagline: '', bio: '', font: 'ff-serif', size: 15, color: '#e6f2f8', scrim: 70, isbn: '978-0-0000000-0-0', price: '$24.99', showBarcode: true, sketchNotes: '' },
       spine: { text: '', color: '#0a1420' },
       showTrim: true
     },
@@ -2333,7 +2343,51 @@ function fieldValue(el) {
   }
   return el.value;
 }
-const rerenderSoon = debounce(() => render(), 260);
+/* A re-render replaces the whole view, which would throw away focus and the
+   caret — that is what made a field accept only one letter per click. These
+   two find the same field again afterwards and put the cursor back. */
+function focusKey(el) {
+  if (!el || !el.getAttribute) return null;
+  const m = el.getAttribute('data-model');
+  if (!m) return el.id ? '#' + el.id : null;
+  const host = el.closest('[data-root]');
+  return JSON.stringify([
+    host ? (host.getAttribute('data-root') || '') : '',
+    host ? (host.getAttribute('data-sub') || '') : '',
+    m, el.tagName
+  ]);
+}
+function findByFocusKey(key) {
+  if (!key) return null;
+  if (key.charAt(0) === '#') return document.getElementById(key.slice(1));
+  let p; try { p = JSON.parse(key); } catch (e) { return null; }
+  const list = document.querySelectorAll('[data-model="' + p[2].replace(/"/g, '\\"') + '"]');
+  for (let i = 0; i < list.length; i++) {
+    const el = list[i];
+    if (el.tagName !== p[3]) continue;
+    const host = el.closest('[data-root]');
+    if ((host ? (host.getAttribute('data-root') || '') : '') !== p[0]) continue;
+    if ((host ? (host.getAttribute('data-sub') || '') : '') !== p[1]) continue;
+    return el;
+  }
+  return null;
+}
+function renderKeepingFocus() {
+  const el = document.activeElement;
+  const isField = el && /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName);
+  const key = isField ? focusKey(el) : null;
+  let a = null, z = null;
+  if (isField) { try { a = el.selectionStart; z = el.selectionEnd; } catch (e) { } }
+  render();
+  if (!key) return;
+  const next = findByFocusKey(key);
+  if (!next) return;
+  try {
+    next.focus({ preventScroll: true });
+    if (a != null && next.setSelectionRange) next.setSelectionRange(a, z);
+  } catch (e) { }
+}
+const rerenderSoon = debounce(() => renderKeepingFocus(), 260);
 
 document.addEventListener('input', (e) => {
   const el = e.target.closest('[data-model]');
@@ -2360,6 +2414,15 @@ document.addEventListener('change', (e) => {
     if (live && ACTIONS[live]) { try { ACTIONS[live](el, e); } catch (err) { console.error(err); } }
     if (el.hasAttribute('data-rerender')) rerenderSoon();
   }
+});
+/* Selects that run an action rather than write a field. They need `change`,
+   not `click` — on click the select still holds its previous value. */
+document.addEventListener('change', (e) => {
+  const el = e.target.closest && e.target.closest('[data-change]');
+  if (!el) return;
+  const fn = ACTIONS[el.getAttribute('data-change')];
+  if (!fn) { console.warn('No action:', el.getAttribute('data-change')); return; }
+  try { fn(el, e); } catch (err) { console.error(err); toast(String(err && err.message || err), 'err', 'ACTION FAULT'); }
 });
 document.addEventListener('click', (e) => {
   const nav = e.target.closest('[data-go]');
@@ -3884,6 +3947,8 @@ function shelfCard(bk, active) {
       '<div class="shelf-tag">' + esc(p.tagline || bk.logline || 'No tagline yet — add one on the profile.') + '</div>' +
       '<div class="flex gap4 wrap mb10">' +
         '<span class="chip cy">' + esc((bk.status || 'drafting').toUpperCase()) + '</span>' +
+        (bk.format && bk.format !== 'novel'
+          ? '<span class="chip vi">' + (bk.format === 'childrens' ? "CHILDREN'S BOOK" : 'COMIC / GRAPHIC NOVEL') + '</span>' : '') +
         (g ? '<span class="chip am">' + esc(g.name) + '</span>' : '') +
         ((bk.about || {}).series ? '<span class="chip vi">' + esc(bk.about.series) + ((bk.about || {}).seriesNo ? ' #' + esc(bk.about.seriesNo) : '') + '</span>' : '') +
       '</div>' +
@@ -4297,6 +4362,18 @@ ACTIONS.aiUndo = function (el) {
 };
 
 /* ============================== COVER STUDIO ============================= */
+/* Cover art can be dragged around inside the frame and zoomed, so a photo that
+   is the wrong shape can still be composed properly instead of being centre-
+   cropped and left there. */
+function coverArtEl(side, a) {
+  if (!a.art) return '<div class="banner-fallback"></div>';
+  const x = clamp(Number(a.artX == null ? 50 : a.artX), 0, 100);
+  const y = clamp(Number(a.artY == null ? 50 : a.artY), 0, 100);
+  const z = clamp(Number(a.artZoom == null ? 100 : a.artZoom), 100, 300) / 100;
+  return '<img class="art" data-artdrag="' + side + '" src="' + attr(a.art) + '" alt="cover art" ' +
+    'style="object-position:' + x + '% ' + y + '%;transform:scale(' + z + ');transform-origin:' + x + '% ' + y + '%" ' +
+    'onerror="this.style.display=\'none\'">';
+}
 function coverFrontPreview(b) {
   const f = b.cover.front;
   const spacer = '<div style="flex:1 1 auto"></div>';
@@ -4312,8 +4389,8 @@ function coverFrontPreview(b) {
   const body = f.position === 'top' ? titleBlock + spacer + authorBlock
     : f.position === 'middle' ? spacer + titleBlock + spacer + authorBlock
     : spacer + titleBlock + authorBlock;
-  return '<div class="cover-preview" id="coverFrontPrev">' +
-    (f.art ? '<img class="art" src="' + attr(f.art) + '" alt="cover art">' : '<div class="banner-fallback"></div>') +
+  return '<div class="cover-preview' + (f.art ? ' draggable-art' : '') + '" id="coverFrontPrev">' +
+    coverArtEl('front', f) +
     '<div class="cvr-scrim" style="background:linear-gradient(180deg,rgba(3,6,12,' + (f.scrim / 200) + ') 0%,rgba(3,6,12,' + (f.scrim / 100) + ') 100%)"></div>' +
     (b.cover.showTrim ? '<div class="trimguide"></div>' : '') +
     '<div class="cvr-txt" style="text-align:' + f.align + ';align-items:' + (f.align === 'center' ? 'center' : f.align === 'right' ? 'flex-end' : 'flex-start') + '">' +
@@ -4322,8 +4399,8 @@ function coverFrontPreview(b) {
 }
 function coverBackPreview(b) {
   const k = b.cover.back;
-  return '<div class="cover-preview" id="coverBackPrev">' +
-    (k.art ? '<img class="art" src="' + attr(k.art) + '" alt="back art">' : '<div class="banner-fallback"></div>') +
+  return '<div class="cover-preview' + (k.art ? ' draggable-art' : '') + '" id="coverBackPrev">' +
+    coverArtEl('back', k) +
     '<div class="cvr-scrim" style="background:rgba(3,6,12,' + (k.scrim / 100) + ')"></div>' +
     (b.cover.showTrim ? '<div class="trimguide"></div>' : '') +
     '<div class="cvr-txt" style="justify-content:flex-start">' +
@@ -4348,7 +4425,7 @@ VIEWS.cover = {
       '<button class="tab ' + (tab === 'spread' ? 'on' : '') + '" data-act="coverTab" data-arg="spread">FULL WRAP PREVIEW</button>' +
       '<span style="flex:1"></span>' +
       '<label class="flex center gap6 fs12 muted" style="padding:6px 10px" data-root="book" data-sub="cover">' +
-        '<input type="checkbox" data-model="showTrim" data-rerender' + (b.cover.showTrim ? ' checked' : '') + '> TRIM / SAFE GUIDES</label>' +
+        '<input type="checkbox" data-model="showTrim" data-live="coverLive"' + (b.cover.showTrim ? ' checked' : '') + '> TRIM / SAFE GUIDES</label>' +
     '</div>' +
 
     (tab === 'spread' ? this.spread(b) : tab === 'back' ? this.back(b, k) : this.front(b, f));
@@ -4362,6 +4439,7 @@ VIEWS.cover = {
           '<button class="btn sm ghost" data-act="coverArtUrl" data-arg="front"><i data-lucide="link"></i>URL</button>' +
           '<button class="btn sm ghost red" data-act="coverArtClear" data-arg="front"><i data-lucide="x"></i>CLEAR</button>' +
         '</div>' +
+        coverFraming(b, 'front') +
         '<div class="faint fs11 mt6 mono">RATIO 2:3 · PRINT TARGET 1600×2400px @300DPI</div>' +
       '</div>' +
       '<div data-root="book" data-sub="cover.front">' +
@@ -4370,19 +4448,19 @@ VIEWS.cover = {
             '<div><strong>Drop or click to upload cover art / sketch</strong></div>' +
             '<div class="fs12">JPG · PNG · WEBP · GIF — stored locally in your browser</div></div>' +
           '<div class="grid-auto g2">' +
-            '<label class="fld"><span class="lb">Cover title</span><input class="inp" data-model="title" data-rerender value="' + attr(f.title || b.title) + '"></label>' +
-            '<label class="fld"><span class="lb">Cover subtitle</span><input class="inp" data-model="subtitle" data-rerender value="' + attr(f.subtitle) + '"></label>' +
-            '<label class="fld"><span class="lb">Author line</span><input class="inp" data-model="author" data-rerender value="' + attr(f.author || b.author) + '"></label>' +
-            '<label class="fld"><span class="lb">Typeface</span><select class="sel" data-model="font" data-rerender>' +
+            '<label class="fld"><span class="lb">Cover title</span><input class="inp" data-model="title" data-live="coverLive" value="' + attr(f.title || b.title) + '"></label>' +
+            '<label class="fld"><span class="lb">Cover subtitle</span><input class="inp" data-model="subtitle" data-live="coverLive" value="' + attr(f.subtitle) + '"></label>' +
+            '<label class="fld"><span class="lb">Author line</span><input class="inp" data-model="author" data-live="coverLive" value="' + attr(f.author || b.author) + '"></label>' +
+            '<label class="fld"><span class="lb">Typeface</span><select class="sel" data-model="font" data-live="coverLive">' +
               FONT_CHOICES.map(o => '<option value="' + o.id + '"' + (f.font === o.id ? ' selected' : '') + '>' + esc(o.label) + '</option>').join('') + '</select></label>' +
-            '<label class="fld"><span class="lb">Title size — ' + f.size + 'px</span><input type="range" min="14" max="90" data-model="size" data-rerender value="' + f.size + '"></label>' +
-            '<label class="fld"><span class="lb">Alignment</span><select class="sel" data-model="align" data-rerender>' +
+            '<label class="fld"><span class="lb">Title size — <b id="cvFSize">' + f.size + '</b>px</span><input type="range" min="14" max="90" data-model="size" data-live="coverLive" value="' + f.size + '"></label>' +
+            '<label class="fld"><span class="lb">Alignment</span><select class="sel" data-model="align" data-live="coverLive">' +
               ['left', 'center', 'right'].map(a => '<option value="' + a + '"' + (f.align === a ? ' selected' : '') + '>' + a.toUpperCase() + '</option>').join('') + '</select></label>' +
-            '<label class="fld"><span class="lb">Block position</span><select class="sel" data-model="position" data-rerender>' +
+            '<label class="fld"><span class="lb">Block position</span><select class="sel" data-model="position" data-live="coverLive">' +
               ['top', 'middle', 'bottom'].map(a => '<option value="' + a + '"' + (f.position === a ? ' selected' : '') + '>' + a.toUpperCase() + '</option>').join('') + '</select></label>' +
-            '<label class="fld"><span class="lb">Text colour</span><input type="color" data-model="color" data-rerender value="' + attr(f.color) + '"></label>' +
-            '<label class="fld"><span class="lb">Art darkening — ' + f.scrim + '%</span><input type="range" min="0" max="100" data-model="scrim" data-rerender value="' + f.scrim + '"></label>' +
-            '<label class="fld flex center gap8" style="padding-top:18px"><input type="checkbox" data-model="shadow" data-rerender' + (f.shadow ? ' checked' : '') + '><span class="fs13">Drop shadow on type</span></label>' +
+            '<label class="fld"><span class="lb">Text colour</span><input type="color" data-model="color" data-live="coverLive" value="' + attr(f.color) + '"></label>' +
+            '<label class="fld"><span class="lb">Art darkening — <b id="cvFScrim">' + f.scrim + '</b>%</span><input type="range" min="0" max="100" data-model="scrim" data-live="coverLive" value="' + f.scrim + '"></label>' +
+            '<label class="fld flex center gap8" style="padding-top:18px"><input type="checkbox" data-model="shadow" data-live="coverLive"' + (f.shadow ? ' checked' : '') + '><span class="fs13">Drop shadow on type</span></label>' +
           '</div>' +
           '<label class="fld"><span class="lb">Art direction / sketch notes</span><textarea class="ta" rows="4" data-model="sketchNotes" placeholder="Composition notes, colour palette, symbolism, reference artists…">' + esc(f.sketchNotes) + '</textarea></label>' +
         '</div></div>' +
@@ -4397,26 +4475,27 @@ VIEWS.cover = {
           '<button class="btn sm ghost" data-act="coverArtUrl" data-arg="back"><i data-lucide="link"></i>URL</button>' +
           '<button class="btn sm ghost red" data-act="coverArtClear" data-arg="back"><i data-lucide="x"></i>CLEAR</button>' +
         '</div>' +
+        coverFraming(b, 'back') +
         '<div class="faint fs11 mt6 mono">BARCODE ZONE: KEEP 2×1.2in CLEAR, BOTTOM-RIGHT</div>' +
       '</div>' +
       '<div data-root="book" data-sub="cover.back">' +
         '<div class="panel clip"><div class="panel-hd"><i data-lucide="file-text"></i><h3>BACK COVER &amp; BLURB</h3>' +
           '<span style="flex:1"></span><button class="btn xs amber" data-act="blurbHelp"><i data-lucide="wand-2"></i>BLURB FORMULA</button></div><div class="panel-bd">' +
           '<div class="dropzone mb14" data-act="coverArt" data-arg="back"><i data-lucide="image-plus"></i><div><strong>Upload back-cover art or texture</strong></div></div>' +
-          '<label class="fld"><span class="lb">Tagline / hook line</span><input class="inp" data-model="tagline" data-rerender value="' + attr(k.tagline) + '" placeholder="One line that sells the whole book"></label>' +
-          '<label class="fld"><span class="lb">Blurb</span><textarea class="ta" rows="9" data-model="blurb" data-rerender placeholder="Paragraph 1: the world + the hero&#10;Paragraph 2: the disruption + the stakes&#10;Paragraph 3: the impossible choice — end on a question">' + esc(k.blurb) + '</textarea>' +
-            '<div class="wcount mt6">' + countWords(k.blurb) + ' words — target 120–180 for print</div></label>' +
-          '<label class="fld"><span class="lb">Author bio</span><textarea class="ta" rows="3" data-model="bio" data-rerender>' + esc(k.bio) + '</textarea></label>' +
+          '<label class="fld"><span class="lb">Tagline / hook line</span><input class="inp" data-model="tagline" data-live="coverLive" value="' + attr(k.tagline) + '" placeholder="One line that sells the whole book"></label>' +
+          '<label class="fld"><span class="lb">Blurb</span><textarea class="ta" rows="9" data-model="blurb" data-live="coverLive" placeholder="Paragraph 1: the world + the hero&#10;Paragraph 2: the disruption + the stakes&#10;Paragraph 3: the impossible choice — end on a question">' + esc(k.blurb) + '</textarea>' +
+            '<div class="wcount mt6"><b id="cvBWords">' + countWords(k.blurb) + '</b> words — target 120–180 for print</div></label>' +
+          '<label class="fld"><span class="lb">Author bio</span><textarea class="ta" rows="3" data-model="bio" data-live="coverLive">' + esc(k.bio) + '</textarea></label>' +
           '<div class="grid-auto g3">' +
-            '<label class="fld"><span class="lb">Typeface</span><select class="sel" data-model="font" data-rerender>' +
+            '<label class="fld"><span class="lb">Typeface</span><select class="sel" data-model="font" data-live="coverLive">' +
               FONT_CHOICES.map(o => '<option value="' + o.id + '"' + (k.font === o.id ? ' selected' : '') + '>' + esc(o.label) + '</option>').join('') + '</select></label>' +
-            '<label class="fld"><span class="lb">Body size — ' + k.size + 'px</span><input type="range" min="9" max="26" data-model="size" data-rerender value="' + k.size + '"></label>' +
-            '<label class="fld"><span class="lb">Text colour</span><input type="color" data-model="color" data-rerender value="' + attr(k.color) + '"></label>' +
-            '<label class="fld"><span class="lb">Art darkening — ' + k.scrim + '%</span><input type="range" min="0" max="100" data-model="scrim" data-rerender value="' + k.scrim + '"></label>' +
-            '<label class="fld"><span class="lb">ISBN</span><input class="inp" data-model="isbn" data-rerender value="' + attr(k.isbn) + '"></label>' +
-            '<label class="fld"><span class="lb">Price</span><input class="inp" data-model="price" data-rerender value="' + attr(k.price) + '"></label>' +
+            '<label class="fld"><span class="lb">Body size — <b id="cvBSize">' + k.size + '</b>px</span><input type="range" min="9" max="26" data-model="size" data-live="coverLive" value="' + k.size + '"></label>' +
+            '<label class="fld"><span class="lb">Text colour</span><input type="color" data-model="color" data-live="coverLive" value="' + attr(k.color) + '"></label>' +
+            '<label class="fld"><span class="lb">Art darkening — <b id="cvBScrim">' + k.scrim + '</b>%</span><input type="range" min="0" max="100" data-model="scrim" data-live="coverLive" value="' + k.scrim + '"></label>' +
+            '<label class="fld"><span class="lb">ISBN</span><input class="inp" data-model="isbn" data-live="coverLive" value="' + attr(k.isbn) + '"></label>' +
+            '<label class="fld"><span class="lb">Price</span><input class="inp" data-model="price" data-live="coverLive" value="' + attr(k.price) + '"></label>' +
           '</div>' +
-          '<label class="flex center gap8 mb10"><input type="checkbox" data-model="showBarcode" data-rerender' + (k.showBarcode ? ' checked' : '') + '><span class="fs13">Show barcode / price block preview</span></label>' +
+          '<label class="flex center gap8 mb10"><input type="checkbox" data-model="showBarcode" data-live="coverLive"' + (k.showBarcode ? ' checked' : '') + '><span class="fs13">Show barcode / price block preview</span></label>' +
           '<label class="fld"><span class="lb">Back art direction notes</span><textarea class="ta" rows="3" data-model="sketchNotes">' + esc(k.sketchNotes) + '</textarea></label>' +
         '</div></div>' +
       '</div></div>';
@@ -4427,14 +4506,14 @@ VIEWS.cover = {
       '<span style="flex:1"></span><button class="btn sm ghost" data-act="printCover"><i data-lucide="printer"></i>PRINT PREVIEW</button></div>' +
       '<div class="panel-bd"><div id="wrapPreview" style="display:flex;gap:0;align-items:stretch;max-width:920px;margin:0 auto">' +
         '<div style="flex:1 1 0;min-width:0">' + coverBackPreview(b) + '</div>' +
-        '<div style="flex:0 0 54px;background:' + attr(b.cover.spine.color || '#0a1420') + ';border-top:1px solid var(--line);border-bottom:1px solid var(--line);display:grid;place-items:center;position:relative">' +
-          '<div style="writing-mode:vertical-rl;transform:rotate(180deg);font-family:var(--font-display);font-size:13px;letter-spacing:3px;color:var(--txt);white-space:nowrap;padding:16px 0">' +
+        '<div id="wrapSpineBox" style="flex:0 0 54px;background:' + attr(b.cover.spine.color || '#0a1420') + ';border-top:1px solid var(--line);border-bottom:1px solid var(--line);display:grid;place-items:center;position:relative">' +
+          '<div id="wrapSpine" style="writing-mode:vertical-rl;transform:rotate(180deg);font-family:var(--font-display);font-size:13px;letter-spacing:3px;color:var(--txt);white-space:nowrap;padding:16px 0">' +
           esc(b.cover.spine.text || (b.title + '   ·   ' + (b.author || ''))) + '</div></div>' +
         '<div style="flex:1 1 0;min-width:0">' + coverFrontPreview(b) + '</div>' +
       '</div>' +
       '<div class="grid-auto g2 mt14" data-root="book" data-sub="cover.spine">' +
-        '<label class="fld"><span class="lb">Spine text</span><input class="inp" data-model="text" data-rerender value="' + attr(b.cover.spine.text) + '" placeholder="' + attr(b.title + ' · ' + (b.author || '')) + '"></label>' +
-        '<label class="fld"><span class="lb">Spine colour</span><input type="color" data-model="color" data-rerender value="' + attr(b.cover.spine.color) + '"></label>' +
+        '<label class="fld"><span class="lb">Spine text</span><input class="inp" data-model="text" data-live="coverLive" value="' + attr(b.cover.spine.text) + '" placeholder="' + attr(b.title + ' · ' + (b.author || '')) + '"></label>' +
+        '<label class="fld"><span class="lb">Spine colour</span><input type="color" data-model="color" data-live="coverLive" value="' + attr(b.cover.spine.color) + '"></label>' +
       '</div>' +
       '<div class="prose-c fs13 mt10"><h5>PRINT CHECKLIST</h5><ul>' +
         '<li>Bleed: add 3mm (0.125in) beyond every trimmed edge — art must run past the guide.</li>' +
@@ -4445,6 +4524,95 @@ VIEWS.cover = {
       '</div></div>';
   }
 };
+/* Framing controls, plus drag-on-the-picture, for one side of the cover. */
+function coverFraming(b, side) {
+  const a = b.cover[side];
+  if (!a.art) return '';
+  const x = Number(a.artX == null ? 50 : a.artX), y = Number(a.artY == null ? 50 : a.artY),
+        z = Number(a.artZoom == null ? 100 : a.artZoom);
+  return '<div class="panel mt10" style="padding:11px" data-root="book" data-sub="cover.' + side + '">' +
+    '<div class="flex between center gap8 mb6"><span class="lb" style="margin:0">FRAME THE PICTURE</span>' +
+      '<button class="btn xs ghost" data-act="coverArtReset" data-arg="' + side + '" title="Put it back to the middle at 100%">RESET</button></div>' +
+    '<div class="fs12 muted mb10">Drag the picture in the preview above to move it, or use these. Zoom in first if you need to crop tighter.</div>' +
+    '<label class="fld" style="margin-bottom:8px"><span class="lb">Across — <b id="cvX' + side + '">' + x + '</b>%</span>' +
+      '<input type="range" min="0" max="100" data-model="artX" data-live="coverLive" value="' + x + '"></label>' +
+    '<label class="fld" style="margin-bottom:8px"><span class="lb">Up and down — <b id="cvY' + side + '">' + y + '</b>%</span>' +
+      '<input type="range" min="0" max="100" data-model="artY" data-live="coverLive" value="' + y + '"></label>' +
+    '<label class="fld" style="margin:0"><span class="lb">Zoom — <b id="cvZ' + side + '">' + z + '</b>%</span>' +
+      '<input type="range" min="100" max="300" step="5" data-model="artZoom" data-live="coverLive" value="' + z + '"></label>' +
+  '</div>';
+}
+/* Repaints only the previews and the live number labels. The form itself is
+   never rebuilt, so the caret stays put while you type and a slider keeps its
+   grip while you drag it. */
+ACTIONS.coverLive = function (el) {
+  const b = currentBook(); if (!b) return;
+  const f = b.cover.front, k = b.cover.back;
+  const swap = (id, html) => { const n = document.getElementById(id); if (n) n.outerHTML = html; };
+  swap('coverFrontPrev', coverFrontPreview(b));
+  swap('coverBackPrev', coverBackPreview(b));
+  const spine = document.getElementById('wrapSpine');
+  if (spine) spine.innerHTML = esc(b.cover.spine.text || (b.title + '   ·   ' + (b.author || '')));
+  const spineBox = document.getElementById('wrapSpineBox');
+  if (spineBox) spineBox.style.background = b.cover.spine.color || '#0a1420';
+  const put = (id, v) => { const n = document.getElementById(id); if (n) n.textContent = v; };
+  put('cvFSize', f.size); put('cvFScrim', f.scrim);
+  put('cvBSize', k.size); put('cvBScrim', k.scrim);
+  put('cvBWords', countWords(k.blurb));
+  put('cvXfront', f.artX); put('cvYfront', f.artY); put('cvZfront', f.artZoom);
+  put('cvXback', k.artX); put('cvYback', k.artY); put('cvZback', k.artZoom);
+};
+ACTIONS.coverArtReset = function (el) {
+  const b = requireBook(); if (!b) return;
+  const a = b.cover[el.getAttribute('data-arg')];
+  a.artX = 50; a.artY = 50; a.artZoom = 100;
+  markDirty(); render();
+};
+/* Drag the artwork inside its frame. Works with a mouse, a finger or a pen. */
+document.addEventListener('pointerdown', (e) => {
+  /* the scrim and the title block sit over the picture, so the drag has to be
+     picked up from the frame rather than from the <img> itself */
+  const frame = e.target.closest && e.target.closest('.cover-preview.draggable-art');
+  if (!frame) return;
+  if (e.target.closest('button, a, input, select, textarea')) return;
+  const img = frame.querySelector('img[data-artdrag]');
+  if (!img) return;
+  const b = currentBook(); if (!b) return;
+  const side = img.getAttribute('data-artdrag');
+  const a = b.cover[side]; if (!a) return;
+  const box = frame.getBoundingClientRect();
+  if (!box.width || !box.height) return;
+  e.preventDefault();
+  const sx = e.clientX, sy = e.clientY;
+  const x0 = clamp(Number(a.artX == null ? 50 : a.artX), 0, 100);
+  const y0 = clamp(Number(a.artY == null ? 50 : a.artY), 0, 100);
+  frame.classList.add('dragging');
+  const move = (ev) => {
+    /* moving the picture left means showing more of its right side, hence the
+       inverted sign — it should feel like sliding the photo under the frame */
+    a.artX = clamp(Math.round(x0 - ((ev.clientX - sx) / box.width) * 100), 0, 100);
+    a.artY = clamp(Math.round(y0 - ((ev.clientY - sy) / box.height) * 100), 0, 100);
+    img.style.objectPosition = a.artX + '% ' + a.artY + '%';
+    img.style.transformOrigin = a.artX + '% ' + a.artY + '%';
+    const px = document.getElementById('cvX' + side), py = document.getElementById('cvY' + side);
+    if (px) px.textContent = a.artX;
+    if (py) py.textContent = a.artY;
+    const sx2 = document.querySelector('[data-sub="cover.' + side + '"] [data-model="artX"]');
+    const sy2 = document.querySelector('[data-sub="cover.' + side + '"] [data-model="artY"]');
+    if (sx2) sx2.value = a.artX;
+    if (sy2) sy2.value = a.artY;
+  };
+  const up = () => {
+    frame.classList.remove('dragging');
+    window.removeEventListener('pointermove', move);
+    window.removeEventListener('pointerup', up);
+    window.removeEventListener('pointercancel', up);
+    markDirty();
+  };
+  window.addEventListener('pointermove', move);
+  window.addEventListener('pointerup', up);
+  window.addEventListener('pointercancel', up);
+});
 ACTIONS.coverTab = function (el) { state.ui.coverTab = el.getAttribute('data-arg'); markDirty(true); render(); };
 ACTIONS.coverArt = async function (el) {
   const b = requireBook(); if (!b) return;
@@ -7286,10 +7454,42 @@ VIEWS.kids = {
   render() {
     const b = requireBook(); if (!b) return noBookPanel();
     b.kids = b.kids || { tier: '4-8', spreads: [] };
+    /* This studio is not a separate place to build a book — it is one view of
+       whichever project is open. The bar makes that obvious, and lets the
+       writer point it at any book from All My Books. */
+    const kidBooks = state.books.filter(x => x.format === 'childrens');
     const tier = KID_TIERS[b.kids.tier] || KID_TIERS['4-8'];
     const spreads = b.kids.spreads || [];
     const totalWords = spreads.reduce((n, s) => n + countWords(s.text), 0);
     return '' +
+    '<div class="panel clip mb14 ' + (b.format === 'childrens' ? '' : 'tone-red') + '">' +
+      '<div class="panel-hd"><i data-lucide="book-open"></i><h3>WHICH BOOK ARE YOU MAKING?</h3><span style="flex:1"></span>' +
+        (b.format === 'childrens' ? '<span class="chip lm">CHILDREN\u2019S BOOK</span>' : '<span class="chip am">NOT MARKED AS ONE YET</span>') +
+      '</div><div class="panel-bd">' +
+        '<div class="helpbox mb14"><b>THIS PAGE WORKS ON A BOOK YOU ALREADY HAVE</b>' +
+          'It is not a separate place to build one. Everything here belongs to the project that is open, so it shows up in ' +
+          '<strong>All My Books</strong>, keeps its own cover, profile and backups, and switching book here switches it everywhere.</div>' +
+        '<div class="grid-auto g2 mb14">' +
+          '<label class="fld" style="margin:0"><span class="lb">Working on</span>' +
+            '<select class="sel" data-change="kidPickBook">' +
+              state.books.map(x => '<option value="' + x.id + '"' + (x.id === b.id ? ' selected' : '') + '>' +
+                esc(x.title) + (x.format === 'childrens' ? '  \u2014 children\u2019s book' : '') + '</option>').join('') +
+            '</select><span class="hint">' + kidBooks.length + ' of your ' + state.books.length +
+              ' book(s) are marked as children\u2019s books.</span></label>' +
+          '<label class="fld" style="margin:0" data-root="book"><span class="lb">Book title</span>' +
+            '<input class="inp" data-model="title" data-live="kidLive" value="' + attr(b.title) + '">' +
+            '<span class="hint">This is the project\u2019s real title \u2014 changing it here renames it everywhere.</span></label>' +
+        '</div>' +
+        '<div class="flex gap6 wrap">' +
+          (b.format === 'childrens'
+            ? '<button class="btn sm ghost" data-act="kidUnmark"><i data-lucide="x"></i>NOT A CHILDREN\u2019S BOOK AFTER ALL</button>'
+            : '<button class="btn sm solid" data-act="kidMark"><i data-lucide="check"></i>MARK \u201C' + esc(b.title) + '\u201D AS A CHILDREN\u2019S BOOK</button>') +
+          '<button class="btn sm" data-act="kidNewBook"><i data-lucide="plus"></i>START A NEW CHILDREN\u2019S BOOK</button>' +
+          '<button class="btn sm ghost" data-go="library"><i data-lucide="library"></i>ALL MY BOOKS</button>' +
+          '<button class="btn sm ghost" data-go="profile"><i data-lucide="book-open"></i>ITS PROFILE PAGE</button>' +
+        '</div>' +
+      '</div></div>' +
+
     '<div class="panel clip mb14"><div class="corner-tl"></div><div class="corner-br"></div>' +
       '<div class="panel-hd"><i data-lucide="baby"></i><h3>AGE-TIER LAYOUT SELECTOR</h3></div>' +
       '<div class="panel-bd" data-root="book" data-sub="kids">' +
@@ -7299,7 +7499,6 @@ VIEWS.kids = {
             '<div class="fs11 t-cy mt6">' + esc(KID_TIERS[k].words) + '</div>' +
             '<div class="fs11 faint">' + esc(KID_TIERS[k].spreads) + '</div></button>').join('') + '</div>' +
         '<div class="grid-auto g2">' +
-          '<label class="fld"><span class="lb">Book title</span><input class="inp" data-model="title" value="' + attr(b.kids.title) + '" placeholder="' + attr(b.title) + '"></label>' +
           '<label class="fld"><span class="lb">Central theme / lesson (never stated aloud)</span><input class="inp" data-model="theme" value="' + attr(b.kids.theme) + '" placeholder="Being small is not the same as being powerless"></label>' +
           '<label class="fld"><span class="lb">Repeating refrain</span><input class="inp" data-model="refrain" value="' + attr(b.kids.refrain) + '" placeholder="…and still the little lamp burned."></label>' +
           '<label class="fld"><span class="lb">Main character description</span><input class="inp" data-model="character" value="' + attr(b.kids.character) + '" placeholder="A round grey rabbit with one folded ear and red boots"></label>' +
@@ -7378,6 +7577,38 @@ VIEWS.kids = {
       '</div></div>' +
     '</div>';
   }
+};
+/* The children's studio points at a real project, so these all act on books. */
+ACTIONS.kidPickBook = function (el) {
+  setActiveBook(el.value);
+  render();
+  const bk = currentBook();
+  toast('Now working on “' + (bk ? bk.title : '') + '”.', 'ok', 'BOOK OPENED');
+};
+ACTIONS.kidLive = debounce(() => { renderRail(); icons(); }, 400);
+ACTIONS.kidMark = function () {
+  const b = requireBook(); if (!b) return;
+  b.format = 'childrens';
+  markDirty(); render();
+  toast('“' + b.title + '” is now marked as a children’s book. It shows as one in All My Books.', 'ok');
+};
+ACTIONS.kidUnmark = function () {
+  const b = requireBook(); if (!b) return;
+  b.format = 'novel';
+  markDirty(); render();
+  toast('Unmarked. Everything you planned here is still on the book.', 'warn');
+};
+ACTIONS.kidNewBook = async function () {
+  const t = await promptDlg('NEW CHILDREN’S BOOK', 'Working title', '');
+  if (t == null) return;
+  const bk = newBook(t.trim() || 'New Picture Book');
+  bk.format = 'childrens';
+  bk.author = (currentBook() || {}).author || '';
+  bk.goalWords = 1000;
+  state.books.push(bk);
+  setActiveBook(bk.id);
+  markDirty(); render();
+  toast('Created “' + bk.title + '”. It is in All My Books like any other project.', 'ok', 'NEW BOOK');
 };
 ACTIONS.kidTier = function (el) {
   const b = requireBook(); if (!b) return;
