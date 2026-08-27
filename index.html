@@ -1086,6 +1086,27 @@ label.fld > .hint{ margin-top:3px; }
 
 
 /* ------------------- pictures placed inside the prose -------------------- */
+/* ---- concentration mode: writing first, panels on demand ---- */
+.writebar{ display:flex; align-items:center; gap:6px; margin-bottom:12px; padding:5px 7px;
+  border:1px solid var(--line); background:var(--sunk); border-radius:var(--radius); flex-wrap:wrap; }
+.writing-grid{ display:grid; gap:14px; align-items:start;
+  grid-template-columns:var(--l,minmax(200px,240px)) minmax(0,1fr) var(--r,minmax(240px,300px)); }
+body.focus-write .writing-grid{ grid-template-columns:minmax(0,1fr) !important; }
+body.focus-write .writing-grid > .side-l,
+body.focus-write .writing-grid > .side-r{ display:none; }
+body.focus-write .writing-grid > .main-col{ max-width:1080px; margin:0 auto; width:100%; }
+.writing-grid > .side-l.peek, .writing-grid > .side-r.peek{
+  display:block !important; position:fixed; top:0; bottom:0; width:min(370px,88vw); z-index:9300;
+  overflow-y:auto; padding:12px; background:var(--chrome); border:1px solid var(--line-hard);
+  box-shadow:0 20px 70px rgba(0,0,0,.75); animation:fade .16s;
+}
+.writing-grid > .side-l.peek{ left:0; border-left:0; }
+.writing-grid > .side-r.peek{ right:0; border-right:0; }
+.writing-grid > .peek > div{ position:static !important; }
+.peek-close{ position:sticky; top:0; z-index:2; width:100%; margin-bottom:8px; }
+.peek-backdrop{ position:fixed; inset:0; z-index:9290; background:rgba(2,4,8,.55); backdrop-filter:blur(2px); }
+@media(max-width:1100px){ .writing-grid{ grid-template-columns:minmax(0,1fr) !important; } }
+
 /* ---- WordPad-style writing surface ---- */
 .editor-wrap.sticky-tools .etoolbar:not(.bottom){ position:sticky; top:0; z-index:22; }
 .editor-wrap .etoolbar.bottom{ border-top:1px solid var(--line); border-bottom:0; }
@@ -1172,6 +1193,7 @@ body.hide-rte-images .rte .fig-grip{ display:none; }
       <span class="savepill" id="savePill"><span class="dot"></span><span id="savePillTxt">SYNCED</span></span>
       <button class="chip" id="vaultPill" data-act="vaultExplain" style="cursor:pointer" title="Where your work is being saved — click to find out">NO VAULT FILE</button>
       <button class="livepill" id="livePill" data-go="gdoc" style="display:none" title="Live updating a Google Doc"><span class="lpdot"></span><span class="lptxt">LIVE UPDATING</span></button>
+      <button class="livepill" id="linkPill" data-act="profTabGo" data-arg="linked" style="display:none" title="Live updating a document on your PC"><span class="lpdot"></span><span class="lptxt">DOC LIVE</span></button>
       <button class="btn ghost sm" id="btnSearch" title="Search everything (Ctrl+K)"><i data-lucide="search"></i><span class="hide-sm">FIND</span></button>
       <button class="btn ghost sm" data-act="guideOnAll" title="How this page works"><i data-lucide="help-circle"></i></button>
       <button class="btn ghost sm" data-act="themeEdit" title="Change colours, fonts and background"><i data-lucide="palette"></i></button>
@@ -2015,6 +2037,7 @@ async function storageInit() {
   const el = $('#railEngine'); if (el) el.textContent = _idb ? 'IDB' : 'LS';
   await vaultRestoreHandle();
   await folderRestoreHandle();
+  await linkDocRestore();
 }
 async function storageLoad() {
   /* write-ahead recovery: a `pending` newer than `state` means the last write
@@ -2181,6 +2204,7 @@ function newBook(title) {
     goalWords: 80000,
     gdoc: { id: '', url: '', title: '', live: false, lastSync: '', lastError: '', lastWords: 0, pushes: 0, hash: '' },
     format: 'novel',            /* novel | childrens | comic — what this project IS */
+    linkedDocs: [],             /* documents on the writer's own PC kept up to date */
     banners: { profile: newBanner(0) },   /* the profile has its own cover picture */
     cover: {
       front: { art: '', artX: 50, artY: 50, artZoom: 100, title: '', subtitle: '', author: '', font: 'ff-scifi', size: 40, align: 'center', color: '#eafcff', shadow: true, scrim: 55, position: 'bottom', sketchNotes: '' },
@@ -2266,7 +2290,7 @@ function defaultState() {
     },
     ui: {
       view: 'profile', bookId: '', railOpen: false, castFilter: 'all', chapterId: '', comicPage: 0,
-      stickyTools: false, hideEditorImages: false,
+      stickyTools: false, hideEditorImages: false, focusWrite: true,
       lastEdited: {}, nav: null, navV: 0, navEdit: false, helpClosed: {}, feedOpen: '', slide: 0,
       shelf: { q: '', sort: 'updated', view: 'grid' }
     },
@@ -2305,6 +2329,7 @@ function markDirty(silent) {
   DIRTY = true; VAULT_DIRTY = true; SNAP_DIRTY = true;
   const b = currentBook(); if (b) b.updated = nowISO();
   try { gdocTouch(); } catch (e) { }
+  try { linkDocTouch(); } catch (e) { }
   if (!silent) paintSavePill('dirty');
 }
 function paintSavePill(mode) {
@@ -2514,6 +2539,9 @@ document.addEventListener('visibilitychange', () => {
       VAULT_DIRTY = false;
       if (VAULT_HANDLE) vaultWriteNow('tab hidden');
       if (FOLDER_HANDLE) folderWriteNow('tab hidden');
+      const bk = currentBook();
+      if (bk) (bk.linkedDocs || []).filter(x => x.live && linkDocHandle(x))
+        .forEach(x => { try { linkDocWrite(bk, x); } catch (e) { } });
     }
   }
 });
@@ -2541,7 +2569,8 @@ function render() {
   const host = $('#view');
   applyTheme();
   renderBanner();
-  try { paintLivePill(); } catch (e) { }
+  document.body.classList.toggle('focus-write', focusOn());
+  try { paintLivePill(); paintLinkPill(); } catch (e) { }
   try {
     host.innerHTML = (v.render ? v.render() : '') +
       (state.app.showGuides === false ? '' : guideFab(CURRENT_VIEW));
@@ -4696,20 +4725,95 @@ ACTIONS.selSize = function (el) {
   styleSelection({ fontSize: next + 'em' });
 };
 
+/* --------------------------- CONCENTRATION MODE ---------------------------
+   Writing pages open with nothing but the writing. The side panels are still
+   there — they slide in over the page when asked for, and go away again — so
+   the screen stays as quiet as WordPad until you actually want a tool.
+   ------------------------------------------------------------------------- */
+function focusOn() { return state.ui.focusWrite !== false; }
+function writeBar(leftWhat, rightWhat) {
+  const f = focusOn();
+  return '<div class="writebar">' +
+    (leftWhat ? '<button class="btn xs ghost" data-act="peekSide" data-s="l" title="' + attr(leftWhat) + '">' +
+      '<i data-lucide="panel-left"></i>' + esc(leftWhat.length > 26 ? 'PANEL' : leftWhat.toUpperCase()) + '</button>' : '') +
+    '<span style="flex:1"></span>' +
+    '<button class="btn xs ' + (f ? 'solid' : 'ghost') + '" data-act="focusToggle" ' +
+      'title="Hide everything except what you are writing">' +
+      '<i data-lucide="' + (f ? 'eye-off' : 'eye') + '"></i>' + (f ? 'JUST THE WRITING' : 'SHOW THE PANELS') + '</button>' +
+    '<span style="flex:1"></span>' +
+    (rightWhat ? '<button class="btn xs ghost" data-act="peekSide" data-s="r" title="' + attr(rightWhat) + '">' +
+      esc(rightWhat.length > 26 ? 'TOOLS' : rightWhat.toUpperCase()) + '<i data-lucide="panel-right"></i></button>' : '') +
+  '</div>';
+}
+ACTIONS.focusToggle = function () {
+  state.ui.focusWrite = !focusOn();
+  markDirty();
+  closePeek();
+  render();
+  toast(focusOn() ? 'Just the writing. The panels are a click away when you want them.'
+                  : 'Panels are back beside the page.', 'ok');
+};
+ACTIONS.peekSide = function (el) {
+  const side = el.getAttribute('data-s');
+  const sel = side === 'l' ? '.writing-grid .side-l' : '.writing-grid .side-r';
+  const panel = document.querySelector(sel);
+  if (!panel) { toast('Nothing on that side of this page.', 'warn'); return; }
+  if (panel.classList.contains('peek')) { closePeek(); return; }
+  closePeek();
+  panel.classList.add('peek');
+  const bd = document.createElement('div');
+  bd.className = 'peek-backdrop';
+  bd.addEventListener('click', closePeek);
+  document.body.appendChild(bd);
+  const x = document.createElement('button');
+  x.className = 'peek-close btn xs ghost';
+  x.textContent = 'CLOSE';
+  x.addEventListener('click', closePeek);
+  panel.prepend(x);
+};
+function closePeek() {
+  document.querySelectorAll('.writing-grid .peek').forEach(p => {
+    p.classList.remove('peek');
+    const x = p.querySelector('.peek-close'); if (x) x.remove();
+  });
+  const bd = document.querySelector('.peek-backdrop'); if (bd) bd.remove();
+}
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && document.querySelector('.writing-grid .peek') && !ModalStack.length) closePeek();
+});
+
 /* ------------------- full screen, sticky and bottom toolbars -------------- */
+/* A chapter card uses backdrop-filter, and that makes it the containing block
+   for anything position:fixed inside it — which trapped full screen inside the
+   card. Moving the editor to the body for the duration sidesteps it entirely. */
+function exitFullscreen() {
+  const wrap = document.querySelector('.editor-wrap.fullscreen');
+  if (!wrap) return;
+  wrap.classList.remove('fullscreen');
+  document.body.classList.remove('rte-fullscreen');
+  const home = document.getElementById('rteHome');
+  if (home && home.parentNode) home.parentNode.replaceChild(wrap, home);
+  document.querySelectorAll('[data-act="edFull"]').forEach(b => b.classList.remove('on'));
+  const ed = wrap.querySelector('.rte');
+  if (ed) ed.focus({ preventScroll: true });
+}
 ACTIONS.edFull = function (el) {
   const id = el.getAttribute('data-ed');
   const wrap = document.querySelector('[data-editor="' + id + '"]');
   if (!wrap) return;
-  const on = wrap.classList.toggle('fullscreen');
-  document.body.classList.toggle('rte-fullscreen', on);
-  el.classList.toggle('on', on);
-  if (on) {
-    const ed = document.getElementById(id);
-    if (ed) ed.focus({ preventScroll: true });
-    toast('Full screen. Press Escape or the button again to come back.', 'ok');
-  }
+  if (wrap.classList.contains('fullscreen')) { exitFullscreen(); hideBubble(); return; }
+  const home = document.createElement('div');
+  home.id = 'rteHome';
+  wrap.parentNode.insertBefore(home, wrap);
+  document.body.appendChild(wrap);
+  wrap.classList.add('fullscreen');
+  document.body.classList.add('rte-fullscreen');
+  document.querySelectorAll('[data-act="edFull"][data-ed="' + id + '"]').forEach(b => b.classList.add('on'));
+  const ed = document.getElementById(id);
+  if (ed) ed.focus({ preventScroll: true });
+  closePeek();
   hideBubble();
+  toast('Full screen. Escape, or the button again, brings the app back.', 'ok');
 };
 ACTIONS.edStick = function (el) {
   const id = el.getAttribute('data-ed');
@@ -4722,12 +4826,8 @@ ACTIONS.edStick = function (el) {
     : 'The toolbar stays at the top of the box.', 'ok');
 };
 document.addEventListener('keydown', (e) => {
-  if (e.key !== 'Escape') return;
-  const wrap = document.querySelector('.editor-wrap.fullscreen');
-  if (!wrap || ModalStack.length) return;
-  wrap.classList.remove('fullscreen');
-  document.body.classList.remove('rte-fullscreen');
-  document.querySelectorAll('[data-act="edFull"]').forEach(b => b.classList.remove('on'));
+  if (e.key !== 'Escape' || ModalStack.length) return;
+  if (document.querySelector('.editor-wrap.fullscreen')) exitFullscreen();
 });
 
 /* -------------------- pictures: drag the corner to resize ----------------- */
@@ -5235,8 +5335,9 @@ VIEWS.prologue = {
       '</div>' +
     '</div>' +
 
-    '<div class="grid-auto" style="grid-template-columns:minmax(0,1fr)' + (open ? ' minmax(260px,340px)' : '') + '">' +
-      '<div>' + editorHTML('proEd', p.html, 'The prologue is a question the reader must carry into chapter one. Open in motion. Close on a hole.', { allowImage: true, minHeight: 560 }) +
+    writeBar('', 'The moodboard') +
+    '<div class="writing-grid" style="--l:0;--r:' + (open ? 'minmax(260px,340px)' : '0') + '">' +
+      '<div class="main-col">' + editorHTML('proEd', p.html, 'The prologue is a question the reader must carry into chapter one. Open in motion. Close on a hole.', { allowImage: true, minHeight: 560 }) +
         '<div class="panel clip mt14"><div class="panel-hd"><i data-lucide="sticky-note"></i><h3>PROLOGUE INTENT &amp; NOTES</h3></div>' +
           '<div class="panel-bd" data-root="book" data-sub="prologue">' +
             '<div class="grid-auto g2">' +
@@ -5249,7 +5350,7 @@ VIEWS.prologue = {
             '<button class="btn sm ghost" data-act="mcOpen" data-arg="mc-prologue"><i data-lucide="graduation-cap"></i>READ: HOW TO HOOK READERS IN A PROLOGUE</button>' +
           '</div></div>' +
       '</div>' +
-      (open ? '<div>' + moodDrawerHTML(b) + '</div>' : '') +
+      (open ? '<div class="side-r">' + moodDrawerHTML(b) + '</div>' : '') +
     '</div>';
   },
   mount() {
@@ -5337,10 +5438,11 @@ VIEWS.chapters = {
     const idx = b.chapters.indexOf(ch);
     const total = bookWords(b);
     return '' +
-    '<div class="grid-auto" style="grid-template-columns:minmax(210px,255px) minmax(0,1fr) minmax(240px,310px)">' +
+    writeBar('The chapter list', 'Scene breakdown, images and notes') +
+    '<div class="writing-grid" style="--l:minmax(210px,255px);--r:minmax(240px,310px)">' +
 
       /* ---- chapter list ---- */
-      '<div><div class="panel clip" style="position:sticky;top:12px">' +
+      '<div class="side-l"><div class="panel clip" style="position:sticky;top:12px">' +
         '<div class="panel-hd"><i data-lucide="files"></i><h3>CHAPTERS</h3><span style="flex:1"></span>' +
           '<button class="btn xs" data-act="chAdd"><i data-lucide="plus"></i></button></div>' +
         '<div class="panel-bd" style="max-height:62vh;overflow:auto;padding:8px">' +
@@ -5364,7 +5466,7 @@ VIEWS.chapters = {
       '</div></div>' +
 
       /* ---- editor ---- */
-      '<div>' +
+      '<div class="main-col">' +
         '<div class="panel clip mb10" data-root="ch:' + ch.id + '"><div class="panel-bd" style="padding:11px">' +
           '<div class="flex gap8 wrap center">' +
             '<span class="chip rd">CH ' + (idx + 1) + '</span>' +
@@ -5388,7 +5490,7 @@ VIEWS.chapters = {
       '</div>' +
 
       /* ---- scene panel ---- */
-      '<div><div style="position:sticky;top:12px">' +
+      '<div class="side-r"><div style="position:sticky;top:12px">' +
         '<div class="panel clip mb14" data-root="ch:' + ch.id + '"><div class="panel-hd"><i data-lucide="notebook-pen"></i><h3>SCENE BREAKDOWN</h3></div>' +
           '<div class="panel-bd" style="max-height:46vh;overflow:auto">' +
             '<label class="fld"><span class="lb">POV character</span><select class="sel" data-model="pov">' +
@@ -8755,7 +8857,7 @@ function manuscriptHTML(b, opts) {
     '<div class="meta"><span>' + esc(b.author || 'Unattributed') + '</span><span>' + fmt(words) + ' words · ' + readTime(words) + '</span><span>' + esc(dstamp()) + '</span></div>' +
     parts.join('\n') + '</div>' + (opts.print ? '<script>window.onload=function(){setTimeout(window.print,400)}<\/script>' : '') + '</body></html>';
 }
-function manuscriptMarkdown(b) {
+function manuscriptMarkdown(b, opts) {
   const out = ['# ' + b.title, ''];
   if (b.subtitle) out.push('## ' + b.subtitle, '');
   if (b.author) out.push('_by ' + b.author + '_', '');
@@ -8764,11 +8866,12 @@ function manuscriptMarkdown(b) {
   if (b.dedication.text) out.push('### Dedication', '', b.dedication.text, '', '---', '');
   /* Pictures placed inside the prose become real Markdown images so nothing
      the writer put in the chapter is silently dropped on export. */
+  const keepPics = (opts && opts.pictures !== undefined) ? !!opts.pictures : picturesInPrint();
   const html2md = (html) => {
     const d = document.createElement('div'); d.innerHTML = String(html || '');
     const swap = (node, alt, src) => node.parentNode.replaceChild(
       document.createTextNode('\n\n![' + (alt || 'picture') + '](' + (src || '') + ')\n\n'), node);
-    if (!picturesInPrint()) {
+    if (!keepPics) {
       d.querySelectorAll('figure, img').forEach(n => n.remove());
     } else {
       d.querySelectorAll('figure').forEach(f => {
@@ -9466,9 +9569,12 @@ ACTIONS.docImportGo = async function () {
 };
 
 /* ---- sending a manuscript back out -------------------------------------- */
-function bookBlocksHTML(b) {
+function bookBlocksHTML(b, opts) {
   const out = [];
-  const strip = (h) => picturesInPrint() ? h : String(h || '').replace(/<figure[^]*?<\/figure>/gi, '').replace(/<img[^>]*>/gi, '');
+  /* opts.pictures overrides the app-wide choice, so one linked document can
+     carry the pictures while another next to it stays raw text. */
+  const keep = (opts && opts.pictures !== undefined) ? !!opts.pictures : picturesInPrint();
+  const strip = (h) => keep ? h : String(h || '').replace(/<figure[^]*?<\/figure>/gi, '').replace(/<img[^>]*>/gi, '');
   out.push('<h1>' + esc(b.title || 'Untitled') + '</h1>');
   if (b.subtitle) out.push('<p class="sub"><i>' + esc(b.subtitle) + '</i></p>');
   if (b.author) out.push('<p class="sub">' + esc(b.author) + '</p>');
@@ -9485,7 +9591,7 @@ function bookBlocksHTML(b) {
   return out.join('\n');
 }
 /** A .doc that Word and WordPad both open, with real headings and page breaks. */
-function bookAsWordHTML(b) {
+function bookAsWordHTML(b, opts) {
   const d = b.design || newDesign();
   return '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" ' +
     'xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8">' +
@@ -9502,7 +9608,7 @@ function bookAsWordHTML(b) {
     'h2 + p{ text-indent:0; }' +
     'img{ max-width:100%; }' +
     'figure{ margin:1em auto; text-align:center; } figcaption{ font-size:' + Math.round(d.size * .85) + 'pt; font-style:italic; }' +
-    '</style></head><body>' + bookBlocksHTML(b) + '</body></html>';
+    '</style></head><body>' + bookBlocksHTML(b, opts) + '</body></html>';
 }
 /** WordPad's native format, written by hand - no library, no server. */
 function bookAsRTF(b) {
@@ -9604,6 +9710,440 @@ ACTIONS.docExportGo = function (el) {
   closeAllModals();
   toast('Saved as ' + base + '.' + f + '.', 'ok', 'EXPORTED');
 };
+
+
+/* ===========================================================================
+   v9 · LIVE-CONNECTED DOCUMENTS ON YOUR OWN PC
+   Point a book at a WordPad (.rtf), Word (.doc) or Notepad (.txt) file on your
+   disk and it keeps that file up to date as you type. Close the app, open the
+   document, and the whole book is there — typeset for print, pictures and all.
+
+   Per book, as many documents as you like: one formatted with pictures to hand
+   to a printer, another as raw text with no pictures at all.
+
+   It never runs on every keystroke. A write happens at most once every N
+   seconds, and only when the manuscript has actually changed, so a long book
+   costs nothing while you are simply thinking.
+   ========================================================================= */
+const LINKDOC_FORMATS = [
+  ['rtf', 'WordPad (.rtf)', 'WordPad’s own format. Pictures are embedded inside the file itself, so it prints exactly as you see it.', true],
+  ['doc', 'Word (.doc)', 'Opens in Word, LibreOffice and Google Docs with real chapter page breaks, your typeface and your margins.', true],
+  ['txt', 'Notepad (.txt)', 'Nothing but the words. Never contains pictures. The safest archive there is.', false],
+  ['html', 'Web page (.html)', 'A typeset page any browser opens, pictures included.', true],
+  ['md', 'Markdown (.md)', 'For Scrivener, Obsidian and publishing pipelines.', true]
+];
+let LINKDOC_HANDLES = {};      /* id -> FileSystemFileHandle, this session */
+let LINKDOC_WRITING = false;
+let LINKDOC_TICK = 0;
+const RTF_PIC_CACHE = new Map();   /* src -> RTF picture group, built once */
+
+function linkedDocs(b) {
+  if (!b.linkedDocs) b.linkedDocs = [];
+  return b.linkedDocs;
+}
+function newLinkedDoc(o) {
+  return Object.assign({
+    id: uid('ld'), name: '', format: 'rtf', pictures: true, live: true,
+    everySec: 10, lastSync: '', lastError: '', bytes: 0, writes: 0, hash: ''
+  }, o || {});
+}
+async function linkDocRestore() {
+  if (!HAS_FSA) return;
+  try {
+    const recs = await idbGet('linkedDocHandles');
+    if (recs && typeof recs === 'object') LINKDOC_HANDLES = recs;
+  } catch (e) { }
+}
+async function linkDocRemember() {
+  try { await idbPut('linkedDocHandles', LINKDOC_HANDLES); } catch (e) { }
+}
+function linkDocHandle(d) { return LINKDOC_HANDLES[d.id] || null; }
+
+/* --------------------------- pictures into RTF ---------------------------- */
+/** Any image the writer used, turned into something RTF will actually show.
+    The decode and hex-encode happen once per picture and are cached, so a
+    re-write of a long book costs almost nothing. */
+async function rtfPictureData(src) {
+  if (RTF_PIC_CACHE.has(src)) return RTF_PIC_CACHE.get(src);
+  let data = null;
+  try {
+    const img = await loadImage(src);
+    let dataUrl = src, kind = 'pngblip';
+    if (/^data:image\/jpe?g/i.test(src)) kind = 'jpegblip';
+    else if (/^data:image\/png/i.test(src)) kind = 'pngblip';
+    else {
+      /* GIF, WEBP, or a remote address - RTF understands none of them, so the
+         first frame is redrawn as a PNG that it does understand. */
+      const cv = document.createElement('canvas');
+      cv.width = img.naturalWidth || 600; cv.height = img.naturalHeight || 400;
+      cv.getContext('2d').drawImage(img, 0, 0);
+      dataUrl = cv.toDataURL('image/png');
+      kind = 'pngblip';
+    }
+    data = {
+      kind: kind,
+      w: img.naturalWidth || 600,
+      h: img.naturalHeight || 400,
+      hex: base64ToHex(dataUrl.slice(dataUrl.indexOf(',') + 1))
+    };
+  } catch (e) { data = null; }
+  RTF_PIC_CACHE.set(src, data);
+  return data;
+}
+async function rtfPicture(src, widthPct, d) {
+  const pic = await rtfPictureData(src);
+  if (!pic) return '';
+  const goalW = rtfGoal(widthPct, d);
+  const goalH = Math.round(goalW * (pic.h / Math.max(1, pic.w)));
+  return '{\\pict\\' + pic.kind + '\\picw' + pic.w + '\\pich' + pic.h +
+    '\\picwgoal' + goalW + '\\pichgoal' + goalH + ' ' + pic.hex + '}';
+}
+/** Width in twips, from the percentage of the text column the writer chose. */
+function rtfGoal(widthPct, d) {
+  d = d || newDesign();
+  const trim = trimOf(d.trim);
+  const usable = Math.max(2, trim[2] - (Number(d.mInner) || 0.85) - (Number(d.mOuter) || 0.6));
+  const pct = clamp(Number(widthPct) || 70, 10, 100) / 100;
+  return Math.round(usable * pct * 1440);
+}
+function base64ToHex(b64) {
+  const bin = atob(b64);
+  const hex = new Array(bin.length);
+  for (let i = 0; i < bin.length; i++) {
+    const v = bin.charCodeAt(i);
+    hex[i] = (v < 16 ? '0' : '') + v.toString(16);
+  }
+  return hex.join('');
+}
+function loadImage(src) {
+  return new Promise((res, rej) => {
+    const im = new Image();
+    im.crossOrigin = 'anonymous';
+    im.onload = () => res(im);
+    im.onerror = () => rej(new Error('image failed'));
+    im.src = src;
+  });
+}
+/** The full RTF, with real pictures where the writer put them. */
+async function bookAsRTFRich(b, withPictures) {
+  const d = b.design || newDesign();
+  const esc2 = (t) => String(t || '')
+    .replace(/\\/g, '\\\\').replace(/\{/g, '\\{').replace(/\}/g, '\\}')
+    .replace(/[\u0080-\uFFFF]/g, (c) => '\\u' + c.charCodeAt(0) + '?');
+  const holder = document.createElement('div');
+  holder.innerHTML = bookBlocksHTML(b, { pictures: withPictures });
+
+  const trim = trimOf(d.trim);
+  const tw = (inches) => Math.round(inches * 1440);
+  const out = ['{\\rtf1\\ansi\\ansicpg1252\\deff0',
+    '{\\fonttbl{\\f0\\froman ' + gFontName(d.font) + ';}{\\f1\\fswiss Arial;}}',
+    '{\\info{\\title ' + esc2(b.title) + '}{\\author ' + esc2(b.author || '') + '}}',
+    '\\paperw' + tw(trim[2]) + '\\paperh' + tw(trim[3]) +
+      '\\margl' + tw(Number(d.mInner) || .85) + '\\margr' + tw(Number(d.mOuter) || .6) +
+      '\\margt' + tw(Number(d.mTop) || .75) + '\\margb' + tw(Number(d.mBottom) || .75),
+    '\\f0\\fs' + Math.round((Number(d.size) || 11) * 2),
+    /* a page-number footer, so the printed document is properly paginated */
+    '{\\footer\\pard\\qc\\fs18 \\chpgn \\par}'
+  ];
+  const base = Math.round((Number(d.size) || 11) * 2);
+  const sl = Math.round((Number(d.leading) || 1.5) * 240);
+  const indent = Math.round((Number(d.indent) || 0) * (Number(d.size) || 11) * 20);
+  const align = d.align === 'justify' ? '\\qj' : '\\ql';
+
+  const walk = async (node) => {
+    let s = '';
+    for (const c of Array.from(node.childNodes)) {
+      if (c.nodeType === 3) { s += esc2(c.textContent); continue; }
+      if (c.nodeType !== 1) continue;
+      const t = c.tagName.toLowerCase();
+      if (t === 'br') { s += '\\line '; continue; }
+      if (t === 'img') {
+        if (!withPictures) continue;
+        const fig = c.closest('figure');
+        const w = fig ? Number(fig.getAttribute('data-w') || 70) : 100;
+        s += await rtfPicture(c.getAttribute('src') || '', w, d);
+        continue;
+      }
+      const inner = await walk(c);
+      if (t === 'b' || t === 'strong') s += '{\\b ' + inner + '}';
+      else if (t === 'i' || t === 'em') s += '{\\i ' + inner + '}';
+      else if (t === 'u') s += '{\\ul ' + inner + '}';
+      else s += inner;
+    }
+    return s;
+  };
+
+  let first = true;
+  for (const n of Array.from(holder.children)) {
+    const tag = n.tagName.toLowerCase();
+    if (tag === 'figure') {
+      if (!withPictures) continue;
+      const im = n.querySelector('img'), cp = n.querySelector('figcaption');
+      const pic = im ? await rtfPicture(im.getAttribute('src') || '', Number(n.getAttribute('data-w') || 70), d) : '';
+      if (pic) out.push('\\pard\\qc\\sa120 ' + pic + '\\par ');
+      if (cp) out.push('\\pard\\qc\\i\\fs' + Math.round(base * 0.85) + ' ' + esc2(cp.textContent) + '\\i0\\fs' + base + '\\par ');
+      continue;
+    }
+    const body = await walk(n);
+    if (tag === 'h1') {
+      out.push('\\pard\\qc\\sb2880\\fs' + Math.round(base * 2.4) + '\\b ' + body + '\\b0\\fs' + base + '\\par\\page ');
+      first = false;
+    } else if (tag === 'h2') {
+      out.push((first ? '' : '\\page ') + '\\pard\\qc\\sb1440\\sa480\\fs' + Math.round(base * 1.6) + '\\b ' + body + '\\b0\\fs' + base + '\\par ');
+      first = false;
+    } else if (tag === 'h3') out.push('\\pard\\qc\\sb240\\sa120\\fs' + Math.round(base * 1.2) + '\\b ' + body + '\\b0\\fs' + base + '\\par ');
+    else if (tag === 'hr') out.push('\\pard\\qc\\sb240\\sa240 ' + esc2(d.sceneBreak || '* * *') + '\\par ');
+    else if (tag === 'blockquote') out.push('\\pard\\li720\\ri720\\sl' + sl + '\\slmult1\\i ' + body + '\\i0\\par ');
+    else if (tag === 'ul' || tag === 'ol') {
+      for (const li of Array.from(n.children)) out.push('\\pard\\li720\\fi-360\\sl' + sl + '\\slmult1 \\bullet\\tab ' + await walk(li) + '\\par ');
+    } else if (n.className === 'sub' || n.className === 'ded') {
+      out.push('\\pard\\qc\\sa120\\i ' + body + '\\i0\\par ');
+    } else {
+      out.push('\\pard' + align + '\\fi' + indent + '\\sl' + sl + '\\slmult1 ' + body + '\\par ');
+    }
+  }
+  out.push('}');
+  return out.join('\n');
+}
+
+/** Everything a linked document could be, in one place. */
+async function buildLinkedDoc(b, fmt, withPictures) {
+  if (fmt === 'rtf') return await bookAsRTFRich(b, withPictures);
+  if (fmt === 'doc') return bookAsWordHTML(b, { pictures: withPictures });
+  if (fmt === 'txt') return bookAsPlainText(b);
+  if (fmt === 'html') return manuscriptHTML(b, { pictures: withPictures });
+  if (fmt === 'md') return manuscriptMarkdown(b, { pictures: withPictures });
+  return bookAsPlainText(b);
+}
+
+/* ------------------------------ the sync loop ----------------------------- */
+/** Writes one linked document, but only if it has actually changed. */
+async function linkDocWrite(b, d, force) {
+  const h = linkDocHandle(d);
+  if (!h) { d.lastError = 'The browser has forgotten this file. Reconnect it.'; return false; }
+  if (!(await handlePerm(h, false))) { d.lastError = 'needs-permission'; paintLinkPill(); return false; }
+  const text = await buildLinkedDoc(b, d.format, d.pictures !== false);
+  const stamp = hashString(text);
+  if (!force && stamp === d.hash) return false;      /* nothing changed */
+  const w = await h.createWritable();                /* swap-file write: atomic */
+  await w.write(text);
+  await w.close();
+  d.hash = stamp;
+  d.bytes = text.length;
+  d.writes = (d.writes || 0) + 1;
+  d.lastSync = nowISO();
+  d.lastError = '';
+  markDirty();
+  return true;
+}
+/** Notes that the manuscript moved on. Cheap — the real work is on a timer. */
+function linkDocTouch() {
+  const b = currentBook();
+  if (!b || !(b.linkedDocs || []).some(d => d.live && linkDocHandle(d))) return;
+  LINKDOC_DIRTY = true;
+  paintLinkPill();
+}
+let LINKDOC_DIRTY = false, LINKDOC_TIMER = null, LINKDOC_LAST = 0;
+function startLinkDocLoop() {
+  if (LINKDOC_TIMER) clearInterval(LINKDOC_TIMER);
+  LINKDOC_TIMER = setInterval(async () => {
+    if (!LINKDOC_DIRTY || LINKDOC_WRITING) return;
+    const b = currentBook(); if (!b) return;
+    const docs = (b.linkedDocs || []).filter(x => x.live && linkDocHandle(x));
+    if (!docs.length) { LINKDOC_DIRTY = false; return; }
+    const gap = Math.min.apply(null, docs.map(x => clamp(Number(x.everySec) || 10, 3, 600))) * 1000;
+    if (Date.now() - LINKDOC_LAST < gap) return;
+    LINKDOC_DIRTY = false;
+    LINKDOC_WRITING = true;
+    LINKDOC_TICK++;
+    paintLinkPill();
+    try {
+      for (const d of docs) {
+        try { await linkDocWrite(b, d); }
+        catch (e) { d.lastError = String(e.message || e); }
+      }
+    } finally {
+      LINKDOC_WRITING = false;
+      LINKDOC_LAST = Date.now();
+      paintLinkPill();
+      const bk2 = currentBook();
+      if (CURRENT_VIEW === 'profile' && bk2 && bk2.profile.tab === 'linked') renderLinkRows();
+    }
+  }, 2000);
+}
+/** The little live badge in the top bar, beside the Google one. */
+function paintLinkPill() {
+  const el = $('#linkPill'); if (!el) return;
+  const b = currentBook();
+  const docs = b ? (b.linkedDocs || []).filter(d => d.live && linkDocHandle(d)) : [];
+  if (!docs.length) { el.style.display = 'none'; return; }
+  el.style.display = '';
+  const bad = docs.find(d => d.lastError);
+  const st = LINKDOC_WRITING ? 'syncing' : bad ? 'error' : LINKDOC_DIRTY ? 'pending' : 'ok';
+  el.className = 'livepill ' + st;
+  const last = docs.map(d => d.lastSync).filter(Boolean).sort().pop();
+  el.querySelector('.lptxt').textContent =
+    st === 'syncing' ? 'WRITING…' : st === 'error' ? 'FILE ERROR' : st === 'pending' ? 'DOC · QUEUED' : 'DOC LIVE';
+  el.title = bad ? ('A linked document could not be written: ' + bad.lastError)
+    : docs.length + ' document(s) on your PC being kept up to date. Last written ' + (last ? timeAgo(last) : 'not yet') + '.';
+}
+function renderLinkRows() {
+  const host = $('#linkRows'); if (!host) return;
+  const b = currentBook(); if (!b) return;
+  host.innerHTML = linkedDocs(b).map(d => linkRowHTML(d)).join('') ||
+    '<div class="empty" style="padding:18px"><i data-lucide="file-text"></i><h4>NO DOCUMENTS LINKED YET</h4></div>';
+  icons();
+}
+
+/* --------------------------------- actions -------------------------------- */
+ACTIONS.linkDocNew = async function (el) {
+  const b = requireBook(); if (!b) return;
+  if (!HAS_FSA) { toast('Writing straight to a file on your PC needs Chrome, Edge, Opera or Brave. Firefox and Safari cannot do it yet — use Save as a document instead.', 'warn', 'NOT SUPPORTED'); return; }
+  const fmt = (el && el.getAttribute('data-f')) || 'rtf';
+  const pics = !(el && el.getAttribute('data-p') === 'no');
+  const spec = LINKDOC_FORMATS.find(f => f[0] === fmt) || LINKDOC_FORMATS[0];
+  try {
+    const h = await window.showSaveFilePicker({
+      suggestedName: slug(b.title || 'manuscript') + (pics ? '' : '-text-only') + '.' + fmt,
+      types: [{ description: spec[1], accept: { 'application/octet-stream': ['.' + fmt] } }]
+    });
+    const d = newLinkedDoc({ name: h.name, format: fmt, pictures: pics && spec[3] });
+    LINKDOC_HANDLES[d.id] = h;
+    await linkDocRemember();
+    linkedDocs(b).push(d);
+    markDirty();
+    await linkDocWrite(b, d, true);
+    render();
+    toast('“' + h.name + '” is linked and up to date. It follows what you write from now on.', 'ok', 'DOCUMENT LINKED');
+  } catch (e) { if (e && e.name !== 'AbortError') toast(String(e.message || e), 'err'); }
+};
+ACTIONS.linkDocOpen = async function () {
+  const b = requireBook(); if (!b) return;
+  if (!HAS_FSA) { toast('This browser cannot open a file for writing. Use Chrome, Edge, Opera or Brave.', 'warn'); return; }
+  try {
+    const [h] = await window.showOpenFilePicker({
+      types: [{ description: 'A document to keep up to date', accept: { 'application/octet-stream': ['.rtf', '.doc', '.txt', '.html', '.md'] } }]
+    });
+    if (!(await handlePerm(h, true))) { toast('Permission to write to that file was declined.', 'warn'); return; }
+    const ext = (h.name.split('.').pop() || 'rtf').toLowerCase();
+    const fmt = LINKDOC_FORMATS.some(f => f[0] === ext) ? ext : 'rtf';
+    const ok = await confirmDlg('TAKE OVER THIS DOCUMENT',
+      '<p>From now on <strong>' + esc(h.name) + '</strong> is written by this app, and whatever is in it now will be replaced by ' +
+      '<strong>' + esc(b.title) + '</strong>.</p>' +
+      '<p class="t-am">If that file has writing in it you have not brought into the app, cancel and use <em>Import a document</em> first.</p>', true);
+    if (!ok) return;
+    const d = newLinkedDoc({ name: h.name, format: fmt });
+    LINKDOC_HANDLES[d.id] = h;
+    await linkDocRemember();
+    linkedDocs(b).push(d);
+    markDirty();
+    await linkDocWrite(b, d, true);
+    render();
+    toast('“' + h.name + '” is now being kept up to date.', 'ok', 'DOCUMENT LINKED');
+  } catch (e) { if (e && e.name !== 'AbortError') toast(String(e.message || e), 'err'); }
+};
+function linkDocById(id) {
+  const b = currentBook(); if (!b) return null;
+  return (b.linkedDocs || []).find(x => x.id === id) || null;
+}
+ACTIONS.linkDocWriteNow = async function (el) {
+  const b = requireBook(); const d = linkDocById(el.getAttribute('data-id')); if (!b || !d) return;
+  try {
+    const wrote = await linkDocWrite(b, d, true);
+    render();
+    toast(wrote ? 'Written to “' + d.name + '”.' : 'Could not write to that file.', wrote ? 'ok' : 'err');
+  } catch (e) { d.lastError = String(e.message || e); render(); toast(String(e.message || e), 'err'); }
+};
+ACTIONS.linkDocLive = function (el) {
+  const d = linkDocById(el.getAttribute('data-id')); if (!d) return;
+  d.live = !d.live;
+  if (d.live) LINKDOC_DIRTY = true;
+  markDirty(); render(); paintLinkPill();
+  toast(d.live ? '“' + d.name + '” follows what you write again.' : '“' + d.name + '” is frozen where it is.', d.live ? 'ok' : 'warn');
+};
+ACTIONS.linkDocPics = function (el) {
+  const d = linkDocById(el.getAttribute('data-id')); if (!d) return;
+  d.pictures = !d.pictures;
+  d.hash = '';
+  markDirty(); render();
+  toast(d.pictures ? 'Pictures will be written into that document.' : 'That document is now text only.', 'ok');
+};
+ACTIONS.linkDocEvery = function (el) {
+  const d = linkDocById(el.getAttribute('data-id')); if (!d) return;
+  d.everySec = clamp(Number(el.value) || 10, 3, 600);
+  markDirty();
+};
+ACTIONS.linkDocReconnect = async function (el) {
+  const d = linkDocById(el.getAttribute('data-id')); if (!d) return;
+  const h = linkDocHandle(d);
+  if (h && await handlePerm(h, true)) {
+    d.lastError = '';
+    const b = currentBook();
+    try { await linkDocWrite(b, d, true); } catch (e) { d.lastError = String(e.message || e); }
+    render(); toast('Reconnected.', 'ok');
+    return;
+  }
+  toast('Pick the file again to reconnect it.', 'warn');
+  ACTIONS.linkDocOpen();
+};
+ACTIONS.linkDocForget = async function (el) {
+  const b = requireBook(); const d = linkDocById(el.getAttribute('data-id')); if (!b || !d) return;
+  const ok = await confirmDlg('STOP UPDATING THIS DOCUMENT',
+    '<p>Stop writing to <strong>' + esc(d.name || 'this file') + '</strong>?</p>' +
+    '<p>The file itself is left on your PC exactly as it is — this only stops the automatic updating.</p>');
+  if (!ok) return;
+  delete LINKDOC_HANDLES[d.id];
+  await linkDocRemember();
+  b.linkedDocs = b.linkedDocs.filter(x => x.id !== d.id);
+  markDirty(); render(); paintLinkPill();
+  toast('No longer updating that file.', 'warn');
+};
+
+/* ------------------------- the tab on the book page ----------------------- */
+function linkRowHTML(d) {
+  const h = linkDocHandle(d);
+  const spec = LINKDOC_FORMATS.find(f => f[0] === d.format) || LINKDOC_FORMATS[0];
+  const st = !h ? ['', 'RECONNECT NEEDED']
+    : d.lastError ? ['rd', 'PROBLEM']
+    : d.live ? ['lm', 'LIVE'] : ['am', 'PAUSED'];
+  return '<div class="panel mb10" style="padding:12px">' +
+    '<div class="flex between center gap8 wrap mb6">' +
+      '<div style="min-width:0;flex:1">' +
+        '<div class="flex center gap6 wrap">' +
+          (d.live && h && !d.lastError ? '<span class="lpdot"></span>' : '') +
+          '<strong class="fs13" style="color:var(--txt);word-break:break-all">' + esc(d.name || 'Untitled file') + '</strong>' +
+          '<span class="chip">' + esc(spec[1]) + '</span>' +
+          '<span class="chip ' + (d.pictures ? 'cy' : '') + '">' + (d.pictures ? 'WITH PICTURES' : 'TEXT ONLY') + '</span>' +
+        '</div>' +
+        '<div class="mono fs10 faint mt6">' +
+          (d.lastSync ? 'LAST WRITTEN ' + esc(timeAgo(d.lastSync)) + ' · ' + esc(new Date(d.lastSync).toLocaleTimeString()) : 'NOT WRITTEN YET') +
+          ' · ' + fmt(d.writes || 0) + ' UPDATES · ' + bytesHuman(d.bytes || 0) +
+        '</div>' +
+      '</div>' +
+      '<span class="chip ' + st[0] + '">' + st[1] + '</span>' +
+    '</div>' +
+    (d.lastError ? '<div class="fs12 t-rd mb6">' +
+      (d.lastError === 'needs-permission'
+        ? 'Your browser has forgotten its permission to write to this file. Press Reconnect.'
+        : esc(d.lastError)) + '</div>' : '') +
+    '<div class="flex gap6 wrap center">' +
+      '<button class="btn xs' + (d.live ? '' : ' solid') + '" data-act="linkDocLive" data-id="' + d.id + '">' +
+        '<i data-lucide="' + (d.live ? 'pause' : 'play') + '"></i>' + (d.live ? 'PAUSE' : 'RESUME') + '</button>' +
+      '<button class="btn xs" data-act="linkDocWriteNow" data-id="' + d.id + '"><i data-lucide="hard-drive-download"></i>WRITE NOW</button>' +
+      (spec[3] ? '<button class="btn xs ghost" data-act="linkDocPics" data-id="' + d.id + '"><i data-lucide="image"></i>' +
+        (d.pictures ? 'MAKE IT TEXT ONLY' : 'PUT PICTURES IN') + '</button>' : '') +
+      (!h || d.lastError ? '<button class="btn xs amber" data-act="linkDocReconnect" data-id="' + d.id + '"><i data-lucide="key"></i>RECONNECT</button>' : '') +
+      '<label class="flex center gap4 fs11 muted">every' +
+        '<select class="sel" style="width:96px;padding:3px 5px" data-change="linkDocEvery" data-id="' + d.id + '">' +
+          [[3, '3 sec'], [5, '5 sec'], [10, '10 sec'], [30, '30 sec'], [60, '1 min'], [300, '5 min']].map(o =>
+            '<option value="' + o[0] + '"' + (Number(d.everySec || 10) === o[0] ? ' selected' : '') + '>' + o[1] + '</option>').join('') +
+        '</select></label>' +
+      '<span style="flex:1"></span>' +
+      '<button class="btn xs ghost red" data-act="linkDocForget" data-id="' + d.id + '"><i data-lucide="unlink"></i>STOP</button>' +
+    '</div>' +
+  '</div>';
+}
+
 
 /* ============================ MIGRATION ================================== */
 /* Books are rebuilt against the current template with deepDefaults, so a book
@@ -10330,6 +10870,7 @@ const PROF_TABS = [
   ['world', 'World & Lore', 'globe'],
   ['covers', 'Cover Art', 'image'],
   ['gallery', 'Gallery', 'image'],
+  ['linked', 'Live Documents', 'file-text'],
   ['notes', 'Notes', 'sticky-note']
 ];
 
@@ -10386,6 +10927,10 @@ VIEWS.profile = {
         '<button class="btn solid" data-act="feedAdd"><i data-lucide="plus"></i>WRITE A NEW CHAPTER</button>' +
         '<button class="btn ghost" data-act="profEdit"><i data-lucide="pencil"></i>EDIT PROFILE</button>' +
         '<button class="btn ghost" data-act="themeEdit"><i data-lucide="palette"></i>CUSTOMISE LOOK</button>' +
+        '<button class="btn ghost" data-act="profTab" data-arg="linked" title="Keep a WordPad or Word document on your PC up to date as you write">' +
+          ((b.linkedDocs || []).some(d => d.live && linkDocHandle(d))
+            ? '<span class="lpdot" style="margin-right:2px"></span>LIVE DOCUMENT'
+            : '<i data-lucide="file-text"></i>LIVE DOCUMENT') + '</button>' +
         '<button class="btn ghost" data-act="docExport" title="Save this book as a Word, WordPad or text document"><i data-lucide="file-output"></i>SAVE AS A DOCUMENT</button>' +
         '<button class="btn ghost" data-go="gdoc" title="Mirror this book into a Google Doc that keeps itself up to date">' +
           ((b.gdoc && b.gdoc.live && b.gdoc.id)
@@ -10426,6 +10971,7 @@ VIEWS.profile = {
       : tab === 'world' ? this.world(b)
       : tab === 'covers' ? this.covers(b)
       : tab === 'gallery' ? VIEWS.profile.gallery(b)
+      : tab === 'linked' ? VIEWS.profile.linked(b)
       : this.notes(b));
   },
 
@@ -10508,10 +11054,11 @@ VIEWS.profile = {
       ).join('');
     }
 
-    return '<div class="grid-auto" style="grid-template-columns:minmax(200px,240px) minmax(0,1fr) minmax(240px,300px)">' +
+    return writeBar('The chapter list and the feed options', 'What to write next, the story map and your progress') +
+    '<div class="writing-grid" style="--l:minmax(200px,240px);--r:minmax(240px,300px)">' +
 
       /* left: jump list */
-      '<div><div style="position:sticky;top:56px">' +
+      '<div class="side-l"><div style="position:sticky;top:56px">' +
         '<div class="panel clip mb10"><div class="panel-hd"><i data-lucide="list"></i><h3>JUMP TO</h3></div>' +
           '<div class="panel-bd storyrail" style="padding:7px">' +
             (chs.length ? chs.map((c, i) => {
@@ -10532,7 +11079,7 @@ VIEWS.profile = {
       '</div></div>' +
 
       /* centre: feed */
-      '<div>' +
+      '<div class="main-col">' +
         '<div class="panel clip mb14"><div class="panel-bd" style="padding:12px">' +
           '<div class="flex gap8 center wrap">' +
             '<div class="prof-av circle" style="width:38px;height:38px;border-width:2px;cursor:default">' +
@@ -10548,7 +11095,7 @@ VIEWS.profile = {
       '</div>' +
 
       /* right: story map + summary */
-      '<div><div style="position:sticky;top:56px">' +
+      '<div class="side-r"><div style="position:sticky;top:56px">' +
         (function () {
           const adv = storyAdvice(b);
           if (!adv.length) return '';
@@ -10838,8 +11385,14 @@ function aboutChecklist(b) {
 /* ---------------------------- profile actions ---------------------------- */
 ACTIONS.profTab = function (el) {
   const b = requireBook(); if (!b) return;
-  b.profile.tab = el.getAttribute('data-k');
+  b.profile.tab = el.getAttribute('data-k') || el.getAttribute('data-arg');
   markDirty(); render();
+};
+/* Jump to a profile tab from anywhere — the top-bar badge uses this. */
+ACTIONS.profTabGo = function (el) {
+  const b = requireBook(); if (!b) return;
+  b.profile.tab = el.getAttribute('data-arg') || 'timeline';
+  markDirty(); go('profile');
 };
 ACTIONS.profCoverNudge = function (el) {
   const b = requireBook(); if (!b) return;
@@ -11412,6 +11965,87 @@ function collectBookImages(b) {
     return true;
   });
 }
+
+VIEWS.profile.linked = function (b) {
+  const docs = linkedDocs(b);
+  const live = docs.filter(d => d.live && linkDocHandle(d)).length;
+  return '' +
+  '<div class="panel clip mb14 ' + (live ? '' : 'tone-red') + '">' +
+    '<div class="panel-hd"><i data-lucide="file-text"></i><h3>LIVE DOCUMENTS ON YOUR PC</h3><span style="flex:1"></span>' +
+      (live ? '<span class="livepill inline ok"><span class="lpdot"></span><span class="lptxt">' + live + ' LIVE</span></span>'
+            : '<span class="chip">NONE YET</span>') +
+    '</div><div class="panel-bd">' +
+      '<div class="helpbox mb14"><b>YOUR BOOK, ALSO SITTING ON YOUR DISK AS A REAL DOCUMENT</b>' +
+        'Point <strong>' + esc(b.title) + '</strong> at a WordPad, Word or Notepad file and this app keeps that file up to date while you write. ' +
+        'Close the app entirely, open the document, and the whole book is there — laid out for print, with every picture where you put it. ' +
+        'It is the backup that needs no thought: even if something happened to the app, the document on your PC is already current.</div>' +
+
+      (!HAS_FSA
+        ? '<div class="panel mb14" style="padding:12px;border-color:color-mix(in srgb, var(--c-amber) 45%, transparent)">' +
+          '<div class="flex center gap8 mb6"><i data-lucide="alert-triangle" style="width:16px;height:16px;color:var(--c-amber)"></i>' +
+          '<strong class="t-am">This browser cannot write straight to a file</strong></div>' +
+          '<div class="fs13 muted">It needs Chrome, Edge, Opera or Brave — Firefox and Safari do not support it yet. ' +
+          'Everything else still works: use <strong>Save as a document</strong> to write the same file by hand whenever you like.</div>' +
+          '<button class="btn sm mt10" data-act="docExport"><i data-lucide="file-output"></i>SAVE AS A DOCUMENT</button></div>'
+        : '<div class="grid-auto g2 mb14">' +
+            '<button class="optcard" data-act="linkDocNew" data-f="rtf" style="text-align:left">' +
+              '<strong class="fs13" style="color:var(--txt)"><i data-lucide="file-plus" style="width:14px;height:14px"></i> NEW WORDPAD DOCUMENT</strong>' +
+              '<div class="fs12 muted mt6">The one to pick. Pictures are embedded in the file itself, chapters start on new pages, ' +
+              'page numbers at the foot — hand it straight to a printer.</div></button>' +
+            '<button class="optcard" data-act="linkDocNew" data-f="doc" style="text-align:left">' +
+              '<strong class="fs13" style="color:var(--txt)"><i data-lucide="file-plus" style="width:14px;height:14px"></i> NEW WORD DOCUMENT</strong>' +
+              '<div class="fs12 muted mt6">For Microsoft Word, LibreOffice or Google Docs, with your typeface, trim size and margins.</div></button>' +
+            '<button class="optcard" data-act="linkDocNew" data-f="txt" data-p="no" style="text-align:left">' +
+              '<strong class="fs13" style="color:var(--txt)"><i data-lucide="file-plus" style="width:14px;height:14px"></i> NEW RAW TEXT FILE</strong>' +
+              '<div class="fs12 muted mt6">Notepad. Nothing but the words, no pictures, no formatting. Keep one of these alongside a ' +
+              'formatted one and you have both versions, always current.</div></button>' +
+            '<button class="optcard" data-act="linkDocOpen" style="text-align:left">' +
+              '<strong class="fs13" style="color:var(--txt)"><i data-lucide="link" style="width:14px;height:14px"></i> USE A DOCUMENT I ALREADY HAVE</strong>' +
+              '<div class="fs12 muted mt6">Pick any .rtf, .doc, .txt, .html or .md file on your PC and this book takes it over.</div></button>' +
+          '</div>') +
+
+      '<div id="linkRows">' + (docs.length ? docs.map(linkRowHTML).join('')
+        : '<div class="empty" style="padding:20px"><i data-lucide="file-text"></i><h4>NOTHING LINKED YET</h4>' +
+          '<div class="fs13">Pick one of the four above. Most writers keep two: a WordPad file with the pictures, and a text file without.</div></div>') + '</div>' +
+    '</div></div>' +
+
+  '<div class="grid-auto" style="grid-template-columns:minmax(0,1fr) minmax(260px,340px)">' +
+    '<div class="panel clip"><div class="panel-hd"><i data-lucide="printer"></i><h3>WHAT LANDS IN THE FILE</h3>' +
+      '<span style="flex:1"></span><button class="btn xs ghost" data-go="designer"><i data-lucide="settings-2"></i>CHANGE THE DESIGN</button></div>' +
+      '<div class="panel-bd prose-c fs13">' +
+        '<p>The document is typeset from your <strong>Book Designer</strong> settings, so it opens looking like the finished book rather than a wall of text:</p>' +
+        '<ul>' +
+          '<li>Title page on its own, then the dedication, then the prologue.</li>' +
+          '<li>Every chapter starts on a new page with its heading centred.</li>' +
+          '<li>Body text ' + esc((b.design || newDesign()).align) + ', first line indented ' + ((b.design || newDesign()).indent) + 'em, ' +
+            'set in ' + esc(gFontName((b.design || newDesign()).font)) + ' at ' + ((b.design || newDesign()).size) + 'pt.</li>' +
+          '<li>Page size ' + esc(trimOf((b.design || newDesign()).trim)[1].split('—')[0].trim()) + ', with your margins and page numbers at the foot.</li>' +
+          '<li>Bold, italics, quotes, lists and scene breaks all carry across.</li>' +
+          '<li><strong>Pictures are embedded in the file</strong> at the size and position you gave them — the file stands alone, so you can email it or take it to a print shop.</li>' +
+        '</ul>' +
+        '<h5>Keeping your PC quiet</h5>' +
+        '<p>Nothing is written on every keystroke. A file is only rewritten when the manuscript has actually changed, and at most once every few ' +
+        'seconds — which you set per document above. Each picture is prepared once and then reused, so a long illustrated book is no slower to write than a short one.</p>' +
+      '</div></div>' +
+    '<div><div style="position:sticky;top:12px">' +
+      '<div class="panel clip mb14"><div class="panel-hd"><i data-lucide="gauge"></i><h3>THIS BOOK</h3></div><div class="panel-bd">' +
+        '<div class="grid-auto g2">' +
+          miniStat('Words', fmt(bookWords(b))) +
+          miniStat('Chapters', fmt((b.chapters || []).length)) +
+          miniStat('Pictures in the prose', fmt(countFigures(b))) +
+          miniStat('Documents linked', fmt(docs.length)) +
+        '</div></div></div>' +
+      '<div class="panel clip"><div class="panel-hd"><i data-lucide="shield"></i><h3>GOOD TO KNOW</h3></div>' +
+        '<div class="panel-bd prose-c fs12"><ul>' +
+          '<li>This is <strong>per book</strong>. Each book gets its own documents, and they never mix.</li>' +
+          '<li>The file is written through a swap file, so a crash mid-write cannot leave you with half a book.</li>' +
+          '<li>A browser sometimes forgets its permission to a file after a restart. The row says so, and Reconnect fixes it in one click.</li>' +
+          '<li>Nothing leaves your computer. This writes to your disk directly — there is no upload and no server.</li>' +
+          '<li>Keep the document closed while you write. WordPad and Word hold their own copy in memory, so a file open in them will not refresh on screen.</li>' +
+        '</ul></div></div>' +
+    '</div></div>' +
+  '</div>';
+};
 
 VIEWS.profile.gallery = function (b) {
   b.gallery = b.gallery || [];
@@ -14376,7 +15010,9 @@ async function boot() {
   requestPersistence().then(p => { state.app.storage.persisted = !!p; });
   paintVaultPill();
   startGdocLoop();
+  startLinkDocLoop();
   paintLivePill();
+  paintLinkPill();
   if (recovered) setTimeout(() => recoveredModal(recovered), 500);
   else if (first) setTimeout(welcomeModal, 400);
   else if (downgraded) setTimeout(() => versionModal(downgraded, false), 500);

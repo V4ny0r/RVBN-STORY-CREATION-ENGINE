@@ -97,6 +97,11 @@ itself as you write.
 
 ### Writing the way a word processor works
 
+Writing pages open with **nothing but the writing**. The chapter list, the feed options,
+the story map, the advice and the progress bar are all still there — they slide in over
+the page when you ask for them from the bar above the text, and go away again. One button
+switches the panels back to sitting permanently beside the page if you prefer that.
+
 The writing box has a toolbar **at the top and at the bottom**, and a pin button that
 makes it follow you down a long chapter so a picture can go in wherever you are, not
 only where you started. **Full screen** gives you nothing but the page. **Highlight any
@@ -128,6 +133,28 @@ mid-chapter, between two paragraphs, wherever you are. Upload it, paste a link, 
 reuse anything already in the book. Click a placed picture to set its width, put it
 left, centre, right or full width, and give it a caption. Figures carry through the
 Book Designer's pagination, the exported HTML book and the Markdown manuscript.
+
+### A live document on your own PC
+
+Open a book's **Live Documents** tab and point it at a WordPad (`.rtf`), Word (`.doc`)
+or Notepad (`.txt`) file on your disk. From then on the app keeps that file up to date
+while you write. Close the app entirely, open the document, and the whole book is there
+— title page, dedication, every chapter starting on a new page, page numbers at the
+foot, set in your Book Designer typeface at your trim size and margins. Hand it to a
+printer as it is.
+
+**Pictures are embedded inside the file itself**, at the size and position you gave
+them, so the document stands alone. Each book can have as many linked documents as you
+like, and each decides for itself whether it carries pictures — so keep a formatted
+`.rtf` with the artwork *and* a raw `.txt` of nothing but the words, both always current.
+
+It is deliberately not per-keystroke: a file is rewritten only when the manuscript has
+actually changed, and at most once every few seconds (you choose, per document). Each
+picture is encoded once and reused, so a long illustrated book costs no more than a
+short one.
+
+> Writing straight to a file needs Chrome, Edge, Opera or Brave. Firefox and Safari do
+> not support it yet — there, *Save as a document* produces exactly the same file by hand.
 
 ### A Google Doc that keeps itself current
 
@@ -218,6 +245,7 @@ guide for whatever page you are on.
 | **Characters** | Every character listed in the menu, each with a full profile page: cover, portrait, dossier, inner life, voice, ties, appearances, gallery, notes. |
 | **Google Doc Sync** | This book mirrored into a live-updating Google Doc, typeset from your Book Designer settings. |
 | **Storage** | Vault file or storage folder on your own disk, write-ahead saves, snapshot history, verified backups, version-stamped and update-proof. |
+| **Live Documents** | A WordPad, Word or Notepad file on your own PC kept up to date as you write, print-formatted, with pictures embedded — or a raw-text twin without them. Per book. |
 | **Export** | Word `.doc`, WordPad `.rtf`, plain `.txt`, JSON backup/restore, clean HTML book, Markdown manuscript, printable manuscript, full story bible, cast sheet, comic script and children's dummy book. |
 | **Import** | Word, WordPad, Markdown, HTML or text manuscripts, split into chapters automatically. |
 
