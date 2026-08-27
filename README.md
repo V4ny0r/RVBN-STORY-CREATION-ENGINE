@@ -95,6 +95,32 @@ read the character *and* the book before suggesting anything (and work offline),
 **Appearances** finds them in your actual prologue and chapters by name, updating
 itself as you write.
 
+### Writing the way a word processor works
+
+The writing box has a toolbar **at the top and at the bottom**, and a pin button that
+makes it follow you down a long chapter so a picture can go in wherever you are, not
+only where you started. **Full screen** gives you nothing but the page. **Highlight any
+text** and a small bar appears over it: bold, italic, underline, bigger, smaller, a
+font just for those words, eleven colours and a highlighter.
+
+Pictures behave like pictures: drag the corner handle to resize one in place, click it
+for width, position and a caption, and text flows around it. One switch decides whether
+you see pictures *while writing*; a separate one decides whether they appear in the
+*finished book* — so you can write with reference art in front of you and still export
+the story on its own.
+
+### Bringing a manuscript in, and sending one out
+
+**Import a document** reads Word (`.docx`), WordPad (`.rtf`), Markdown, HTML and plain
+text. It finds your chapters — real headings, or lines that read like *Chapter Four* or
+*Prologue* — shows you what it found before anything changes, and keeps your bold and
+italics. Choose whether it becomes a new book, gets added to the one you have open, or
+replaces it.
+
+**Save as a document** writes the whole manuscript back out as `.doc` (opens in Word,
+WordPad, Google Docs and LibreOffice, with real chapter page breaks and your typeface),
+`.rtf`, `.txt`, `.html`, `.md`, or a designed PDF.
+
 ### Pictures inside the prose
 
 The picture button in any editor drops a photo or animated GIF **at the text cursor** —
@@ -133,8 +159,18 @@ Six of them are full light modes. Beyond the presets, *Fine-Tune Colours & Fonts
 
 - **Background pictures and GIFs** behind the whole app, with fill mode, blur and dimming.
 - Apply any look to **just one page, one whole book, or everything** — page beats book beats global.
-- **Banners are resizable in pixels everywhere**, with a live vertical reframe slider, opacity, blur and scrim.
-- **Drag your own menu**: press *Arrange Menu* to drag pages between groups, reorder groups, rename them, add your own, or reset.
+- **Every page owns its banner.** Nothing cascades and nothing follows you around: the
+  banner on the Cover Studio is not the banner on the Prologue. Each one has the same
+  full set of controls — six size presets from Compact to Full Bleed, height in pixels,
+  reframe up/down *and* left/right (or just drag the picture), zoom, opacity, dark fade,
+  blur, and a switch to hide the page name over it. Remove a banner from any page and a
+  slim strip stays behind to put it back. If you do want one picture everywhere, one
+  button copies it — and each page still keeps its own copy afterwards.
+- **Drag your own menu**: press *Arrange Menu* to drag pages between groups, reorder
+  groups, rename them, add your own, or reset. Every page also has a **→ dropdown** that
+  sends it straight into any other group without dragging.
+- **Your books are the menu.** Under *Book Profiles* each book is listed by its own name
+  with its picture and word count; clicking one opens that book and lands on its profile.
 - **Dashboard slideshow**: your own images, GIFs or video with six transitions (fade, slide, zoom, flip, blur, Ken Burns), adjustable timing and height. Pull pictures straight from anywhere else in the book.
 
 ### Finishing the book
@@ -161,7 +197,11 @@ your chapter feed, on the dashboard and in the Idea Lab.
 
 ### Never wondering what a page is for
 
-Every page opens with a plain-English guide: one sentence on what the page is, a numbered *step by step*, and a *good to know* list. Modals and complex fields carry their own explanations. Hide them all with the **?** button in the top bar, bring them back the same way.
+Every page carries a small **?** in the corner. Press it for a plain-English guide: one
+sentence on what the page is, a numbered *step by step*, and a *good to know* list. It
+stays out of the way until you want it, so the page itself is not crowded. Modals and
+complex fields carry their own explanations, and the **?** in the top bar opens the
+guide for whatever page you are on.
 
 | Area | Modules |
 | --- | --- |
@@ -178,7 +218,8 @@ Every page opens with a plain-English guide: one sentence on what the page is, a
 | **Characters** | Every character listed in the menu, each with a full profile page: cover, portrait, dossier, inner life, voice, ties, appearances, gallery, notes. |
 | **Google Doc Sync** | This book mirrored into a live-updating Google Doc, typeset from your Book Designer settings. |
 | **Storage** | Vault file or storage folder on your own disk, write-ahead saves, snapshot history, verified backups, version-stamped and update-proof. |
-| **Export** | JSON backup/restore, clean HTML book, Markdown manuscript, printable manuscript, full story bible, cast sheet, comic script and children's dummy book. |
+| **Export** | Word `.doc`, WordPad `.rtf`, plain `.txt`, JSON backup/restore, clean HTML book, Markdown manuscript, printable manuscript, full story bible, cast sheet, comic script and children's dummy book. |
+| **Import** | Word, WordPad, Markdown, HTML or text manuscripts, split into chapters automatically. |
 
 ## AI providers
 

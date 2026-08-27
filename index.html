@@ -216,6 +216,10 @@ body.no-fx::before,body.no-fx::after{ display:none; }
 /* ------------------------------ BANNER ---------------------------------- */
 .banner{ position:relative; width:100%; overflow:hidden; border-bottom:1px solid var(--line); background:var(--void); flex:0 0 auto; }
 .banner-media{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; display:block; }
+.banner.draggable-banner{ cursor:grab; touch-action:none; }
+.banner.draggable-banner.dragging{ cursor:grabbing; }
+.banner-off{ display:flex; align-items:center; justify-content:flex-end; gap:8px; height:34px; padding:0 12px;
+  border-bottom:1px solid var(--line); background:var(--sunk); }
 .banner-fallback{
   position:absolute; inset:0;
   background:
@@ -647,6 +651,13 @@ input[type=checkbox]{ accent-color:#23e0ff; width:15px; height:15px; cursor:poin
 .helpbox b{ display:block; font-family:var(--font-mono); font-size:9.5px; letter-spacing:2.2px; color:var(--accent); margin-bottom:4px; }
 .helpbox strong{ color:var(--txt); } .helpbox em{ color:var(--accent-3); font-style:normal; }
 .guide{ margin-bottom:14px; }
+.guide-fab{ position:fixed; right:18px; bottom:56px; z-index:40; width:38px; height:38px; border-radius:50%; cursor:pointer;
+  display:grid; place-items:center; font-family:var(--font-display); font-size:18px; font-weight:900;
+  background:var(--accent); color:#04121a; border:1px solid var(--accent);
+  box-shadow:0 8px 24px rgba(0,0,0,.55), 0 0 18px color-mix(in srgb, var(--accent) 40%, transparent);
+  opacity:.5; transition:opacity .16s, transform .16s; }
+.guide-fab:hover{ opacity:1; transform:scale(1.08); }
+@media(max-width:640px){ .guide-fab{ right:12px; bottom:64px; width:34px; height:34px; font-size:16px; } }
 .guide-hd{
   display:flex; align-items:center; gap:9px; width:100%; padding:10px 14px; cursor:pointer; text-align:left;
   background:linear-gradient(90deg,color-mix(in srgb, var(--accent-2) 12%, transparent),color-mix(in srgb, var(--accent) 6%, transparent) 55%,transparent);
@@ -662,6 +673,8 @@ input[type=checkbox]{ accent-color:#23e0ff; width:15px; height:15px; cursor:poin
 .guide-bd ol,.guide-bd ul{ margin:0; padding-left:1.25em; font-size:13.5px; line-height:1.66; color:var(--txt-dim); }
 .guide-bd ol{ list-style:decimal; } .guide-bd ul{ list-style:disc; }
 .guide-bd li{ margin-bottom:5px; } .guide-bd li strong{ color:var(--txt); }
+.navto{ background:var(--sunk); color:var(--txt-dim); border:1px solid var(--line); font-family:var(--font-mono);
+  font-size:9px; padding:1px 2px; max-width:26px; cursor:pointer; }
 .hint{ display:block; font-size:11.5px; color:var(--txt-faint); line-height:1.5; margin-top:4px; }
 label.fld > .hint{ margin-top:3px; }
 
@@ -1073,6 +1086,45 @@ label.fld > .hint{ margin-top:3px; }
 
 
 /* ------------------- pictures placed inside the prose -------------------- */
+/* ---- WordPad-style writing surface ---- */
+.editor-wrap.sticky-tools .etoolbar:not(.bottom){ position:sticky; top:0; z-index:22; }
+.editor-wrap .etoolbar.bottom{ border-top:1px solid var(--line); border-bottom:0; }
+.editor-wrap.sticky-tools .etoolbar.bottom{ position:sticky; bottom:0; z-index:22; }
+.editor-wrap.fullscreen{
+  position:fixed; inset:0; z-index:60; margin:0; border-radius:0; max-width:none;
+  display:flex; flex-direction:column; background:var(--bg-panel); backdrop-filter:none;
+}
+.editor-wrap.fullscreen .etoolbar:not(.bottom){ position:sticky; top:0; }
+.editor-wrap.fullscreen .rte{ flex:1 1 auto; overflow-y:auto; min-height:0 !important; padding:34px clamp(16px,8vw,120px); }
+.editor-wrap.fullscreen .etoolbar.bottom{ position:sticky; bottom:0; }
+body.rte-fullscreen .main-scroll{ overflow:hidden; }
+body.hide-rte-images .rte figure.ed-fig, body.hide-rte-images .rte img{ display:none !important; }
+
+.rte-bubble{
+  position:fixed; z-index:70; display:flex; align-items:center; gap:2px; flex-wrap:wrap; max-width:min(94vw,620px);
+  padding:4px 6px; background:var(--chrome); border:1px solid var(--line-hard); border-radius:var(--radius);
+  box-shadow:0 14px 40px rgba(0,0,0,.7); backdrop-filter:blur(10px); animation:fade .12s;
+}
+.rte-bubble.hidden{ display:none; }
+.rte-bubble .selfont{ background:var(--sunk); color:var(--txt-dim); border:1px solid var(--line);
+  font-family:var(--font-ui); font-size:11px; padding:2px 3px; max-width:104px; cursor:pointer; }
+.rte-bubble .swatches{ display:flex; gap:2px; align-items:center; }
+.rte-bubble .sw{ width:15px; height:15px; border-radius:3px; border:1px solid var(--line-hard); cursor:pointer; padding:0; }
+.rte-bubble .sw:hover{ transform:scale(1.18); }
+
+.rte figure.ed-fig.selected{ outline:2px solid var(--accent); outline-offset:2px; }
+.rte figure.ed-fig .fig-grip{
+  position:absolute; right:-7px; bottom:-7px; width:15px; height:15px; border-radius:3px; cursor:nwse-resize;
+  background:var(--accent); border:2px solid var(--bg-panel); z-index:5; touch-action:none;
+  opacity:.4; transition:opacity .15s, transform .15s;
+}
+.rte figure.ed-fig{ position:relative; }
+.rte figure.ed-fig:hover .fig-grip, .rte figure.ed-fig.selected .fig-grip{ opacity:1; transform:scale(1.15); }
+body.hide-rte-images .rte .fig-grip{ display:none; }
+.rte figure.ed-fig .fig-readout{
+  position:absolute; left:6px; top:6px; z-index:6; font-family:var(--font-mono); font-size:10px;
+  background:rgba(3,6,12,.82); color:var(--accent); padding:2px 6px; border-radius:3px;
+}
 .rte figure.ed-fig{ margin:1.1em auto; padding:0; max-width:100%; }
 .rte figure.ed-fig img{ width:100%; display:block; border:1px solid var(--line); margin:0; cursor:pointer; }
 .rte figure.ed-fig figcaption{ font-size:.78em; text-align:center; color:var(--txt-faint); margin-top:.4em; font-style:italic; }
@@ -1118,10 +1170,10 @@ label.fld > .hint{ margin-top:3px; }
 
     <div class="flex center gap6" style="flex-wrap:wrap;justify-content:flex-end">
       <span class="savepill" id="savePill"><span class="dot"></span><span id="savePillTxt">SYNCED</span></span>
-      <button class="chip" id="vaultPill" data-go="storage" style="cursor:pointer" title="Where your work is being saved">NO VAULT FILE</button>
+      <button class="chip" id="vaultPill" data-act="vaultExplain" style="cursor:pointer" title="Where your work is being saved — click to find out">NO VAULT FILE</button>
       <button class="livepill" id="livePill" data-go="gdoc" style="display:none" title="Live updating a Google Doc"><span class="lpdot"></span><span class="lptxt">LIVE UPDATING</span></button>
       <button class="btn ghost sm" id="btnSearch" title="Search everything (Ctrl+K)"><i data-lucide="search"></i><span class="hide-sm">FIND</span></button>
-      <button class="btn ghost sm" data-act="guideOnAll" title="Show or hide the plain-English guide on every page"><i data-lucide="help-circle"></i></button>
+      <button class="btn ghost sm" data-act="guideOnAll" title="How this page works"><i data-lucide="help-circle"></i></button>
       <button class="btn ghost sm" data-act="themeEdit" title="Change colours, fonts and background"><i data-lucide="palette"></i></button>
       <button class="btn ghost sm" id="btnSaveNow" title="Save right now (Ctrl+S)"><i data-lucide="hard-drive-download"></i></button>
       <button class="btn solid sm" data-act="quickSettings" title="Settings — appearance, storage, AI, program name"><i data-lucide="settings-2"></i><span class="hide-sm">SETTINGS</span></button>
@@ -2075,7 +2127,8 @@ const REL_TYPES = [
 const BANNER_PRESETS = [['Hidden', 0], ['Compact', 130], ['Medium', 230], ['Tall', 330], ['Cinematic Hero', 440], ['Full Bleed', 580]];
 const LEGACY_BANNER_H = { off: 0, compact: 130, medium: 230, hero: 440 };
 function newBanner(px) {
-  return { type: 'none', src: '', h: (px == null ? 230 : px), offset: 50, opacity: 100, tint: 60, blur: 0, fit: 'cover', title: '', desc: '' };
+  return { type: 'none', src: '', h: (px == null ? 230 : px), offset: 50, offsetX: 50, zoom: 100,
+    opacity: 100, tint: 60, blur: 0, fit: 'cover', title: '', desc: '', hideText: false };
 }
 function migrateBanner(bn) {
   const out = Object.assign(newBanner(230), bn || {});
@@ -2187,7 +2240,8 @@ function defaultState() {
       fx: true,
       autosaveSec: 5,
       globalBanner: newBanner(230),
-      perViewBanners: true,
+      pageBanners: {},
+      printImages: true,          /* do pictures placed in the prose reach the finished book? */
       photoLayout: 'right',
       google: { clientId: '', minSeconds: 12, connected: false },
       storage: { vaultName: '', folderName: '', autoVault: true, vaultEverySec: 20, snapshotEverySec: 120,
@@ -2212,6 +2266,7 @@ function defaultState() {
     },
     ui: {
       view: 'profile', bookId: '', railOpen: false, castFilter: 'all', chapterId: '', comicPage: 0,
+      stickyTools: false, hideEditorImages: false,
       lastEdited: {}, nav: null, navV: 0, navEdit: false, helpClosed: {}, feedOpen: '', slide: 0,
       shelf: { q: '', sort: 'updated', view: 'grid' }
     },
@@ -2488,7 +2543,8 @@ function render() {
   renderBanner();
   try { paintLivePill(); } catch (e) { }
   try {
-    host.innerHTML = guidePanel(CURRENT_VIEW) + (v.render ? v.render() : '');
+    host.innerHTML = (v.render ? v.render() : '') +
+      (state.app.showGuides === false ? '' : guideFab(CURRENT_VIEW));
   } catch (err) {
     console.error(err);
     host.innerHTML = '<div class="panel clip"><div class="panel-bd"><h3 class="t-rd">MODULE FAULT</h3><pre class="mono fs12" style="white-space:pre-wrap;color:var(--c-red-t)">' + esc(String(err && err.stack || err)) + '</pre></div></div>';
@@ -3123,18 +3179,36 @@ ACTIONS.logoClear = function () { state.app.logo = ''; markDirty(); renderBrand(
 /* -------------------------------- BANNER --------------------------------
    Cascade: this page's banner  →  this book's banner  →  the global banner.
    Heights are free-form pixels so any banner can be any size.            */
-function activeBanner() {
+/* Pages that ARE a banner already — a profile cover, a character cover — never
+   get a second strip on top of them. */
+const HERO_VIEWS = ['profile', 'character'];
+/* Pages that belong to no particular book, so their banner is kept app-wide. */
+const BOOKLESS_VIEWS = ['library', 'settings', 'storage', 'exportv', 'gdoc', 'masterclass'];
+
+function bannerStoreFor(view) {
   const b = currentBook();
-  if (state.app.perViewBanners && b && b.banners && b.banners[CURRENT_VIEW]) return { data: b.banners[CURRENT_VIEW], scope: 'view' };
-  if (b && b.banners && b.banners.__book) return { data: b.banners.__book, scope: 'book' };
-  return { data: state.app.globalBanner, scope: 'global' };
+  if (b && BOOKLESS_VIEWS.indexOf(view) < 0) { b.banners = b.banners || {}; return b.banners; }
+  state.app.pageBanners = state.app.pageBanners || {};
+  return state.app.pageBanners;
+}
+/* Every page owns its own banner. Nothing cascades and nothing follows you
+   around — changing one page's banner changes exactly that page. */
+function activeBanner(view) {
+  view = view || CURRENT_VIEW;
+  const store = bannerStoreFor(view);
+  if (!store[view]) store[view] = newBanner(230);
+  return { data: store[view], scope: 'page', view: view };
 }
 /** Shared markup for any banner anywhere (page banners and profile covers). */
 function bannerMediaHTML(bn) {
   const op = (bn.opacity == null ? 100 : bn.opacity) / 100;
   const blur = Number(bn.blur) || 0;
-  const style = 'object-position:50% ' + (bn.offset == null ? 50 : bn.offset) + '%;object-fit:' + (bn.fit || 'cover') +
-    ';opacity:' + op + (blur ? ';filter:blur(' + blur + 'px);transform:scale(' + (1 + blur / 40) + ')' : '');
+  const zoom = clamp(Number(bn.zoom == null ? 100 : bn.zoom), 100, 300) / 100;
+  const scale = zoom * (blur ? 1 + blur / 40 : 1);
+  const style = 'object-position:' + (bn.offsetX == null ? 50 : bn.offsetX) + '% ' + (bn.offset == null ? 50 : bn.offset) +
+    '%;object-fit:' + (bn.fit || 'cover') + ';opacity:' + op +
+    (blur ? ';filter:blur(' + blur + 'px)' : '') +
+    (scale !== 1 ? ';transform:scale(' + scale.toFixed(3) + ')' : '');
   if (bn.src && bn.type === 'video') {
     return '<video class="banner-media" src="' + attr(bn.src) + '" autoplay muted loop playsinline style="' + style + '"></video>';
   }
@@ -3147,33 +3221,42 @@ function bannerMediaHTML(bn) {
 }
 function renderBanner() {
   const host = $('#bannerHost');
-  const { data: bn, scope } = activeBanner();
+  if (!host) return;
+  /* A page that is its own hero (a book profile, a character page) must not get
+     a second banner stacked above it. */
+  if (HERO_VIEWS.indexOf(CURRENT_VIEW) >= 0) { host.innerHTML = ''; return; }
+
+  const { data: bn } = activeBanner();
   const meta = VIEW_META[CURRENT_VIEW] || { t: 'ARCHITECT', e: '', d: '' };
   const book = currentBook();
   const h = clamp(Number(bn.h == null ? 230 : bn.h), 0, 700);
   if (h < 40) {
-    host.innerHTML = '<div class="banner" style="height:34px;display:flex;align-items:center;justify-content:flex-end;padding:0 10px;gap:6px">' +
-      '<span class="mono fs10 faint">BANNER HIDDEN</span>' +
-      '<button class="btn ghost xs" data-act="bannerEdit"><i data-lucide="image"></i>BANNER</button></div>';
+    /* Removed, but never gone for good — one click puts it back. */
+    host.innerHTML = '<div class="banner-off">' +
+      '<span class="mono fs10 faint">NO BANNER ON THIS PAGE</span>' +
+      '<button class="btn ghost xs" data-act="bannerRestore"><i data-lucide="image-plus"></i>ADD A BANNER HERE</button>' +
+      '<button class="btn ghost xs" data-act="bannerEdit"><i data-lucide="sliders-horizontal"></i>SETTINGS</button></div>';
     icons(); return;
   }
   const titleSize = clamp(Math.round(h / 12), 17, 40);
-  const title = bn.title || (book && ['library', 'settings', 'exportv', 'masterclass'].indexOf(CURRENT_VIEW) === -1 ? book.title + ' — ' + meta.t : meta.t);
+  const title = bn.title || (book && BOOKLESS_VIEWS.indexOf(CURRENT_VIEW) === -1 ? book.title + ' — ' + meta.t : meta.t);
   const desc = bn.desc || meta.d;
   host.innerHTML =
-    '<div class="banner" style="height:' + h + 'px">' + bannerMediaHTML(bn) +
+    '<div class="banner' + (bn.src ? ' draggable-banner' : '') + '" style="height:' + h + 'px">' + bannerMediaHTML(bn) +
       '<div class="banner-scrim" style="opacity:' + ((bn.tint == null ? 60 : bn.tint) / 100) + '"></div>' +
       '<div class="banner-tools">' +
         '<button class="btn ghost xs" data-act="bannerNudge" data-d="-40" title="Make this banner shorter">–</button>' +
         '<span class="chip mono" style="background:var(--sunk)">' + h + 'px</span>' +
         '<button class="btn ghost xs" data-act="bannerNudge" data-d="40" title="Make this banner taller">+</button>' +
-        '<button class="btn ghost xs" data-act="bannerEdit" title="Change the picture, GIF, video, size and position"><i data-lucide="sliders-horizontal"></i>EDIT BANNER</button>' +
+        '<button class="btn ghost xs" data-act="bannerEdit" title="Picture, size, position — this page only"><i data-lucide="sliders-horizontal"></i>EDIT</button>' +
+        '<button class="btn ghost xs red" data-act="bannerHideHere" title="Remove the banner from this page (you can add it back)"><i data-lucide="x"></i></button>' +
       '</div>' +
+      (bn.hideText ? '' :
       '<div class="banner-inner">' +
-        '<div class="banner-eyebrow">' + esc(meta.e) + (scope !== 'global' ? ' · ' + scope.toUpperCase() + ' BANNER' : '') + '</div>' +
+        '<div class="banner-eyebrow">' + esc(meta.e) + ' · THIS PAGE\u2019S OWN BANNER</div>' +
         '<h1 class="banner-title" style="font-size:' + titleSize + 'px">' + esc(title) + '</h1>' +
         (desc && h > 150 ? '<div class="banner-desc">' + esc(desc) + '</div>' : '') +
-      '</div>' +
+      '</div>') +
     '</div>';
   icons();
 }
@@ -3182,6 +3265,56 @@ ACTIONS.bannerNudge = function (el) {
   data.h = clamp((Number(data.h) || 230) + Number(el.getAttribute('data-d')), 0, 700);
   markDirty(); renderBanner();
 };
+ACTIONS.bannerHideHere = function () {
+  const { data } = activeBanner();
+  data.__lastH = clamp(Number(data.h) || 230, 40, 700);
+  data.h = 0;
+  markDirty(); renderBanner();
+  toast('Banner removed from this page. The strip left behind puts it back.', 'warn');
+};
+ACTIONS.bannerRestore = function () {
+  const { data } = activeBanner();
+  data.h = clamp(Number(data.__lastH) || 230, 40, 700);
+  markDirty(); renderBanner();
+  toast('Banner back on this page.', 'ok');
+};
+/* Drag the banner picture to reframe it — the same gesture as a cover. */
+document.addEventListener('pointerdown', (e) => {
+  const frame = e.target.closest && e.target.closest('.banner.draggable-banner');
+  if (!frame) return;
+  if (e.target.closest('button, a, input, select, textarea, .banner-tools')) return;
+  const media = frame.querySelector('.banner-media');
+  if (!media) return;
+  const { data } = activeBanner();
+  const box = frame.getBoundingClientRect();
+  if (!box.width || !box.height) return;
+  e.preventDefault();
+  const sx = e.clientX, sy = e.clientY;
+  const x0 = clamp(Number(data.offsetX == null ? 50 : data.offsetX), 0, 100);
+  const y0 = clamp(Number(data.offset == null ? 50 : data.offset), 0, 100);
+  frame.classList.add('dragging');
+  const move = (ev) => {
+    data.offsetX = clamp(Math.round(x0 - ((ev.clientX - sx) / box.width) * 100), 0, 100);
+    data.offset = clamp(Math.round(y0 - ((ev.clientY - sy) / box.height) * 100), 0, 100);
+    media.style.objectPosition = data.offsetX + '% ' + data.offset + '%';
+    const a = document.getElementById('bnOffV'), c = document.getElementById('bnOffXV');
+    if (a) a.textContent = data.offset + '%';
+    if (c) c.textContent = data.offsetX + '%';
+    const sa = document.getElementById('bnOffset'), sc = document.getElementById('bnOffsetX');
+    if (sa) sa.value = data.offset;
+    if (sc) sc.value = data.offsetX;
+  };
+  const up = () => {
+    frame.classList.remove('dragging');
+    window.removeEventListener('pointermove', move);
+    window.removeEventListener('pointerup', up);
+    window.removeEventListener('pointercancel', up);
+    markDirty();
+  };
+  window.addEventListener('pointermove', move);
+  window.addEventListener('pointerup', up);
+  window.addEventListener('pointercancel', up);
+});
 
 /** The banner editor is reused for page banners AND profile covers.
  *  `target` is either null (page banner cascade) or a direct object ref. */
@@ -3189,16 +3322,15 @@ function openBannerEditor(bn, opts) {
   opts = opts || {};
   window.__bannerDraft = bn;
   window.__bannerRepaint = opts.repaint || renderBanner;
-  const scope = opts.scopeLabel || activeBanner().scope;
   const b = currentBook();
+  const here = (VIEW_META[CURRENT_VIEW] || {}).t || 'this page';
   openModal({
-    title: opts.title || ('BANNER HUB — ' + ((VIEW_META[CURRENT_VIEW] || {}).t || '')), icon: 'image', size: '',
+    title: opts.title || ('BANNER — ' + here.toUpperCase()), icon: 'image', size: '',
     body:
-      '<div class="helpbox mb14"><b>WHAT THIS DOES</b>' +
-        'Sets the picture strip at the top of ' + esc(opts.what || 'this page') + '. You can use a <strong>photo, an animated GIF, or a video</strong>. ' +
-        'Drag <em>Banner height</em> to make it as short or as tall as you like, and <em>Vertical reframe</em> to slide the picture up or down so the right part shows.' +
+      '<div class="helpbox mb14"><b>THIS BANNER BELONGS TO ' + esc(String(opts.what || here).toUpperCase()) + '</b>' +
+        'Nothing here touches any other page. Use a <strong>photo, an animated GIF, or a video</strong>, set how tall it is, ' +
+        'and slide or drag the picture until the right part of it shows. Every banner in the app has these same controls.' +
       '</div>' +
-      (opts.noScope ? '' : '<div class="flex wrap gap6 mb14"><span class="chip cy">CURRENTLY EDITING: ' + esc(String(scope).toUpperCase()) + ' BANNER</span></div>') +
 
       '<div class="grid-auto g2">' +
         '<div>' +
@@ -3227,8 +3359,13 @@ function openBannerEditor(bn, opts) {
             '<div class="flex gap4 wrap mt6">' + BANNER_PRESETS.map(pr =>
               '<button class="btn xs ghost" data-act="bnPreset" data-h="' + pr[1] + '">' + esc(pr[0]) + '</button>').join('') + '</div>' +
             '<span class="hint">0px hides the banner completely on this page.</span></label>' +
-          '<label class="fld"><span class="lb">Vertical reframe — <b id="bnOffV" class="t-cy">' + (bn.offset == null ? 50 : bn.offset) + '%</b> (slide the picture up / down)</span>' +
+          '<label class="fld"><span class="lb">Up and down — <b id="bnOffV" class="t-cy">' + (bn.offset == null ? 50 : bn.offset) + '%</b></span>' +
             '<input type="range" id="bnOffset" min="0" max="100" value="' + (bn.offset == null ? 50 : bn.offset) + '"></label>' +
+          '<label class="fld"><span class="lb">Left and right — <b id="bnOffXV" class="t-cy">' + (bn.offsetX == null ? 50 : bn.offsetX) + '%</b></span>' +
+            '<input type="range" id="bnOffsetX" min="0" max="100" value="' + (bn.offsetX == null ? 50 : bn.offsetX) + '"></label>' +
+          '<label class="fld"><span class="lb">Zoom — <b id="bnZmV" class="t-cy">' + (bn.zoom == null ? 100 : bn.zoom) + '%</b></span>' +
+            '<input type="range" id="bnZoom" min="100" max="300" step="5" value="' + (bn.zoom == null ? 100 : bn.zoom) + '">' +
+            '<span class="hint">You can also just drag the picture in the banner itself.</span></label>' +
           '<div class="lb mt10">3 · Mood</div>' +
           '<label class="fld"><span class="lb">Picture opacity — <b id="bnOpV" class="t-cy">' + (bn.opacity == null ? 100 : bn.opacity) + '%</b></span>' +
             '<input type="range" id="bnOpacity" min="10" max="100" value="' + (bn.opacity == null ? 100 : bn.opacity) + '"></label>' +
@@ -3247,17 +3384,17 @@ function openBannerEditor(bn, opts) {
       '</div>') +
 
       (opts.noScope ? '' :
-      '<div class="panel mt10" style="padding:11px"><div class="lb">4 · Where should these settings apply?</div>' +
+      '<label class="flex center gap8 fs13 mt10"><input type="checkbox" id="bnHideText"' + (bn.hideText ? ' checked' : '') + '>' +
+        '<span>Hide the page name and description over this banner — picture only</span></label>' +
+      '<div class="panel mt10" style="padding:11px"><div class="lb">Copy this banner somewhere else</div>' +
         '<div class="flex gap6 wrap">' +
-          '<button class="btn sm" data-act="bnScope" data-arg="view"><i data-lucide="file-text"></i>JUST THIS PAGE</button>' +
-          (b ? '<button class="btn sm amber" data-act="bnScope" data-arg="book"><i data-lucide="book"></i>EVERY PAGE OF THIS BOOK</button>' : '') +
-          '<button class="btn sm violet" data-act="bnScope" data-arg="global"><i data-lucide="globe"></i>EVERY PAGE, EVERY BOOK</button>' +
-          (scope !== 'global' ? '<button class="btn sm ghost red" data-act="bnDropOverride"><i data-lucide="rotate-ccw"></i>CLEAR THIS PAGE\'S OVERRIDE</button>' : '') +
+          (b ? '<button class="btn sm amber" data-act="bnCopyTo" data-arg="book"><i data-lucide="book"></i>USE IT ON EVERY PAGE OF THIS BOOK</button>' : '') +
+          '<button class="btn sm violet" data-act="bnCopyTo" data-arg="all"><i data-lucide="globe"></i>USE IT ON EVERY PAGE EVERYWHERE</button>' +
+          '<button class="btn sm ghost red" data-act="bnRemoveHere"><i data-lucide="x"></i>REMOVE IT FROM THIS PAGE</button>' +
         '</div>' +
-        '<div class="hint mt6">A page banner beats a book banner, which beats the global one. Changes preview live behind this window.</div>' +
+        '<div class="hint mt6">These copy the picture and settings across once. After that each page is still its own — changing one never changes another.</div>' +
       '</div>'),
-    footer: (opts.noScope ? '' : '<label class="flex center gap6 fs12 muted" style="margin-right:auto"><input type="checkbox" id="bnPerView"' + (state.app.perViewBanners ? ' checked' : '') + '> Allow different banners on different pages</label>') +
-            '<button class="btn solid" data-modal-close>DONE</button>',
+    footer: '<button class="btn solid" data-modal-close>DONE</button>',
     onMount: (r) => {
       const sync = () => {
         const d = window.__bannerDraft;
@@ -3266,6 +3403,9 @@ function openBannerEditor(bn, opts) {
         if (g('bnFit')) d.fit = g('bnFit').value;
         d.h = Number(g('bnH').value);
         d.offset = Number(g('bnOffset').value);
+        if (g('bnOffsetX')) d.offsetX = Number(g('bnOffsetX').value);
+        if (g('bnZoom')) d.zoom = Number(g('bnZoom').value);
+        if (g('bnHideText')) d.hideText = g('bnHideText').checked;
         d.opacity = Number(g('bnOpacity').value);
         d.tint = Number(g('bnTint').value);
         d.blur = Number(g('bnBlur').value);
@@ -3273,13 +3413,15 @@ function openBannerEditor(bn, opts) {
         if (g('bnDesc')) d.desc = g('bnDesc').value;
         g('bnHV').textContent = d.h + 'px';
         g('bnOffV').textContent = d.offset + '%';
+        if (g('bnOffXV')) g('bnOffXV').textContent = d.offsetX + '%';
+        if (g('bnZmV')) g('bnZmV').textContent = d.zoom + '%';
         g('bnOpV').textContent = d.opacity + '%';
         g('bnTiV').textContent = d.tint + '%';
         g('bnBlV').textContent = d.blur + 'px';
         markDirty(); window.__bannerRepaint();
       };
       window.__bannerSync = sync;
-      ['bnType', 'bnFit', 'bnH', 'bnOffset', 'bnOpacity', 'bnTint', 'bnBlur', 'bnTitle', 'bnDesc'].forEach(id => {
+      ['bnType', 'bnFit', 'bnH', 'bnOffset', 'bnOffsetX', 'bnZoom', 'bnOpacity', 'bnTint', 'bnBlur', 'bnTitle', 'bnDesc', 'bnHideText'].forEach(id => {
         const el = $('#' + id, r); if (el) { el.addEventListener('input', sync); el.addEventListener('change', sync); }
       });
       const url = $('#bnUrl', r);
@@ -3290,8 +3432,6 @@ function openBannerEditor(bn, opts) {
         if (v) { d.type = /\.(mp4|webm|ogg|mov)(\?|$)/i.test(v) ? 'video' : 'image'; const t = $('#bnType', r); if (t) t.value = d.type; }
         markDirty(); window.__bannerRepaint();
       }, 400));
-      const pv = $('#bnPerView', r);
-      if (pv) pv.addEventListener('change', (e) => { state.app.perViewBanners = e.target.checked; markDirty(); renderBanner(); });
     }
   });
 }
@@ -3313,22 +3453,33 @@ ACTIONS.bnUpload = async function (el) {
   toast(kind === 'video' ? 'Video loaded.' : 'Picture loaded' + (/gif/i.test(f.type) ? ' — your GIF will animate.' : '.'), 'ok');
 };
 ACTIONS.bnClear = function () { const d = window.__bannerDraft; d.src = ''; d.type = 'none'; markDirty(); window.__bannerRepaint(); const u = $('#bnUrl'); if (u) u.value = ''; };
-ACTIONS.bnScope = function (el) {
+/* Copies this banner onto other pages once. They stay independent afterwards. */
+ACTIONS.bnCopyTo = async function (el) {
   const target = el.getAttribute('data-arg');
   const src = clone(window.__bannerDraft);
-  const b = currentBook();
-  if (target === 'global') state.app.globalBanner = src;
-  else if (target === 'book' && b) { b.banners = b.banners || {}; b.banners.__book = src; }
-  else if (b) { b.banners = b.banners || {}; b.banners[CURRENT_VIEW] = src; }
-  else state.app.globalBanner = src;
+  delete src.__lastH;
+  const views = Object.keys(NAV_ITEMS).filter(v => HERO_VIEWS.indexOf(v) < 0);
+  const ok = await confirmDlg(target === 'book' ? 'USE THIS BANNER ON EVERY PAGE OF THIS BOOK' : 'USE THIS BANNER EVERYWHERE',
+    '<p>This copies the picture and every setting onto ' +
+    (target === 'book' ? '<strong>every page of this book</strong>' : '<strong>every page of every book</strong>') +
+    ', replacing whatever is on them now.</p><p>Each page keeps its own copy, so you can still change any single one afterwards.</p>');
+  if (!ok) return;
+  const paint = (store) => views.forEach(v => { store[v] = clone(src); });
+  if (target === 'book') { const b = currentBook(); if (b) { b.banners = b.banners || {}; paint(b.banners); } }
+  else {
+    state.books.forEach(bk => { bk.banners = bk.banners || {}; paint(bk.banners); });
+    state.app.pageBanners = state.app.pageBanners || {};
+    paint(state.app.pageBanners);
+  }
   markDirty(); renderBanner();
-  toast('Banner applied to ' + (target === 'view' ? 'this page' : target === 'book' ? 'the whole book' : 'every page') + '.', 'ok');
-  window.__bannerDraft = activeBanner().data;
+  toast('Copied. Every page has its own copy now.', 'ok');
 };
-ACTIONS.bnDropOverride = function () {
-  const b = currentBook(); if (!b || !b.banners) return;
-  delete b.banners[CURRENT_VIEW];
-  markDirty(); renderBanner(); closeModal(); toast('Override cleared — this page now inherits its banner.', 'ok');
+ACTIONS.bnRemoveHere = function () {
+  const d = window.__bannerDraft;
+  d.__lastH = clamp(Number(d.h) || 230, 40, 700);
+  d.h = 0;
+  markDirty(); closeModal(); renderBanner();
+  toast('Banner removed from this page. Use “Add a banner here” to bring it back.', 'warn');
 };
 
 /* --------------------------------- RAIL --------------------------------- */
@@ -3345,7 +3496,7 @@ function renderRail() {
       (edit ? '<button class="btn xs ghost" data-act="navAddGroup" title="Create a new heading"><i data-lucide="plus"></i>GROUP</button>' +
               '<button class="btn xs ghost red" data-act="navReset" title="Put the menu back the way it started"><i data-lucide="rotate-ccw"></i></button>' : '') +
     '</div>' +
-    (edit ? '<div class="rail-tip">Drag the <b>⠿</b> handles to move pages between groups, or drag a whole group heading to reorder it.</div>' : '') +
+    (edit ? '<div class="rail-tip">Drag the <b>⠿</b> handles to move pages between groups, or use <b>▴ ▾</b> to reorder and the <b>→</b> dropdown to send a page into any other group. Drag a group heading to move the whole group.</div>' : '') +
 
     groups.map((g, gi) =>
       '<div class="rail-group' + (edit ? ' editing' : '') + '" data-group="' + g.id + '"' + (edit ? ' draggable="true"' : '') + '>' +
@@ -3364,11 +3515,33 @@ function renderRail() {
         '<div class="rail-items' + (g.open === false ? ' hidden' : '') + '" data-groupitems="' + g.id + '">' +
           g.items.map(v => {
             const it = NAV_ITEMS[v]; if (!it) return '';
+            /* "Book Profile" is not one page — it is one page per book. Show the
+               books themselves, by name, rather than a generic entry. */
+            if (v === 'profile' && !edit) {
+              return state.books.map(bk =>
+                '<div class="navwrap"><button class="navitem' +
+                  (CURRENT_VIEW === 'profile' && b && b.id === bk.id ? ' active' : '') +
+                  '" data-act="openBookProfile" data-id="' + bk.id + '" title="' + attr('Open “' + bk.title + '” and go to its profile') + '">' +
+                  (b && b.id === bk.id ? '<span style="color:var(--accent);font-size:9px">\u25cf</span>' : '') +
+                  ((bk.profile && bk.profile.avatar)
+                    ? '<span class="railav"><img src="' + attr(bk.profile.avatar) + '" alt=""></span>'
+                    : '<i data-lucide="book-open"></i>') +
+                  '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(bk.title) + '</span>' +
+                  '<span class="badge">' + fmt(bookWords(bk)) + 'w</span>' +
+                '</button></div>').join('') +
+                '<div class="navwrap"><button class="navitem" data-act="newBook" style="color:var(--accent-3)">' +
+                  '<i data-lucide="plus"></i><span>New Book Project</span></button></div>';
+            }
             const bd = it.badge ? it.badge() : null;
             return '<div class="navwrap" data-navitem="' + v + '" data-ing="' + g.id + '"' + (edit ? ' draggable="true"' : '') + '>' +
               (edit ? '<span class="draghandle sm">⠿</span>' : '') +
               (edit ? '<span class="navmove"><button class="btn xs ghost" data-act="navMoveItem" data-v="' + v + '" data-d="-1" title="Move up">▴</button>' +
-                      '<button class="btn xs ghost" data-act="navMoveItem" data-v="' + v + '" data-d="1" title="Move down">▾</button></span>' : '') +
+                      '<button class="btn xs ghost" data-act="navMoveItem" data-v="' + v + '" data-d="1" title="Move down">▾</button>' +
+                      '<select class="navto" data-change="navSendTo" data-v="' + v + '" title="Move this page into another group">' +
+                        '<option value="">→</option>' +
+                        groups.filter(x => x.id !== g.id).map(x =>
+                          '<option value="' + x.id + '">' + esc(x.label) + '</option>').join('') +
+                      '</select></span>' : '') +
               '<button class="navitem' + (CURRENT_VIEW === v ? ' active' : '') + (g.tone === 'red' ? ' tone-red' : '') + '" data-go="' + v + '" title="' + attr((VIEW_META[v] || {}).d || '') + '">' +
                 '<i data-lucide="' + it.i + '"></i><span>' + esc(it.t) + '</span>' +
                 (bd ? '<span class="badge">' + bd + '</span>' : '') + '</button></div>';
@@ -3407,16 +3580,7 @@ function renderRail() {
       '</div></div>';
     })() +
 
-    '<div class="rail-group"><div class="rail-label"><span class="gname">SWITCH BOOK</span>' +
-      '<button class="btn xs ghost" data-go="library" title="See all my books">ALL</button></div><div class="rail-items">' +
-      state.books.map(bk => '<div class="navwrap"><button class="navitem' + (b && b.id === bk.id ? ' active' : '') + '" data-act="switchBook" data-id="' + bk.id + '" title="' + (b && b.id === bk.id ? 'This is the book you are working on' : 'Switch to this book') + '">' +
-        (b && b.id === bk.id ? '<span style="color:var(--accent);font-size:9px">●</span>' : '') +
-        (bk.profile && bk.profile.avatar
-          ? '<span class="railav"><img src="' + attr(bk.profile.avatar) + '" alt=""></span>'
-          : '<i data-lucide="book"></i>') +
-        '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(bk.title) + '</span></button></div>').join('') +
-      '<div class="navwrap"><button class="navitem" data-act="newBook" style="color:var(--accent-3)"><i data-lucide="plus"></i><span>New Book Project</span></button></div>' +
-    '</div></div>';
+    '</div>';
 
   $('#bookSwitchName').textContent = b ? b.title : 'No Project';
   if (edit) wireNavDrag();
@@ -3511,6 +3675,19 @@ ACTIONS.navMoveGroup = function (el) {
   const [m] = nav.splice(i, 1); nav.splice(j, 0, m);
   markDirty(); renderRail(); icons();
 };
+/* Send any page into any group, without needing to drag it — the reliable
+   route on a touchscreen, and quicker than dragging on a long menu. */
+ACTIONS.navSendTo = function (el) {
+  const gid = el.value; if (!gid) return;
+  const v = el.getAttribute('data-v');
+  const nav = normaliseNav();
+  nav.forEach(g => { g.items = g.items.filter(x => x !== v); });
+  const target = nav.find(g => g.id === gid);
+  if (target) target.items.push(v);
+  state.ui.nav = nav;
+  markDirty(); renderRail(); icons();
+  toast('Moved to ' + (target ? target.label : 'the menu') + '.', 'ok');
+};
 ACTIONS.navEditToggle = function () { state.ui.navEdit = !state.ui.navEdit; markDirty(); renderRail(); icons(); if (state.ui.navEdit) toast('Drag the ⠿ handles to rearrange your menu.', 'info', 'ARRANGE MODE'); };
 ACTIONS.navToggleGroup = function (el) {
   if (el.closest('[data-act="navRenameGroup"]')) return;
@@ -3544,10 +3721,28 @@ ACTIONS.navReset = async function () {
 };
 
 ACTIONS.switchBook = function (el) {
-  setActiveBook(el.getAttribute('data-id'));
+  const id = el.getAttribute('data-id');
+  const already = state.ui.bookId === id;
+  setActiveBook(id);
+  /* the dropdown used to stay open over the page, which made a successful
+     switch look like nothing had happened at all */
+  const m = $('#bookMenu'); if (m) m.classList.add('hidden');
   render();
   const bk = currentBook();
-  toast('“' + (bk ? bk.title : '') + '” is now the open book.', 'ok', 'BOOK OPENED');
+  toast(already ? '“' + (bk ? bk.title : '') + '” was already the open book.'
+                : '“' + (bk ? bk.title : '') + '” is now the open book.',
+    already ? 'warn' : 'ok', 'BOOK OPENED');
+};
+/* Opening a book from the menu takes you to that book's profile, so the switch
+   is impossible to miss. */
+ACTIONS.openBookProfile = function (el) {
+  const id = el.getAttribute('data-id');
+  const changed = state.ui.bookId !== id;
+  setActiveBook(id);
+  const m = $('#bookMenu'); if (m) m.classList.add('hidden');
+  go('profile');
+  const bk = currentBook();
+  if (changed) toast('Now working on “' + (bk ? bk.title : '') + '”.', 'ok', 'BOOK OPENED');
 };
 ACTIONS.toggleBookMenu = function () {
   const m = $('#bookMenu');
@@ -4024,6 +4219,7 @@ VIEWS.library = {
           '<button class="btn sm ' + (s.view === 'list' ? '' : 'ghost') + '" data-act="shelfView" data-k="list" title="Compact list"><i data-lucide="list"></i>LIST</button>' +
         '</div>' +
         '<button class="btn solid" data-act="newBook"><i data-lucide="plus"></i>NEW BOOK</button>' +
+        '<button class="btn ghost sm" data-act="docImport" title="Bring in a Word, WordPad, Markdown or text manuscript"><i data-lucide="file-input"></i>IMPORT DOC</button>' +
         '<button class="btn ghost sm" data-act="impPick" title="Load a book from a backup file"><i data-lucide="upload"></i>IMPORT</button>' +
       '</div>' +
       (s.q ? '<div class="hint mt6">Showing ' + list.length + ' of ' + state.books.length + ' books. <button class="btn xs ghost" data-act="shelfClearQ">CLEAR SEARCH</button></div>' : '') +
@@ -4108,7 +4304,7 @@ function editorHTML(id, html, ph, opts) {
     ['removeFormat', 'eraser', 'Clear formatting'], ['undo', 'rotate-ccw', 'Undo'], ['redo', 'refresh-cw', 'Redo']
   ];
   return '' +
-  '<div class="editor-wrap panel" data-editor="' + id + '">' +
+  '<div class="editor-wrap panel' + (state.ui.stickyTools ? ' sticky-tools' : '') + '" data-editor="' + id + '">' +
     '<div class="etoolbar">' +
       tools.map(t => t === null ? '<span class="esep"></span>'
         : '<button class="etool" data-act="edCmd" data-cmd="' + t[0] + '" data-ed="' + id + '" title="' + attr(t[2]) + '"><i data-lucide="' + t[1] + '"></i></button>').join('') +
@@ -4118,10 +4314,26 @@ function editorHTML(id, html, ph, opts) {
       '<button class="etool" data-act="edPaper" data-ed="' + id + '" title="Manuscript paper mode"><i data-lucide="file-text"></i></button>' +
       '<button class="etool' + (state.ui.pageSim === id ? ' on' : '') + '" data-act="edPageView" data-ed="' + id + '" title="See this on real book pages as you write"><i data-lucide="book-open"></i></button>' +
       '<button class="etool" data-act="edFocus" data-ed="' + id + '" title="Focus mode (large type)"><i data-lucide="maximize"></i></button>' +
+      '<button class="etool" data-act="edFull" data-ed="' + id + '" title="Full screen — nothing but the writing"><i data-lucide="expand"></i></button>' +
+      '<button class="etool' + (state.ui.stickyTools ? ' on' : '') + '" data-act="edStick" data-ed="' + id + '" title="Keep this toolbar with you as you scroll, so you can add a picture anywhere"><i data-lucide="pin"></i></button>' +
+      (opts.allowImage ? '<button class="etool" data-act="edPics" data-ed="' + id + '" title="Show or hide pictures — while writing, and in the finished book"><i data-lucide="eye"></i></button>' : '') +
       '<span style="flex:1"></span>' +
       '<span class="wcount" id="' + id + '-stats">0 words</span>' +
     '</div>' +
     '<div class="rte" id="' + id + '" contenteditable="true" spellcheck="true" data-ph="' + attr(ph || 'Begin writing…') + '" style="min-height:' + (opts.minHeight || 420) + 'px">' + (html || '') + '</div>' +
+    /* the same tools again at the foot of the box, so you never have to scroll
+       back to the top of a long chapter to reach for one */
+    '<div class="etoolbar bottom">' +
+      tools.map(t => t === null ? '<span class="esep"></span>'
+        : '<button class="etool" data-act="edCmd" data-cmd="' + t[0] + '" data-ed="' + id + '" title="' + attr(t[2]) + '"><i data-lucide="' + t[1] + '"></i></button>').join('') +
+      '<span class="esep"></span>' +
+      (opts.allowImage ? '<button class="etool" data-act="edImage" data-ed="' + id + '" title="Insert a picture or GIF here"><i data-lucide="image-plus"></i></button>' : '') +
+      '<button class="etool" data-act="edMark" data-ed="' + id + '" title="Tag this paragraph as a part of the story"><i data-lucide="bookmark"></i></button>' +
+      '<button class="etool" data-act="edFull" data-ed="' + id + '" title="Full screen"><i data-lucide="expand"></i></button>' +
+      '<button class="etool' + (state.ui.stickyTools ? ' on' : '') + '" data-act="edStick" data-ed="' + id + '" title="Keep the toolbar with you as you scroll"><i data-lucide="pin"></i></button>' +
+      '<span style="flex:1"></span>' +
+      '<span class="mono fs10 faint">HIGHLIGHT ANY TEXT FOR SIZE, COLOUR AND FONT</span>' +
+    '</div>' +
     '<div class="diffbar hidden" id="' + id + '-diff">' +
       '<i data-lucide="sparkles" style="width:16px;height:16px;color:var(--accent-3)"></i>' +
       '<span class="fs13"><b class="t-am">AI PASSAGE INSERTED</b> — highlighted below. Keep it or roll it back.</span>' +
@@ -4144,7 +4356,7 @@ function wireEditor(id, setter, label) {
     if (stats) stats.innerHTML = '<b>' + fmt(w) + '</b> words · <b>' + fmt(txt.length) + '</b> chars · <b>' + readTime(w) + '</b> read';
   };
   const commit = debounce(() => {
-    setter(el.innerHTML);
+    setter(cleanEditorHTML(el.innerHTML));
     markDirty();
     const b = currentBook();
     if (b) {
@@ -4153,8 +4365,9 @@ function wireEditor(id, setter, label) {
     }
   }, 700);
   el.addEventListener('input', () => {
+    ensureFigGrips(el);
     update(); commit();
-    if (state.ui.pageSim === id) pageSimSoon(el.innerHTML, label);
+    if (state.ui.pageSim === id) pageSimSoon(cleanEditorHTML(el.innerHTML), label);
   });
   el.addEventListener('keyup', saveRange);
   el.addEventListener('mouseup', saveRange);
@@ -4168,8 +4381,30 @@ function wireEditor(id, setter, label) {
   el.addEventListener('keydown', (e) => {
     if (e.key === 'Tab') { e.preventDefault(); document.execCommand('insertHTML', false, '&nbsp;&nbsp;&nbsp;&nbsp;'); }
   });
+  ensureFigGrips(el);
   update();
-  if (state.ui.pageSim === id) setTimeout(() => pageSimRepaint(el.innerHTML, label), 60);
+  if (state.ui.pageSim === id) setTimeout(() => pageSimRepaint(cleanEditorHTML(el.innerHTML), label), 60);
+}
+/* The resize handle is a piece of editing furniture, not part of the writing:
+   it is put on every picture when an editor opens and taken back off before
+   anything is saved, exported or typeset. */
+function ensureFigGrips(el) {
+  if (!el) return;
+  el.querySelectorAll('figure.ed-fig').forEach(f => {
+    if (!f.querySelector('.fig-grip')) {
+      const g = document.createElement('span');
+      g.className = 'fig-grip';
+      g.setAttribute('contenteditable', 'false');
+      f.appendChild(g);
+    }
+  });
+}
+function cleanEditorHTML(html) {
+  const d = document.createElement('div');
+  d.innerHTML = String(html || '');
+  d.querySelectorAll('.fig-grip, .fig-readout').forEach(n => n.remove());
+  d.querySelectorAll('figure.ed-fig.selected').forEach(n => n.classList.remove('selected'));
+  return d.innerHTML;
 }
 function saveRange() {
   const s = window.getSelection();
@@ -4205,7 +4440,7 @@ ACTIONS.edImage = function (el) {
   saveRange();
   window.__edTarget = id;
   const b = currentBook();
-  const pool = b ? (b.gallery || []).concat(collectBookImages(b)) : [];
+  const pool = b ? dedupeImages((b.gallery || []).concat(collectBookImages(b))) : [];
   openModal({
     title: 'PUT A PICTURE HERE', icon: 'image-plus', size: pool.length ? 'wide' : '',
     body:
@@ -4231,6 +4466,7 @@ function edInsertFigure(src, caption) {
   const fig = '<figure class="ed-fig" data-align="center" data-w="70">' +
     '<img src="' + attr(src) + '" alt="' + attr(caption || '') + '">' +
     (caption ? '<figcaption>' + esc(caption) + '</figcaption>' : '') +
+    '<span class="fig-grip" contenteditable="false"></span>' +
     '</figure><p><br></p>';
   document.execCommand('insertHTML', false, fig);
   ed.dispatchEvent(new Event('input'));
@@ -4317,6 +4553,263 @@ ACTIONS.figDelete = function () {
 };
 ACTIONS.edPaper = function (el) { const ed = document.getElementById(el.getAttribute('data-ed')); if (ed) { ed.classList.toggle('paper'); el.classList.toggle('on'); } };
 ACTIONS.edFocus = function (el) { const ed = document.getElementById(el.getAttribute('data-ed')); if (ed) { ed.classList.toggle('focus-mode'); el.classList.toggle('on'); } };
+
+
+/* ===========================================================================
+   v8 · WORDPAD-STYLE WRITING
+   A writing surface that behaves the way people expect a word processor to:
+   a toolbar top and bottom, one that can follow you down a long chapter,
+   a real full-screen mode, pictures you drag to resize with the text flowing
+   under them, and a little bar that appears when you highlight something.
+   ========================================================================= */
+
+const RTE_FONTS = [
+  ['', 'Same as the page'],
+  ['Georgia, serif', 'Georgia'],
+  ['"Playfair Display", Georgia, serif', 'Playfair Display'],
+  ['"Times New Roman", Times, serif', 'Times New Roman'],
+  ['Inter, system-ui, sans-serif', 'Inter'],
+  ['Arial, Helvetica, sans-serif', 'Arial'],
+  ['"Courier New", Courier, monospace', 'Courier New'],
+  ['"Special Elite", Courier, monospace', 'Typewriter'],
+  ['"Dancing Script", cursive', 'Handwritten'],
+  ['Cinzel, Georgia, serif', 'Cinzel']
+];
+const RTE_SIZES = [['', 'Normal'], ['0.8em', 'Small'], ['0.9em', 'Slightly small'],
+  ['1.15em', 'Slightly large'], ['1.35em', 'Large'], ['1.6em', 'Very large'], ['2em', 'Huge']];
+const RTE_COLOURS = ['#e9f6ff', '#ffffff', '#ff2b3d', '#ff8e3c', '#ffd23f', '#7ee787', '#23e0ff', '#8b7bff', '#ff7ac6', '#9aa7b4', '#111418'];
+
+/* ------------------------ the selection bubble ---------------------------- */
+let RTE_BUBBLE = null;
+function rteBubble() {
+  if (RTE_BUBBLE && document.body.contains(RTE_BUBBLE)) return RTE_BUBBLE;
+  const el = document.createElement('div');
+  el.className = 'rte-bubble hidden';
+  el.innerHTML =
+    '<button class="etool" data-act="selCmd" data-cmd="bold" title="Bold"><b>B</b></button>' +
+    '<button class="etool" data-act="selCmd" data-cmd="italic" title="Italic"><i>I</i></button>' +
+    '<button class="etool" data-act="selCmd" data-cmd="underline" title="Underline"><u>U</u></button>' +
+    '<button class="etool" data-act="selCmd" data-cmd="strikeThrough" title="Strikethrough"><s>S</s></button>' +
+    '<span class="esep"></span>' +
+    '<button class="etool" data-act="selSize" data-d="up" title="Bigger">A<span style="font-size:8px">▴</span></button>' +
+    '<button class="etool" data-act="selSize" data-d="down" title="Smaller">a<span style="font-size:8px">▾</span></button>' +
+    '<select class="selfont" data-change="selFont" title="Font for the highlighted words">' +
+      RTE_FONTS.map(f => '<option value="' + attr(f[0]) + '">' + esc(f[1]) + '</option>').join('') + '</select>' +
+    '<select class="selfont" data-change="selSizePick" title="Size for the highlighted words">' +
+      RTE_SIZES.map(f => '<option value="' + attr(f[0]) + '">' + esc(f[1]) + '</option>').join('') + '</select>' +
+    '<span class="esep"></span>' +
+    '<span class="swatches">' + RTE_COLOURS.map(c =>
+      '<button class="sw" data-act="selColour" data-c="' + attr(c) + '" style="background:' + attr(c) + '" title="Text colour ' + attr(c) + '"></button>').join('') + '</span>' +
+    '<button class="etool" data-act="selHighlight" title="Highlight behind the words"><i data-lucide="highlighter"></i></button>' +
+    '<span class="esep"></span>' +
+    '<button class="etool" data-act="selCmd" data-cmd="removeFormat" title="Clear formatting"><i data-lucide="eraser"></i></button>';
+  document.body.appendChild(el);
+  RTE_BUBBLE = el;
+  icons();
+  return el;
+}
+function hideBubble() { if (RTE_BUBBLE) RTE_BUBBLE.classList.add('hidden'); }
+function showBubbleForSelection() {
+  const sel = window.getSelection();
+  if (!sel || sel.isCollapsed || !sel.rangeCount) { hideBubble(); return; }
+  const node = sel.anchorNode;
+  const host = node && (node.nodeType === 1 ? node : node.parentElement);
+  const rte = host && host.closest && host.closest('.rte');
+  if (!rte) { hideBubble(); return; }
+  const rect = sel.getRangeAt(0).getBoundingClientRect();
+  if (!rect || (!rect.width && !rect.height)) { hideBubble(); return; }
+  const el = rteBubble();
+  el.setAttribute('data-ed', rte.id || '');
+  el.classList.remove('hidden');
+  const w = el.offsetWidth || 460, h = el.offsetHeight || 40;
+  let left = rect.left + rect.width / 2 - w / 2;
+  left = clamp(left, 8, Math.max(8, window.innerWidth - w - 8));
+  let top = rect.top - h - 10;
+  if (top < 8) top = rect.bottom + 10;
+  el.style.left = Math.round(left) + 'px';
+  el.style.top = Math.round(top) + 'px';
+}
+document.addEventListener('selectionchange', debounce(() => {
+  try { showBubbleForSelection(); } catch (e) { }
+}, 90));
+document.addEventListener('mousedown', (e) => {
+  if (RTE_BUBBLE && !RTE_BUBBLE.contains(e.target) && !(e.target.closest && e.target.closest('.rte'))) hideBubble();
+});
+window.addEventListener('scroll', () => hideBubble(), true);
+
+/* Applying a style to a selection: keep the selection alive across the click. */
+function withSelection(fn) {
+  const ed = RTE_BUBBLE && document.getElementById(RTE_BUBBLE.getAttribute('data-ed') || '');
+  const sel = window.getSelection();
+  if (!sel || !sel.rangeCount) return;
+  const range = sel.getRangeAt(0).cloneRange();
+  if (ed) ed.focus({ preventScroll: true });
+  sel.removeAllRanges(); sel.addRange(range);
+  fn(range, ed);
+  if (ed) ed.dispatchEvent(new Event('input'));
+  setTimeout(showBubbleForSelection, 0);
+}
+/** Wraps whatever is highlighted in a span carrying the given inline styles. */
+function styleSelection(styles) {
+  withSelection((range) => {
+    const span = document.createElement('span');
+    Object.keys(styles).forEach(k => { span.style[k] = styles[k]; });
+    try {
+      span.appendChild(range.extractContents());
+      range.insertNode(span);
+      const sel = window.getSelection();
+      const r = document.createRange();
+      r.selectNodeContents(span);
+      sel.removeAllRanges(); sel.addRange(r);
+    } catch (e) { console.warn(e); }
+  });
+}
+ACTIONS.selCmd = function (el) {
+  const cmd = el.getAttribute('data-cmd');
+  withSelection(() => { document.execCommand(cmd, false, null); });
+};
+ACTIONS.selColour = function (el) { styleSelection({ color: el.getAttribute('data-c') }); };
+ACTIONS.selHighlight = function () {
+  styleSelection({ background: 'color-mix(in srgb, var(--c-amber) 38%, transparent)', padding: '0 .12em' });
+};
+ACTIONS.selFont = function (el) {
+  const v = el.value;
+  styleSelection({ fontFamily: v || 'inherit' });
+  el.selectedIndex = 0;
+};
+ACTIONS.selSizePick = function (el) {
+  const v = el.value;
+  styleSelection({ fontSize: v || 'inherit' });
+  el.selectedIndex = 0;
+};
+ACTIONS.selSize = function (el) {
+  const up = el.getAttribute('data-d') === 'up';
+  /* step through the same ladder the dropdown offers, from wherever we are */
+  const sel = window.getSelection();
+  let cur = 1;
+  if (sel && sel.anchorNode) {
+    const host = sel.anchorNode.nodeType === 1 ? sel.anchorNode : sel.anchorNode.parentElement;
+    const fs = host && host.closest('span[style*="font-size"]');
+    if (fs) cur = parseFloat(fs.style.fontSize) || 1;
+  }
+  const next = clamp(Math.round((cur + (up ? 0.15 : -0.15)) * 100) / 100, 0.6, 3);
+  styleSelection({ fontSize: next + 'em' });
+};
+
+/* ------------------- full screen, sticky and bottom toolbars -------------- */
+ACTIONS.edFull = function (el) {
+  const id = el.getAttribute('data-ed');
+  const wrap = document.querySelector('[data-editor="' + id + '"]');
+  if (!wrap) return;
+  const on = wrap.classList.toggle('fullscreen');
+  document.body.classList.toggle('rte-fullscreen', on);
+  el.classList.toggle('on', on);
+  if (on) {
+    const ed = document.getElementById(id);
+    if (ed) ed.focus({ preventScroll: true });
+    toast('Full screen. Press Escape or the button again to come back.', 'ok');
+  }
+  hideBubble();
+};
+ACTIONS.edStick = function (el) {
+  const id = el.getAttribute('data-ed');
+  state.ui.stickyTools = !state.ui.stickyTools;
+  markDirty();
+  document.querySelectorAll('[data-editor]').forEach(w => w.classList.toggle('sticky-tools', !!state.ui.stickyTools));
+  document.querySelectorAll('[data-act="edStick"]').forEach(bt => bt.classList.toggle('on', !!state.ui.stickyTools));
+  toast(state.ui.stickyTools
+    ? 'The toolbar now follows you down the page, so you can drop a picture in anywhere.'
+    : 'The toolbar stays at the top of the box.', 'ok');
+};
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape') return;
+  const wrap = document.querySelector('.editor-wrap.fullscreen');
+  if (!wrap || ModalStack.length) return;
+  wrap.classList.remove('fullscreen');
+  document.body.classList.remove('rte-fullscreen');
+  document.querySelectorAll('[data-act="edFull"]').forEach(b => b.classList.remove('on'));
+});
+
+/* -------------------- pictures: drag the corner to resize ----------------- */
+/* Clicking a picture selects it and shows a handle; dragging the handle
+   resizes it live, exactly like dragging a picture in a word processor. */
+document.addEventListener('click', (e) => {
+  const img = e.target.closest && e.target.closest('.rte img');
+  document.querySelectorAll('.rte figure.ed-fig.selected').forEach(f => { if (!img || f !== img.closest('figure')) f.classList.remove('selected'); });
+  if (!img) return;
+  const fig = img.closest('figure.ed-fig');
+  if (fig) fig.classList.add('selected');
+});
+document.addEventListener('pointerdown', (e) => {
+  const grip = e.target.closest && e.target.closest('.fig-grip');
+  if (!grip) return;
+  const fig = grip.closest('figure.ed-fig'); if (!fig) return;
+  const rte = fig.closest('.rte'); if (!rte) return;
+  e.preventDefault(); e.stopPropagation();
+  const colW = rte.clientWidth || 600;
+  const startW = fig.getBoundingClientRect().width;
+  const sx = e.clientX;
+  const readout = document.createElement('span');
+  readout.className = 'fig-readout';
+  fig.appendChild(readout);
+  const move = (ev) => {
+    const w = clamp(Math.round(((startW + (ev.clientX - sx)) / colW) * 100), 10, 100);
+    const step = Math.round(w / 5) * 5;      /* the CSS ladder runs in fives */
+    fig.setAttribute('data-w', String(clamp(step, 15, 100)));
+    fig.style.width = w + '%';
+    readout.textContent = w + '%';
+  };
+  const up = () => {
+    readout.remove();
+    fig.style.width = '';
+    window.removeEventListener('pointermove', move);
+    window.removeEventListener('pointerup', up);
+    window.removeEventListener('pointercancel', up);
+    rte.dispatchEvent(new Event('input'));
+  };
+  window.addEventListener('pointermove', move);
+  window.addEventListener('pointerup', up);
+  window.addEventListener('pointercancel', up);
+});
+
+/* --------------- show or hide pictures in the finished book --------------- */
+function picturesInPrint() { return (state.app.printImages !== false); }
+ACTIONS.edPics = function () {
+  const b = currentBook();
+  openModal({
+    title: 'PICTURES IN YOUR WRITING', icon: 'image', size: 'narrow',
+    body:
+      '<div class="helpbox mb14"><b>TWO SEPARATE THINGS</b>' +
+        'Whether you can see pictures <em>while you write</em>, and whether they end up <em>in the finished book</em>. ' +
+        'They are not the same choice, so you get both.</div>' +
+      '<label class="flex center gap8 fs13 mb10"><input type="checkbox" data-act="picsInEditor"' +
+        (state.ui.hideEditorImages ? '' : ' checked') + '> <span>Show pictures while I am writing</span></label>' +
+      '<div class="fs12 muted mb14" style="padding-left:26px">Turn this off for a clean wall of text. The pictures are still there — they come back the moment you tick it again.</div>' +
+      '<label class="flex center gap8 fs13 mb10"><input type="checkbox" data-act="picsInPrint"' +
+        (picturesInPrint() ? ' checked' : '') + '> <span>Include pictures in the finished book</span></label>' +
+      '<div class="fs12 muted" style="padding-left:26px">Controls the Book Designer, the PDF, the printed manuscript and every export. ' +
+        'Turn it off to get the story on its own, exactly as written, with nothing else on the page.</div>' +
+      (b ? '<div class="mono fs11 faint mt14">' + countFigures(b) + ' picture(s) currently placed inside this book’s writing.</div>' : ''),
+    footer: '<button class="btn solid" data-modal-close>DONE</button>'
+  });
+};
+ACTIONS.picsInEditor = function () {
+  state.ui.hideEditorImages = !state.ui.hideEditorImages;
+  document.body.classList.toggle('hide-rte-images', !!state.ui.hideEditorImages);
+  markDirty(); closeModal(); ACTIONS.edPics();
+};
+ACTIONS.picsInPrint = function () {
+  state.app.printImages = !picturesInPrint();
+  markDirty(); closeModal(); ACTIONS.edPics();
+  toast(picturesInPrint() ? 'Pictures will be in the finished book.' : 'The finished book will be text only.', 'ok');
+};
+function countFigures(b) {
+  let n = 0;
+  const count = (h) => { n += (String(h || '').match(/<figure/gi) || []).length; };
+  count(b.prologue && b.prologue.html);
+  (b.chapters || []).forEach(c => count(c.html));
+  return n;
+}
 
 /* --------------------- AI insertion with diff highlight ------------------ */
 let AI_INSERT_SEQ = 0;
@@ -5324,7 +5817,10 @@ VIEWS.character = {
           '</div>' +
         '</div>' +
         '<div class="charhead" style="justify-content:' + (pos === 'middle' ? 'center' : pos === 'right' ? 'flex-end' : 'flex-start') + '">' +
-          '<div class="charav" style="width:' + av + 'px;height:' + av + 'px;border-radius:' + shape + ';margin-top:-' + Math.round(av / 2.6) + 'px;' +
+          /* never pull the portrait up further than the cover is tall, or it
+             rides out of the panel and collides with whatever is above it */
+          '<div class="charav" style="width:' + av + 'px;height:' + av + 'px;border-radius:' + shape + ';margin-top:-' +
+            Math.min(Math.round(av / 2.6), Math.max(0, Math.round(coverH * 0.42))) + 'px;' +
             ((c.avatarShape || 'round') === 'hex' ? 'clip-path:polygon(25% 5%,75% 5%,100% 50%,75% 95%,25% 95%,0 50%);' : '') +
             'border-color:' + attr(c.color || 'var(--accent)') + '">' + charPortrait(c, Math.round(av / 2.6)) + '</div>' +
           '<div style="flex:1;min-width:0;padding:6px 0">' +
@@ -8097,7 +8593,7 @@ VIEWS.settings = {
               '</select><span class="hint">You can also flip this from inside the photo viewer itself.</span></label>' +
             '<div class="flex gap6 wrap">' +
               '<button class="btn sm" data-act="bannerEdit"><i data-lucide="sliders-horizontal"></i>BANNER SETTINGS</button>' +
-              '<label class="flex center gap8 fs13" style="align-self:center"><input type="checkbox" data-model="perViewBanners" data-live="bannerLive"' + (a.perViewBanners ? ' checked' : '') + '> Different banners on different pages</label>' +
+              '<span class="fs12 muted" style="align-self:center">Every page has its own banner — open a page and press <strong>Edit</strong> on its banner.</span>' +
             '</div>' +
           '</div></div>' +
 
@@ -8272,11 +8768,15 @@ function manuscriptMarkdown(b) {
     const d = document.createElement('div'); d.innerHTML = String(html || '');
     const swap = (node, alt, src) => node.parentNode.replaceChild(
       document.createTextNode('\n\n![' + (alt || 'picture') + '](' + (src || '') + ')\n\n'), node);
-    d.querySelectorAll('figure').forEach(f => {
-      const im = f.querySelector('img'), cp = f.querySelector('figcaption');
-      swap(f, cp ? cp.textContent : '', im ? im.getAttribute('src') : '');
-    });
-    d.querySelectorAll('img').forEach(im => swap(im, im.getAttribute('alt'), im.getAttribute('src')));
+    if (!picturesInPrint()) {
+      d.querySelectorAll('figure, img').forEach(n => n.remove());
+    } else {
+      d.querySelectorAll('figure').forEach(f => {
+        const im = f.querySelector('img'), cp = f.querySelector('figcaption');
+        swap(f, cp ? cp.textContent : '', im ? im.getAttribute('src') : '');
+      });
+      d.querySelectorAll('img').forEach(im => swap(im, im.getAttribute('alt'), im.getAttribute('src')));
+    }
     return stripHTML(d.innerHTML.replace(/<\/(p|div|h2|h3|blockquote|li)>/gi, '\n\n').replace(/<br\s*\/?>/gi, '\n').replace(/<li>/gi, '- ')).replace(/\n{3,}/g, '\n\n').trim();
   };
   if (b.prologue.html) out.push('## Prologue', '', html2md(b.prologue.html), '', '---', '');
@@ -8393,6 +8893,8 @@ VIEWS.exportv = {
               '<button class="btn solid lg" data-act="expAll"><i data-lucide="download"></i>EXPORT ENTIRE VAULT</button>' +
               '<button class="btn lg" data-act="expBook"' + (b ? '' : ' disabled') + '><i data-lucide="book"></i>EXPORT THIS BOOK ONLY</button>' +
               '<button class="btn amber lg" data-act="impPick"><i data-lucide="upload"></i>IMPORT / RESTORE JSON</button>' +
+              '<button class="btn solid lg" data-act="docExport"><i data-lucide="file-output"></i>SAVE AS WORD / WORDPAD / TEXT</button>' +
+              '<button class="btn lg" data-act="docImport"><i data-lucide="file-input"></i>IMPORT A WORD OR WORDPAD FILE</button>' +
               '<button class="btn ghost lg" data-act="expClipboard"><i data-lucide="copy"></i>COPY VAULT TO CLIPBOARD</button>' +
             '</div>' +
           '</div></div>' +
@@ -8639,6 +9141,470 @@ ACTIONS.impReplace = async function () {
   toast('Vault restored from backup.', 'ok', 'RESTORED');
 };
 
+
+/* ===========================================================================
+   v8 · BRINGING A DOCUMENT IN, AND SENDING ONE OUT
+   Open a manuscript you already wrote — Word (.docx), WordPad (.rtf), a web
+   page, Markdown or plain text — and it arrives here already split into
+   chapters, with its bold and italics intact. Send it back out again in
+   whichever of those formats you want.
+   ========================================================================= */
+
+/* ---- .docx is a ZIP. Browsers can inflate, so no library is needed. ------ */
+async function unzipEntry(buf, wanted) {
+  const dv = new DataView(buf);
+  const u8 = new Uint8Array(buf);
+  /* find the end-of-central-directory record, scanning back from the tail */
+  let eocd = -1;
+  for (let i = u8.length - 22; i >= Math.max(0, u8.length - 66000); i--) {
+    if (dv.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
+  }
+  if (eocd < 0) throw new Error('That file is not a readable .docx.');
+  const count = dv.getUint16(eocd + 10, true);
+  let p = dv.getUint32(eocd + 16, true);
+  for (let i = 0; i < count; i++) {
+    if (dv.getUint32(p, true) !== 0x02014b50) break;
+    const method = dv.getUint16(p + 10, true);
+    const compSize = dv.getUint32(p + 20, true);
+    const nameLen = dv.getUint16(p + 28, true);
+    const extraLen = dv.getUint16(p + 30, true);
+    const cmtLen = dv.getUint16(p + 32, true);
+    const localOff = dv.getUint32(p + 42, true);
+    const name = new TextDecoder().decode(u8.subarray(p + 46, p + 46 + nameLen));
+    p += 46 + nameLen + extraLen + cmtLen;
+    if (name !== wanted) continue;
+    /* jump to the local header to find where the data actually starts */
+    const lnLen = dv.getUint16(localOff + 26, true);
+    const leLen = dv.getUint16(localOff + 28, true);
+    const start = localOff + 30 + lnLen + leLen;
+    const raw = u8.subarray(start, start + compSize);
+    if (method === 0) return new TextDecoder().decode(raw);
+    if (method !== 8) throw new Error('This .docx uses a compression this browser cannot read.');
+    if (typeof DecompressionStream !== 'function') throw new Error('This browser cannot unzip a .docx. Save it as .rtf or .txt and import that instead.');
+    const ds = new DecompressionStream('deflate-raw');
+    const blob = new Blob([raw]).stream().pipeThrough(ds);
+    return new TextDecoder().decode(await new Response(blob).arrayBuffer());
+  }
+  throw new Error('That .docx has no document inside it.');
+}
+/** Word XML → the same simple HTML this app writes. */
+function docxToHTML(xml) {
+  const doc = new DOMParser().parseFromString(xml, 'application/xml');
+  const NS = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+  const paras = doc.getElementsByTagNameNS(NS, 'p');
+  const out = [];
+  for (let i = 0; i < paras.length; i++) {
+    const p = paras[i];
+    const styleEl = p.getElementsByTagNameNS(NS, 'pStyle')[0];
+    const style = styleEl ? (styleEl.getAttribute('w:val') || styleEl.getAttributeNS(NS, 'val') || '') : '';
+    const jcEl = p.getElementsByTagNameNS(NS, 'jc')[0];
+    const jc = jcEl ? (jcEl.getAttribute('w:val') || jcEl.getAttributeNS(NS, 'val') || '') : '';
+    const runs = p.getElementsByTagNameNS(NS, 'r');
+    let html = '';
+    for (let j = 0; j < runs.length; j++) {
+      const r = runs[j];
+      const ts = r.getElementsByTagNameNS(NS, 'rPr')[0];
+      const bold = !!(ts && ts.getElementsByTagNameNS(NS, 'b')[0]);
+      const ital = !!(ts && ts.getElementsByTagNameNS(NS, 'i')[0]);
+      const und = !!(ts && ts.getElementsByTagNameNS(NS, 'u')[0]);
+      let txt = '';
+      const ts2 = r.getElementsByTagNameNS(NS, 't');
+      for (let k = 0; k < ts2.length; k++) txt += ts2[k].textContent;
+      if (r.getElementsByTagNameNS(NS, 'br').length) txt += ' ';
+      if (!txt) continue;
+      let piece = esc(txt);
+      if (bold) piece = '<b>' + piece + '</b>';
+      if (ital) piece = '<i>' + piece + '</i>';
+      if (und) piece = '<u>' + piece + '</u>';
+      html += piece;
+    }
+    const plain = html.replace(/<[^>]+>/g, '').trim();
+    if (/^Heading1$/i.test(style) || /^Title$/i.test(style)) out.push('<h2>' + html + '</h2>');
+    else if (/^Heading[2-6]$/i.test(style)) out.push('<h3>' + html + '</h3>');
+    else if (!plain) out.push('<p><br></p>');
+    else if (jc === 'center' && plain.length < 60) out.push('<h3>' + html + '</h3>');
+    else out.push('<p>' + html + '</p>');
+  }
+  return out.join('\n');
+}
+
+/* ---- WordPad's own format ------------------------------------------------ */
+function rtfToHTML(rtf) {
+  let s = String(rtf || '');
+  s = s.replace(/\{\\\*[^{}]*\}/g, '');                    /* drop \* groups   */
+  s = s.replace(/\{\\(fonttbl|colortbl|stylesheet|info|generator)[^]*?\}\s*/g, '');
+  const out = [];
+  let cur = '', bold = false, ital = false, und = false;
+  /* {\b bold text} — the brace closes the group AND the bold. Without a stack
+     the bold ran on and swallowed the rest of the paragraph. */
+  const stack = [];
+  const flushRun = (t) => {
+    if (!t) return;
+    let piece = esc(t);
+    if (bold) piece = '<b>' + piece + '</b>';
+    if (ital) piece = '<i>' + piece + '</i>';
+    if (und) piece = '<u>' + piece + '</u>';
+    cur += piece;
+  };
+  const endPara = () => { out.push(cur.trim() ? '<p>' + cur + '</p>' : '<p><br></p>'); cur = ''; };
+  let i = 0, buf = '';
+  while (i < s.length) {
+    const ch = s[i];
+    if (ch === '\\') {
+      const m = /^\\([a-zA-Z]+)(-?\d+)? ?/.exec(s.slice(i));
+      if (m) {
+        flushRun(buf); buf = '';
+        const word = m[1], arg = m[2];
+        if (word === 'par' || word === 'line') endPara();
+        else if (word === 'b') bold = arg !== '0';
+        else if (word === 'i') ital = arg !== '0';
+        else if (word === 'ul' || word === 'ulw' || word === 'uld') und = true;
+        else if (word === 'ulnone' || word === 'ul0') und = false;
+        else if (word === 'pard' || word === 'plain') { bold = ital = und = false; }
+        else if (word === 'tab') buf += '    ';
+        else if (word === 'u' && arg) { buf += String.fromCharCode(Number(arg)); }
+        i += m[0].length;
+        continue;
+      }
+      const esc2 = /^\\([\\{}])/.exec(s.slice(i));
+      if (esc2) { buf += esc2[1]; i += 2; continue; }
+      const hex = /^\\'([0-9a-fA-F]{2})/.exec(s.slice(i));
+      if (hex) { buf += String.fromCharCode(parseInt(hex[1], 16)); i += 4; continue; }
+      i++; continue;
+    }
+    if (ch === '{') { flushRun(buf); buf = ''; stack.push([bold, ital, und]); i++; continue; }
+    if (ch === '}') {
+      flushRun(buf); buf = '';
+      const prev = stack.pop();
+      if (prev) { bold = prev[0]; ital = prev[1]; und = prev[2]; }
+      i++; continue;
+    }
+    if (ch === '\n' || ch === '\r') { i++; continue; }
+    buf += ch; i++;
+  }
+  flushRun(buf); endPara();
+  return out.join('\n').replace(/(<p><br><\/p>\s*){3,}/g, '<p><br></p>');
+}
+
+/* ---- plain text and Markdown -------------------------------------------- */
+function textToHTML(txt) {
+  return String(txt || '').replace(/\r\n?/g, '\n').split(/\n{2,}/).map(block => {
+    const t = block.trim();
+    if (!t) return '';
+    const h = /^(#{1,6})\s+(.*)$/.exec(t);
+    if (h) { const lv = h[1].length === 1 ? 1 : h[1].length === 2 ? 2 : 3; return '<h' + lv + '>' + esc(h[2]) + '</h' + lv + '>'; }
+    if (/^[-*]\s+/m.test(t) && t.split('\n').every(l => /^[-*]\s+/.test(l.trim())))
+      return '<ul>' + t.split('\n').map(l => '<li>' + esc(l.replace(/^[-*]\s+/, '').trim()) + '</li>').join('') + '</ul>';
+    if (/^(\*\s*){3,}$/.test(t) || /^-{3,}$/.test(t)) return '<hr>';
+    return '<p>' + esc(t).replace(/\n/g, '<br>') + '</p>';
+  }).filter(Boolean).join('\n');
+}
+/** Anything already HTML: keep only the tags this app understands. */
+function tameHTML(html) {
+  const d = document.createElement('div');
+  d.innerHTML = String(html || '').replace(/<!--[^]*?-->/g, '');
+  d.querySelectorAll('script,style,link,meta,head,noscript,iframe,object,embed').forEach(n => n.remove());
+  const keep = { P: 1, BR: 1, B: 1, STRONG: 1, I: 1, EM: 1, U: 1, H1: 1, H2: 1, H3: 1, H4: 1, H5: 1, H6: 1,
+    BLOCKQUOTE: 1, UL: 1, OL: 1, LI: 1, HR: 1, FIGURE: 1, FIGCAPTION: 1, IMG: 1, DIV: 1, SPAN: 1 };
+  const walk = (node) => {
+    Array.from(node.children).forEach(c => {
+      walk(c);
+      if (!keep[c.tagName]) {
+        while (c.firstChild) c.parentNode.insertBefore(c.firstChild, c);
+        c.remove();
+        return;
+      }
+      Array.from(c.attributes).forEach(a => {
+        if (['src', 'alt', 'data-align', 'data-w'].indexOf(a.name) < 0) c.removeAttribute(a.name);
+      });
+      if (c.tagName === 'DIV') {
+        const p = document.createElement('p');
+        while (c.firstChild) p.appendChild(c.firstChild);
+        c.replaceWith(p);
+      }
+    });
+  };
+  walk(d);
+  return d.innerHTML;
+}
+
+/* ---- splitting one long document into chapters --------------------------- */
+const CHAPTER_RX = /^(chapter|part|book|act|section|scene)\b[\s.:—-]*[0-9ivxlcdm]*\.?\s*(.*)$/i;
+const FRONT_RX = /^(prologue|preface|foreword|introduction|epilogue|afterword|acknowledgements?|dedication|epigraph)\b/i;
+
+/** Turns imported HTML into { title, chapters:[{title, html}] }. */
+function splitIntoChapters(html) {
+  const d = document.createElement('div');
+  d.innerHTML = html || '';
+  const nodes = Array.from(d.childNodes).filter(n => n.nodeType === 1 || (n.nodeType === 3 && n.textContent.trim()));
+  const chapters = [];
+  let cur = null, docTitle = '';
+  const textOf = (n) => (n.textContent || '').replace(/\s+/g, ' ').trim();
+  const looksLikeHeading = (n) => {
+    if (n.nodeType !== 1) return false;
+    const t = textOf(n);
+    if (!t || t.length > 90) return false;
+    if (/^H[1-6]$/.test(n.tagName)) return true;
+    /* a short standalone line that names a chapter counts even without a style */
+    if (CHAPTER_RX.test(t) || FRONT_RX.test(t)) return true;
+    /* an all-caps short line on its own is a heading in most manuscripts */
+    if (t.length < 60 && t === t.toUpperCase() && /[A-Z]/.test(t) && !/[.!?]$/.test(t)) return true;
+    return false;
+  };
+  const open = (title) => { cur = { title: title, parts: [] }; chapters.push(cur); };
+  nodes.forEach((n, i) => {
+    if (looksLikeHeading(n)) {
+      const t = textOf(n);
+      /* the very first heading, before any prose, is the book's own title */
+      if (!chapters.length && !docTitle && !CHAPTER_RX.test(t) && !FRONT_RX.test(t) && n.tagName === 'H1') { docTitle = t; return; }
+      open(t);
+      return;
+    }
+    if (!cur) open('');
+    cur.parts.push(n.nodeType === 1 ? n.outerHTML : '<p>' + esc(textOf(n)) + '</p>');
+  });
+  const outChapters = chapters
+    .map(c => ({ title: c.title, html: c.parts.join('\n') }))
+    .filter(c => stripHTML(c.html).trim() || c.title);
+  return { title: docTitle, chapters: outChapters };
+}
+
+async function readDocumentFile(file) {
+  const name = (file.name || '').toLowerCase();
+  if (/\.docx$/.test(name)) {
+    const buf = await file.arrayBuffer();
+    return tameHTML(docxToHTML(await unzipEntry(buf, 'word/document.xml')));
+  }
+  if (/\.rtf$/.test(name)) return tameHTML(rtfToHTML(await file.text()));
+  if (/\.(html?|htm)$/.test(name)) return tameHTML(await file.text());
+  if (/\.(md|markdown)$/.test(name)) return textToHTML(await file.text());
+  if (/\.doc$/.test(name)) {
+    /* old binary .doc — but Word also writes HTML with a .doc extension */
+    const txt = await file.text();
+    if (/<html|<body|<w:WordDocument/i.test(txt)) return tameHTML(txt);
+    throw new Error('An old binary .doc cannot be read here. Open it in Word or WordPad and save it as .docx or .rtf, then import that.');
+  }
+  return textToHTML(await file.text());
+}
+
+ACTIONS.docImport = async function () {
+  const f = await pickFileRaw('.docx,.rtf,.txt,.md,.html,.htm,.doc,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+  if (!f) return;
+  let html;
+  try { html = await readDocumentFile(f); }
+  catch (e) { toast(String(e.message || e), 'err', 'COULD NOT READ IT'); return; }
+  const found = splitIntoChapters(html);
+  if (!found.chapters.length) { toast('There was no text in that file.', 'warn'); return; }
+  window.__docImport = { file: f.name, title: found.title, chapters: found.chapters, html: html };
+  const words = found.chapters.reduce((n, c) => n + countWords(stripHTML(c.html)), 0);
+  openModal({
+    title: 'IMPORT A DOCUMENT', icon: 'file-input', size: 'wide',
+    body:
+      '<div class="helpbox mb14"><b>READ AND SPLIT UP FOR YOU</b>' +
+        'This is what the app found inside <code>' + esc(f.name) + '</code>. Headings, and lines that read like ' +
+        '“Chapter Four” or “Prologue”, become chapters. Bold and italics come across. Check it looks right, then choose where it goes.</div>' +
+      '<div class="grid-auto g3 mb14">' +
+        miniStat('Chapters found', String(found.chapters.length)) +
+        miniStat('Words', fmt(words)) +
+        miniStat('Book title in the file', esc(found.title || '—')) +
+      '</div>' +
+      '<div style="max-height:44vh;overflow:auto;border:1px solid var(--line);background:var(--bg-panel)">' +
+        found.chapters.map((c, i) =>
+          '<div style="padding:10px 12px;border-bottom:1px solid var(--line)">' +
+            '<div class="flex between center gap8"><strong class="fs13" style="color:var(--txt)">' +
+              esc(c.title || 'Untitled section ' + (i + 1)) + '</strong>' +
+              '<span class="chip">' + fmt(countWords(stripHTML(c.html))) + ' words</span></div>' +
+            '<div class="fs12 muted mt6">' + esc(excerptOf(stripHTML(c.html), 150)) + '</div>' +
+          '</div>').join('') +
+      '</div>' +
+      '<label class="fld mt14"><span class="lb">Where should it go?</span>' +
+        '<select class="sel" id="impWhere">' +
+          '<option value="new">Into a brand new book</option>' +
+          (currentBook() ? '<option value="append">Add to the end of “' + attr(currentBook().title) + '”</option>' +
+            '<option value="replace">Replace every chapter in “' + attr(currentBook().title) + '”</option>' : '') +
+        '</select></label>',
+    footer: '<button class="btn ghost" data-modal-close>CANCEL</button>' +
+      '<button class="btn solid" data-act="docImportGo"><i data-lucide="check"></i>BRING IT IN</button>'
+  });
+};
+ACTIONS.docImportGo = async function () {
+  const d = window.__docImport; if (!d) return;
+  const where = ($('#impWhere') || { value: 'new' }).value;
+  let b = currentBook();
+  if (where === 'new' || !b) {
+    b = newBook(d.title || (d.file || 'Imported Manuscript').replace(/\.[^.]+$/, ''));
+    state.books.push(b);
+    setActiveBook(b.id);
+  } else if (where === 'replace') {
+    const ok = await confirmDlg('REPLACE EVERY CHAPTER',
+      '<p class="t-rd">Every chapter currently in “' + esc(b.title) + '” is deleted and replaced with what is in this document.</p>' +
+      '<p class="t-am">A snapshot is taken first, so it can be undone from Storage &amp; Backups.</p>', true);
+    if (!ok) return;
+    await snapshotTake('Before importing ' + (d.file || 'a document'), true);
+    b.chapters = [];
+  }
+  d.chapters.forEach((c, i) => {
+    const t = String(c.title || '').trim();
+    /* front matter lands where it belongs rather than becoming "Chapter 1" */
+    if (/^prologue/i.test(t) && !stripHTML(b.prologue.html || '').trim()) {
+      b.prologue.html = c.html;
+      b.prologue.title = t;
+      return;
+    }
+    const ch = newChapter(b.chapters.length + 1);
+    ch.title = t || ('Chapter ' + (b.chapters.length + 1));
+    ch.html = c.html;
+    if (FRONT_RX.test(t)) ch.part = /epilogue/i.test(t) ? 'epilogue' : ch.part;
+    b.chapters.push(ch);
+  });
+  b.updated = nowISO();
+  markDirty(); saveNow(true);
+  closeAllModals();
+  go('profile');
+  toast(d.chapters.length + ' section(s) imported into “' + b.title + '”.', 'ok', 'IMPORTED');
+  logActivity('write', 'Imported ' + (d.file || 'a document'));
+};
+
+/* ---- sending a manuscript back out -------------------------------------- */
+function bookBlocksHTML(b) {
+  const out = [];
+  const strip = (h) => picturesInPrint() ? h : String(h || '').replace(/<figure[^]*?<\/figure>/gi, '').replace(/<img[^>]*>/gi, '');
+  out.push('<h1>' + esc(b.title || 'Untitled') + '</h1>');
+  if (b.subtitle) out.push('<p class="sub"><i>' + esc(b.subtitle) + '</i></p>');
+  if (b.author) out.push('<p class="sub">' + esc(b.author) + '</p>');
+  if (b.dedication && b.dedication.text) out.push('<p class="ded"><i>' + esc(b.dedication.text) + '</i></p>');
+  if (stripHTML(b.prologue.html || '').trim()) {
+    out.push('<h2>' + esc(b.prologue.title || 'Prologue') + '</h2>');
+    out.push(strip(b.prologue.html));
+  }
+  (b.chapters || []).forEach((c, i) => {
+    out.push('<h2>' + esc(c.title || 'Chapter ' + (i + 1)) + '</h2>');
+    out.push(strip(c.html) || '<p><i>(unwritten)</i></p>');
+  });
+  if (b.dedication && b.dedication.ack) { out.push('<h2>Acknowledgements</h2>'); out.push('<p>' + esc(b.dedication.ack) + '</p>'); }
+  return out.join('\n');
+}
+/** A .doc that Word and WordPad both open, with real headings and page breaks. */
+function bookAsWordHTML(b) {
+  const d = b.design || newDesign();
+  return '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" ' +
+    'xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8">' +
+    '<title>' + esc(b.title) + '</title>' +
+    '<!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View><w:Zoom>100</w:Zoom></w:WordDocument></xml><![endif]-->' +
+    '<style>' +
+    '@page{ size:' + trimOf(d.trim)[2] + 'in ' + trimOf(d.trim)[3] + 'in; margin:' +
+      d.mTop + 'in ' + d.mOuter + 'in ' + d.mBottom + 'in ' + d.mInner + 'in; }' +
+    'body{ font-family:"' + gFontName(d.font) + '", Georgia, serif; font-size:' + d.size + 'pt; line-height:' + d.leading + '; }' +
+    'h1{ font-size:' + Math.round(d.size * 2.4) + 'pt; text-align:center; margin:2in 0 .4in; page-break-after:always; }' +
+    'h2{ font-size:' + Math.round(d.size * 1.6) + 'pt; text-align:center; margin:1in 0 .5in; page-break-before:always; }' +
+    'p{ margin:0; text-indent:' + d.indent + 'em; text-align:' + (d.align === 'justify' ? 'justify' : 'left') + '; }' +
+    'p.sub,p.ded{ text-align:center; text-indent:0; margin:.3em 0; }' +
+    'h2 + p{ text-indent:0; }' +
+    'img{ max-width:100%; }' +
+    'figure{ margin:1em auto; text-align:center; } figcaption{ font-size:' + Math.round(d.size * .85) + 'pt; font-style:italic; }' +
+    '</style></head><body>' + bookBlocksHTML(b) + '</body></html>';
+}
+/** WordPad's native format, written by hand - no library, no server. */
+function bookAsRTF(b) {
+  /* everything outside plain ASCII goes out as an RTF unicode escape */
+  const esc2 = (t) => String(t || '')
+    .replace(/\\/g, '\\\\').replace(/\{/g, '\\{').replace(/\}/g, '\\}')
+    .replace(/[\u0080-\uFFFF]/g, (c) => '\\u' + c.charCodeAt(0) + '?');
+  const d = document.createElement('div');
+  d.innerHTML = bookBlocksHTML(b);
+  const out = ['{\\rtf1\\ansi\\deff0{\\fonttbl{\\f0 Georgia;}}\\fs24'];
+  Array.from(d.children).forEach(n => {
+    const tag = n.tagName.toLowerCase();
+    const walk = (node) => {
+      let s = '';
+      Array.from(node.childNodes).forEach(c => {
+        if (c.nodeType === 3) { s += esc2(c.textContent); return; }
+        if (c.nodeType !== 1) return;
+        const t = c.tagName.toLowerCase();
+        if (t === 'br') { s += '\\line '; return; }
+        if (t === 'img') { s += '[picture]'; return; }
+        const inner = walk(c);
+        if (t === 'b' || t === 'strong') s += '{\\b ' + inner + '}';
+        else if (t === 'i' || t === 'em') s += '{\\i ' + inner + '}';
+        else if (t === 'u') s += '{\\ul ' + inner + '}';
+        else s += inner;
+      });
+      return s;
+    };
+    const body = walk(n);
+    if (tag === 'h1') out.push('\\pard\\qc\\fs48\\b ' + body + '\\b0\\fs24\\par\\page ');
+    else if (tag === 'h2') out.push('\\page\\pard\\qc\\fs36\\b ' + body + '\\b0\\fs24\\par ');
+    else if (tag === 'h3') out.push('\\pard\\qc\\fs28\\b ' + body + '\\b0\\fs24\\par ');
+    else if (tag === 'hr') out.push('\\pard\\qc * * *\\par ');
+    else if (tag === 'blockquote') out.push('\\pard\\li720\\i ' + body + '\\i0\\par ');
+    else if (tag === 'ul' || tag === 'ol') Array.from(n.children).forEach(li => out.push('\\pard\\li360 \\bullet\\tab ' + walk(li) + '\\par '));
+    else out.push('\\pard\\fi360\\qj ' + body + '\\par ');
+  });
+  out.push('}');
+  return out.join('\n');
+}
+function bookAsPlainText(b) {
+  const d = document.createElement('div');
+  d.innerHTML = bookBlocksHTML(b);
+  const lines = [];
+  Array.from(d.children).forEach(n => {
+    const t = (n.textContent || '').replace(/\s+/g, ' ').trim();
+    const tag = n.tagName.toLowerCase();
+    if (tag === 'h1') { lines.push(t.toUpperCase(), '='.repeat(Math.min(60, t.length)), ''); }
+    else if (tag === 'h2') { lines.push('', '', t.toUpperCase(), '-'.repeat(Math.min(60, t.length)), ''); }
+    else if (tag === 'h3') { lines.push('', t, ''); }
+    else if (tag === 'hr') lines.push('', '   * * *', '');
+    else if (t) lines.push(t, '');
+  });
+  return lines.join('\r\n');
+}
+
+ACTIONS.docExport = function () {
+  const b = requireBook(); if (!b) return;
+  openModal({
+    title: 'SAVE THIS BOOK AS A DOCUMENT', icon: 'file-output', size: '',
+    body:
+      '<div class="helpbox mb14"><b>A REAL FILE YOU CAN OPEN ANYWHERE</b>' +
+        'Your whole manuscript — title page, dedication, prologue and every chapter — written out as an ordinary document. ' +
+        'Keep it as a backup, email it, or carry on writing in Word.' +
+        (picturesInPrint() ? '' : ' <strong class="t-am">Pictures are currently set to be left out.</strong>') + '</div>' +
+      '<div class="grid-auto g2">' +
+        '<button class="optcard" data-act="docExportGo" data-f="doc" style="text-align:left">' +
+          '<strong class="fs13" style="color:var(--txt)">WORD (.doc)</strong>' +
+          '<div class="fs12 muted mt6">Opens in Microsoft Word, WordPad, Google Docs and LibreOffice. Keeps headings, chapter page breaks, your typeface and your margins. <strong>The one most people want.</strong></div></button>' +
+        '<button class="optcard" data-act="docExportGo" data-f="rtf" style="text-align:left">' +
+          '<strong class="fs13" style="color:var(--txt)">WORDPAD (.rtf)</strong>' +
+          '<div class="fs12 muted mt6">Rich Text — WordPad’s own format. Opens in absolutely everything and keeps bold and italics.</div></button>' +
+        '<button class="optcard" data-act="docExportGo" data-f="txt" style="text-align:left">' +
+          '<strong class="fs13" style="color:var(--txt)">NOTEPAD (.txt)</strong>' +
+          '<div class="fs12 muted mt6">Plain text, nothing but the words. The safest long-term archive there is.</div></button>' +
+        '<button class="optcard" data-act="docExportGo" data-f="html" style="text-align:left">' +
+          '<strong class="fs13" style="color:var(--txt)">WEB PAGE (.html)</strong>' +
+          '<div class="fs12 muted mt6">A typeset page that opens in any browser, pictures included.</div></button>' +
+        '<button class="optcard" data-act="docExportGo" data-f="md" style="text-align:left">' +
+          '<strong class="fs13" style="color:var(--txt)">MARKDOWN (.md)</strong>' +
+          '<div class="fs12 muted mt6">For Scrivener, Obsidian, GitHub and most publishing pipelines.</div></button>' +
+        '<button class="optcard" data-act="docExportGo" data-f="pdf" style="text-align:left">' +
+          '<strong class="fs13" style="color:var(--txt)">PDF</strong>' +
+          '<div class="fs12 muted mt6">Goes to the Book Designer, where you choose the print template first.</div></button>' +
+      '</div>',
+    footer: '<button class="btn ghost" data-modal-close>CLOSE</button>'
+  });
+};
+ACTIONS.docExportGo = function (el) {
+  const b = requireBook(); if (!b) return;
+  const f = el.getAttribute('data-f');
+  const base = slug(b.title || 'manuscript');
+  if (f === 'pdf') { closeAllModals(); go('designer'); toast('Choose a template, then press Export PDF.', 'ok'); return; }
+  if (f === 'doc') downloadBlob(base + '.doc', bookAsWordHTML(b), 'application/msword');
+  else if (f === 'rtf') downloadBlob(base + '.rtf', bookAsRTF(b), 'application/rtf');
+  else if (f === 'txt') downloadBlob(base + '.txt', bookAsPlainText(b), 'text/plain');
+  else if (f === 'html') downloadBlob(base + '.html', manuscriptHTML(b, {}), 'text/html');
+  else if (f === 'md') downloadBlob(base + '.md', manuscriptMarkdown(b), 'text/markdown');
+  closeAllModals();
+  toast('Saved as ' + base + '.' + f + '.', 'ok', 'EXPORTED');
+};
+
 /* ============================ MIGRATION ================================== */
 /* Books are rebuilt against the current template with deepDefaults, so a book
    saved by ANY build keeps every field it had — including ones this build has
@@ -8654,6 +9620,14 @@ function migrateBook(bk) {
   out.design = bk.design ? deepDefaults(bk.design, newDesign()) : null;
   out.banners = {};
   Object.keys(bk.banners || {}).forEach(k => { out.banners[k] = migrateBanner(bk.banners[k]); });
+  /* Banners used to cascade from one book-wide banner. Give every page its own
+     copy of it once, so the picture the writer chose is still there but each
+     page can now be changed on its own. */
+  const seed = out.banners.__book;
+  if (seed && seed.src) {
+    Object.keys(NAV_ITEMS).forEach(v => { if (!out.banners[v]) out.banners[v] = migrateBanner(clone(seed)); });
+  }
+  delete out.banners.__book;
   if (!out.banners.profile) out.banners.profile = newBanner(0);
   out.chapters = (bk.chapters || []).map(c => deepDefaults(c, newChapter(1)));
   out.characters = (bk.characters || []).map(c => deepDefaults(c, newCharacter('sup')));
@@ -8668,6 +9642,12 @@ function migrateState(loaded) {
   const d = defaultState();
   const s = deepDefaults(loaded || {}, d);
   s.app.globalBanner = migrateBanner((loaded.app || {}).globalBanner);
+  s.app.pageBanners = s.app.pageBanners || {};
+  Object.keys(s.app.pageBanners).forEach(k => { s.app.pageBanners[k] = migrateBanner(s.app.pageBanners[k]); });
+  /* same one-time seeding for the pages that belong to no book */
+  if (s.app.globalBanner && s.app.globalBanner.src) {
+    BOOKLESS_VIEWS.forEach(v => { if (!s.app.pageBanners[v]) s.app.pageBanners[v] = migrateBanner(clone(s.app.globalBanner)); });
+  }
   s.app.showGuides = (loaded.app || {}).showGuides !== false;
   s.ui.lastEdited = s.ui.lastEdited || {};
   s.ui.helpClosed = s.ui.helpClosed || {};
@@ -9297,43 +10277,45 @@ const VIEW_HELP = {
     tips: ['Everything lives in this browser only. Clearing site data deletes it — the JSON backup is your safety net.'] }
 };
 function guidePanel(view) {
-  const h = VIEW_HELP[view];
-  if (!h || !state.app.showGuides) return '';
-  const open = !state.ui.helpClosed[view];
-  return '<div class="guide">' +
-    '<button class="guide-hd" data-act="guideToggle" data-v="' + view + '">' +
-      '<span class="q">?</span>' +
-      '<span style="flex:1">' + esc(h.one) + '</span>' +
-      '<span class="mono fs10 faint">' + (open ? 'HIDE' : 'HOW THIS PAGE WORKS') + '</span>' +
-      '<i data-lucide="' + (open ? 'chevron-down' : 'chevron-right') + '" style="width:15px;height:15px"></i>' +
-    '</button>' +
-    (open ? '<div class="guide-bd"><div class="cols">' +
-      '<div><h6>Step by step</h6><ol>' + h.steps.map(s => '<li>' + s + '</li>').join('') + '</ol></div>' +
-      '<div><h6>Good to know</h6><ul>' + h.tips.map(s => '<li>' + s + '</li>').join('') + '</ul>' +
-        '<div class="flex gap6 wrap mt10">' +
-          '<button class="btn xs ghost" data-act="themeEdit"><i data-lucide="palette"></i>CUSTOMISE LOOK</button>' +
-          '<button class="btn xs ghost" data-act="bannerEdit"><i data-lucide="image"></i>CHANGE BANNER</button>' +
-          '<button class="btn xs ghost" data-act="guideOffAll">HIDE ALL GUIDES</button>' +
-        '</div>' +
-      '</div>' +
-    '</div></div>' : '') +
-  '</div>';
+  return '';   /* the guide is a floating ? button now — see guideFab() */
 }
-ACTIONS.guideToggle = function (el) {
-  const v = el.getAttribute('data-v');
-  state.ui.helpClosed[v] = !state.ui.helpClosed[v];
-  markDirty(true); render();
+/* A small round ? in the corner of the page. Out of the way until wanted,
+   which keeps the page itself uncluttered. */
+function guideFab(view) {
+  if (!VIEW_HELP[view]) return '';
+  return '<button class="guide-fab" data-act="guideOpen" data-v="' + view + '" title="How this page works">?</button>';
+}
+ACTIONS.guideOpen = function (el) {
+  const view = (el && el.getAttribute('data-v')) || CURRENT_VIEW;
+  const h = VIEW_HELP[view];
+  const meta = VIEW_META[view] || { t: view };
+  if (!h) { toast('No guide for this page yet.', 'warn'); return; }
+  openModal({
+    title: 'HOW THIS PAGE WORKS — ' + String(meta.t).toUpperCase(), icon: 'help-circle', size: '',
+    body:
+      '<div class="helpbox mb14"><b>IN ONE LINE</b>' + h.one + '</div>' +
+      '<div class="grid-auto g2">' +
+        '<div><h6 class="lb">Step by step</h6><ol class="prose-c" style="padding-left:1.2em">' +
+          h.steps.map(x => '<li style="margin-bottom:7px">' + x + '</li>').join('') + '</ol></div>' +
+        '<div><h6 class="lb">Good to know</h6><ul class="prose-c" style="padding-left:1.2em">' +
+          h.tips.map(x => '<li style="margin-bottom:7px">' + x + '</li>').join('') + '</ul></div>' +
+      '</div>' +
+      '<div class="flex gap6 wrap mt14">' +
+        '<button class="btn sm ghost" data-act="themeEdit"><i data-lucide="palette"></i>CUSTOMISE LOOK</button>' +
+        '<button class="btn sm ghost" data-act="bannerEdit"><i data-lucide="image"></i>THIS PAGE\u2019S BANNER</button>' +
+      '</div>',
+    footer: '<label class="flex center gap6 fs12 muted" style="margin-right:auto">' +
+        '<input type="checkbox" data-act="guideFabToggle"' + (state.app.showGuides === false ? '' : ' checked') + '> Show the ? button on pages</label>' +
+      '<button class="btn solid" data-modal-close>GOT IT</button>'
+  });
 };
-ACTIONS.guideOffAll = function () {
-  state.app.showGuides = false; markDirty(); render();
-  toast('Guides hidden. Turn them back on with the ? button in the top bar.', 'ok');
-};
-ACTIONS.guideOnAll = function () {
-  state.app.showGuides = !state.app.showGuides;
-  if (state.app.showGuides) state.ui.helpClosed = {};
+ACTIONS.guideFabToggle = function () {
+  state.app.showGuides = state.app.showGuides === false;
   markDirty(); render();
-  toast(state.app.showGuides ? 'Page guides are on.' : 'Page guides hidden.', 'ok');
+  toast(state.app.showGuides ? 'The ? button is back on every page.' : 'The ? button is hidden. Use the ? in the top bar for this page\u2019s guide.', 'ok');
 };
+/* The top-bar ? opens the guide for whatever page you are on. */
+ACTIONS.guideOnAll = function () { ACTIONS.guideOpen({ getAttribute: () => CURRENT_VIEW }); };
 
 /* ===========================================================================
    v2 · THE SOCIAL BOOK PROFILE
@@ -9404,6 +10386,7 @@ VIEWS.profile = {
         '<button class="btn solid" data-act="feedAdd"><i data-lucide="plus"></i>WRITE A NEW CHAPTER</button>' +
         '<button class="btn ghost" data-act="profEdit"><i data-lucide="pencil"></i>EDIT PROFILE</button>' +
         '<button class="btn ghost" data-act="themeEdit"><i data-lucide="palette"></i>CUSTOMISE LOOK</button>' +
+        '<button class="btn ghost" data-act="docExport" title="Save this book as a Word, WordPad or text document"><i data-lucide="file-output"></i>SAVE AS A DOCUMENT</button>' +
         '<button class="btn ghost" data-go="gdoc" title="Mirror this book into a Google Doc that keeps itself up to date">' +
           ((b.gdoc && b.gdoc.live && b.gdoc.id)
             ? '<span class="lpdot" style="margin-right:2px"></span>GOOGLE DOC · LIVE'
@@ -10395,6 +11378,15 @@ function newPhoto(src, title) {
   return { id: uid('ph'), src: src, title: title || '', desc: '', tags: '', at: nowISO() };
 }
 /** Pictures living elsewhere in the project, gathered for the "from this book" strip. */
+/** One picture, however many places it is used. */
+function dedupeImages(list) {
+  const seen = Object.create(null);
+  return (list || []).filter(im => {
+    const k = im && im.src;
+    if (!k || seen[k]) return false;
+    seen[k] = 1; return true;
+  });
+}
 function collectBookImages(b) {
   const out = [];
   const add = (src, cap, where) => { if (src) out.push({ src: src, title: cap, where: where, auto: true }); };
@@ -10410,13 +11402,24 @@ function collectBookImages(b) {
   (b.kids.spreads || []).forEach((sp, i) => add(sp.art, 'Spread ' + (i + 1), "Children's Studio"));
   (b.lore || []).forEach(l => add(l.img, l.name || 'Lore', 'World & Lore'));
   (b.slideshow.slides || []).forEach((sl, i) => add(sl.src, sl.title || 'Slide ' + (i + 1), 'Slideshow'));
-  return out;
+  (b.characters || []).forEach(c => (c.gallery || []).forEach(im => add(im.src, im.caption || c.name || 'Character', 'Cast')));
+  /* One picture used in three places is still one picture. Keep the first
+     mention (its most meaningful home) and drop the repeats. */
+  const seen = Object.create(null);
+  return out.filter(im => {
+    if (!im.src || seen[im.src]) return false;
+    seen[im.src] = 1;
+    return true;
+  });
 }
 
 VIEWS.profile.gallery = function (b) {
   b.gallery = b.gallery || [];
   const mine = b.gallery;
-  const auto = collectBookImages(b);
+  /* a picture already sitting in the album is not also "used elsewhere" */
+  const inAlbum = Object.create(null);
+  mine.forEach(p => { if (p && p.src) inAlbum[p.src] = 1; });
+  const auto = collectBookImages(b).filter(im => !inAlbum[im.src]);
   const showAuto = state.ui.galAuto !== false;
   return '<div class="panel clip mb14"><div class="panel-bd">' +
     '<div class="helpbox"><b>THE PICTURE ALBUM FOR THIS BOOK</b>' +
@@ -10458,7 +11461,7 @@ VIEWS.profile.gallery = function (b) {
 };
 ACTIONS.coversFromGallery = function () {
   const b = requireBook(); if (!b) return;
-  const pool = (b.gallery || []).concat(collectBookImages(b));
+  const pool = dedupeImages((b.gallery || []).concat(collectBookImages(b)));
   if (!pool.length) { toast('No pictures yet — add some in the Gallery tab.', 'warn'); return; }
   window.__coverPool = pool;
   openModal({
@@ -10522,7 +11525,9 @@ ACTIONS.galAddUrl = async function () {
 };
 ACTIONS.galCopyIn = function (el) {
   const b = requireBook(); if (!b) return;
-  const im = collectBookImages(b)[Number(el.getAttribute('data-i'))]; if (!im) return;
+  const inAlbum = Object.create(null);
+  (b.gallery || []).forEach(p => { if (p && p.src) inAlbum[p.src] = 1; });
+  const im = collectBookImages(b).filter(x => !inAlbum[x.src])[Number(el.getAttribute('data-i'))]; if (!im) return;
   b.gallery = b.gallery || [];
   b.gallery.push(Object.assign(newPhoto(im.src, im.title), { desc: 'From ' + im.where + '.' }));
   markDirty(); render();
@@ -10534,7 +11539,10 @@ let PHOTO_CTX = { kind: 'mine', i: 0, list: [] };
 ACTIONS.galOpen = function (el) { openPhotoView(el.getAttribute('data-k'), Number(el.getAttribute('data-i'))); };
 function photoList(kind) {
   const b = currentBook(); if (!b) return [];
-  return kind === 'auto' ? collectBookImages(b) : (b.gallery || []);
+  if (kind !== 'auto') return (b.gallery || []);
+  const inAlbum = Object.create(null);
+  (b.gallery || []).forEach(p => { if (p && p.src) inAlbum[p.src] = 1; });
+  return collectBookImages(b).filter(im => !inAlbum[im.src]);
 }
 function openPhotoView(kind, i) {
   const list = photoList(kind);
@@ -11977,6 +12985,7 @@ function chapterNodes(html, d) {
     if (tag === 'hr') { nodes.push('<p class="bk-break">' + esc(d.sceneBreak || '* * *') + '</p>'); return; }
     if (tag === 'img') { nodes.push('<figure class="bk-fig" style="width:100%"><img src="' + attr(n.getAttribute('src') || '') + '" alt=""></figure>'); return; }
     if (tag === 'figure') {
+      if (!picturesInPrint()) return;      /* text-only book, as chosen */
       const im = n.querySelector('img'); if (!im) return;
       const cp = n.querySelector('figcaption');
       const al = n.getAttribute('data-align') || 'center';
@@ -13231,6 +14240,43 @@ function paintVaultPill() {
   el.title = m[2];
   el.textContent = m[1];
 }
+/* Clicking the little status chip in the top bar explains, in plain words,
+   what a vault actually is and what state yours is in. */
+ACTIONS.vaultExplain = function () {
+  const st = state.app.storage || {};
+  const name = (VAULT_HANDLE && VAULT_HANDLE.name) || st.vaultName || '';
+  const folder = (FOLDER_HANDLE && FOLDER_HANDLE.name) || st.folderName || '';
+  const line = {
+    ready: ['t-lm', 'Everything you write is being saved into “' + (name || 'your vault file') + '” automatically.'],
+    'needs-permission': ['t-am', 'Your browser has forgotten its permission to write to “' + (name || 'your vault file') +
+      '”. Nothing is being written to it until you allow it again. Your work is still safe inside the browser in the meantime.'],
+    error: ['t-rd', 'The last write to your vault file failed. Your work is still safe inside the browser, but the file on your disk is behind.'],
+    none: ['t-am', 'You have not set one up. Your work is still saved inside this browser — but if the browser is cleared, or you move to another computer, there is no copy on your disk.'],
+    unsupported: ['t-am', 'This browser cannot write straight to a file. Use the Download-a-backup button instead, or open the app in Chrome, Edge, Opera or Brave.']
+  }[VAULT_STATUS] || ['t-am', 'Not set up.'];
+  openModal({
+    title: 'WHAT IS THE VAULT?', icon: 'database', size: 'narrow',
+    body:
+      '<div class="helpbox mb14"><b>ONE FILE ON YOUR OWN COMPUTER THAT HOLDS EVERYTHING</b>' +
+        'Pick any file — in Documents, Dropbox, OneDrive, on a memory stick — and this app writes every book, chapter, ' +
+        'character, picture and setting into it as you work. Copy that one file to another machine, open the app there, ' +
+        'point it at the file, and you are exactly where you left off. No account, no sync service, no upload.</div>' +
+      '<div class="prose-c fs13">' +
+        '<h5>Right now</h5><p class="' + line[0] + '">' + esc(line[1]) + '</p>' +
+        (folder ? '<p class="t-lm">You also have a storage folder connected: <code>' + esc(folder) + '/</code>.</p>' : '') +
+        '<h5>Why bother?</h5><ul>' +
+          '<li>A browser can be cleared, by you or by itself. A file on your disk cannot.</li>' +
+          '<li>It is what makes updating the app safe — new app file, same vault, nothing lost.</li>' +
+          '<li>It is the copy you can back up, email to yourself, or drop on a USB stick.</li>' +
+        '</ul>' +
+      '</div>',
+    footer:
+      (VAULT_STATUS === 'needs-permission' ? '<button class="btn amber" data-act="vaultReconnect" data-modal-close><i data-lucide="key"></i>ALLOW IT AGAIN</button>' : '') +
+      (VAULT_STATUS === 'none' && HAS_FSA ? '<button class="btn solid" data-act="vaultChoose" data-modal-close><i data-lucide="folder"></i>SET ONE UP NOW</button>' : '') +
+      '<button class="btn ghost" data-go="storage" data-modal-close><i data-lucide="database"></i>STORAGE &amp; BACKUPS</button>' +
+      '<button class="btn" data-modal-close>CLOSE</button>'
+  });
+};
 function recoveredModal(from) {
   const label = from === 'crash' ? 'the emergency copy written as the tab closed'
     : 'the write-ahead copy from an interrupted save';
@@ -13273,6 +14319,7 @@ async function boot() {
   state.ui.view = CURRENT_VIEW;
 
   renderBrand();
+  document.body.classList.toggle('hide-rte-images', !!state.ui.hideEditorImages);
   render();
   startAutosave();
   refreshStorageMeter();
