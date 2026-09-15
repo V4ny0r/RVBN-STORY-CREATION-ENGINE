@@ -126,6 +126,20 @@ replaces it.
 WordPad, Google Docs and LibreOffice, with real chapter page breaks and your typeface),
 `.rtf`, `.txt`, `.html`, `.md`, or a designed PDF.
 
+### Hearing your characters
+
+Every character page has a **Voice Clips** tab. The *Voice & Dialogue* tab is where you
+write down how someone speaks; this is where you keep proof. Upload samples you made
+anywhere — an AI voice tool such as ElevenLabs, a phone recording, an actor's read — or
+**record one on the spot** from your microphone. Name each clip (*Calm*, *Furious*,
+*Lying*), reorder them, and press play.
+
+Beside the character's name sits **Hear them**: one press plays a clip at random, never
+repeating the one that just sounded, so you get a different side of them each time. If
+you already wrote their voice notes, *Copy their voice notes* assembles a ready-made
+prompt — how they speak, words they use, words they never use, their recorded lines — to
+paste straight into whichever voice tool you use.
+
 ### Pictures inside the prose
 
 The picture button in any editor drops a photo or animated GIF **at the text cursor** —
@@ -242,7 +256,7 @@ guide for whatever page you are on.
 | **Vault** | Draggable moodboard canvas, external reference library, and six in-depth masterclass craft lessons. |
 | **Book Designer** | Your book typeset on real pages — eight print templates, trim sizes, margins, drop caps, running heads, page numbers — previewed live and exported as a proper PDF. |
 | **Idea Lab** | Twenty-one brainstorming tools that read your book first, plus a Story Advisor that works out what you should write next. |
-| **Characters** | Every character listed in the menu, each with a full profile page: cover, portrait, dossier, inner life, voice, ties, appearances, gallery, notes. |
+| **Characters** | Every character listed in the menu, each with a full profile page: cover picture you drag to reframe, portrait, dossier, inner life, voice, ties, appearances, gallery, voice clips you can play, notes. |
 | **Google Doc Sync** | This book mirrored into a live-updating Google Doc, typeset from your Book Designer settings. |
 | **Storage** | Vault file or storage folder on your own disk, write-ahead saves, snapshot history, verified backups, version-stamped and update-proof. |
 | **Live Documents** | A WordPad, Word or Notepad file on your own PC kept up to date as you write, print-formatted, with pictures embedded — or a raw-text twin without them. Per book. |

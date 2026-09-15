@@ -216,7 +216,7 @@ body.no-fx::before,body.no-fx::after{ display:none; }
 /* ------------------------------ BANNER ---------------------------------- */
 .banner{ position:relative; width:100%; overflow:hidden; border-bottom:1px solid var(--line); background:var(--void); flex:0 0 auto; }
 .banner-media{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; display:block; }
-.banner.draggable-banner{ cursor:grab; touch-action:none; }
+.banner.draggable-banner{ cursor:grab; }
 .banner.draggable-banner.dragging{ cursor:grabbing; }
 .banner-off{ display:flex; align-items:center; justify-content:flex-end; gap:8px; height:34px; padding:0 12px;
   border-bottom:1px solid var(--line); background:var(--sunk); }
@@ -559,7 +559,7 @@ input[type=checkbox]{ accent-color:#23e0ff; width:15px; height:15px; cursor:poin
 .cover-preview{ aspect-ratio:2/3; background:var(--surface-2); border:1px solid var(--line); position:relative; overflow:hidden;
   display:flex; flex-direction:column; box-shadow:0 20px 50px rgba(0,0,0,.7); }
 .cover-preview img.art{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
-.cover-preview.draggable-art{ cursor:grab; touch-action:none; }
+.cover-preview.draggable-art{ cursor:grab; }
 .cover-preview.draggable-art.dragging{ cursor:grabbing; }
 .cover-preview.draggable-art .cvr-txt{ cursor:grab; }
 .cover-preview.draggable-art::after{ content:'DRAG THE PICTURE TO MOVE IT'; position:absolute; left:0; right:0; top:0; z-index:7;
@@ -721,14 +721,65 @@ label.fld > .hint{ margin-top:3px; }
 @media(max-width:1240px){ #livePill .lptxt{ display:none; } #livePill{ padding:4px 7px; } }
 
 /* ---- character profile page ---- */
-.charcover{ position:relative; background:linear-gradient(135deg, color-mix(in srgb, var(--accent) 16%, var(--void)), var(--void)); border-bottom:1px solid var(--line-hard); }
-.charcover-empty{ position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; color:var(--txt-faint); font-size:12px; letter-spacing:2px; text-transform:uppercase; }
-.charcover-tools{ position:absolute; right:10px; bottom:10px; display:flex; gap:6px; }
-.charhead{ display:flex; gap:16px; align-items:flex-start; padding:0 18px 16px; flex-wrap:wrap; }
-.charav{ flex:0 0 auto; overflow:hidden; border:3px solid var(--accent); background:var(--void); display:grid; place-items:center; box-shadow:0 10px 34px rgba(0,0,0,.55); }
-.charav.sm{ border-width:1px; box-shadow:none; }
+.charcover{ position:relative; overflow:hidden; background:linear-gradient(135deg, color-mix(in srgb, var(--accent) 16%, var(--void)), var(--void)); border-bottom:1px solid var(--line-hard); }
+.charcover img.cvr{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; display:block; }
+/* No touch-action:none here. This is a full-width hero at the top of the
+   scroller — claiming the gesture would stop a finger scrolling the page, and
+   every attempted scroll would silently re-crop the picture. Touch uses the
+   sliders; a mouse or pen drags. */
+.charcover.grabbable{ cursor:grab; }
+.charcover.grabbable.dragging{ cursor:grabbing; }
+.charcover.grabbable::after{ content:'DRAG THE PICTURE TO MOVE IT'; position:absolute; left:0; right:0; top:0; z-index:4;
+  padding:4px 0; text-align:center; font-family:var(--font-mono); font-size:8px; letter-spacing:1.4px;
+  color:var(--txt); background:rgba(3,6,12,.62); opacity:0; transition:opacity .16s; pointer-events:none; }
+.charcover.grabbable:hover::after{ opacity:1; }
+.charcover-empty{ position:absolute; inset:0 0 46px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; color:var(--txt-faint); font-size:12px; letter-spacing:2px; text-transform:uppercase; }
+/* The cover's own controls live along the foot of the picture itself. The strip
+   spans the full width so the buttons can wrap, but it is transparent to the
+   pointer — only the buttons themselves are — or it would swallow every drag
+   that started anywhere along the bottom of the cover. */
+.charcover-tools{ position:absolute; left:10px; right:10px; bottom:10px; z-index:6; display:flex; gap:6px; flex-wrap:wrap;
+  justify-content:flex-end; align-items:flex-end; pointer-events:none; }
+.charcover-tools > *{ pointer-events:auto; }
+/* keep the buttons off whichever side the portrait hangs down on */
+.charblock.pos-right .charcover-tools{ justify-content:flex-start; }
+.charblock.pos-middle .charcover-tools{ justify-content:flex-end; max-width:none; }
+/* z-index 5 lifts the whole header above the cover, which is a positioned
+   element and would otherwise paint straight over the portrait */
+/* above the cover tools (6) as well as the cover, so the portrait is never
+   painted over by anything */
+.charhead{ display:flex; gap:16px; align-items:flex-start; padding:0 18px 16px; flex-wrap:wrap;
+  position:relative; z-index:7; }
+.charhead .charid{ display:flex; gap:16px; align-items:flex-start; min-width:0; flex:1 1 auto; }
+.charhead .characts{ display:flex; gap:6px; flex-wrap:wrap; align-items:flex-start; padding-top:10px; margin-left:auto; }
+/* a middle or right portrait cannot be done with justify-content: the identity
+   block grows to fill the row, so there is never any free space to distribute */
+.charhead.pos-middle{ flex-direction:column; align-items:center; text-align:center; }
+.charhead.pos-middle .charid{ flex-direction:column; align-items:center; flex:0 0 auto; }
+/* text-align does not move flex items, so the name row and the chip row need
+   telling separately or they hang off to the left of a centred block */
+.charhead.pos-middle .charid .flex{ justify-content:center; }
+.charhead.pos-middle .characts{ margin:10px auto 0; justify-content:center; }
+.charhead.pos-right{ flex-direction:row-reverse; text-align:right; }
+.charhead.pos-right .charid{ flex-direction:row-reverse; }
+.charhead.pos-right .characts{ margin-left:0; margin-right:auto; }
+.charhead.pos-right .charid .flex{ justify-content:flex-end; }
+.charav{ flex:0 0 auto; overflow:hidden; border:3px solid var(--accent); background:var(--void); display:grid; place-items:center;
+  box-shadow:0 10px 34px rgba(0,0,0,.55); position:relative; z-index:3; }
+.charav.sm{ border-width:1px; box-shadow:none; z-index:auto; }
 .charname{ font-family:var(--font-display); font-size:clamp(20px,2.4vw,30px); margin:0; color:var(--txt); letter-spacing:1px; }
-@media(max-width:760px){ .charhead{ justify-content:flex-start !important; } .charav{ margin-top:-38px !important; } }
+.clip-row{ display:flex; align-items:center; gap:10px; padding:10px 12px; margin-bottom:8px; flex-wrap:wrap;
+  border:1px solid var(--line); background:var(--bg-panel); border-radius:var(--radius); transition:border-color .16s; }
+.clip-row.sounding{ border-color:var(--accent); box-shadow:0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent),
+  0 0 22px color-mix(in srgb, var(--accent) 18%, transparent); }
+.clip-row.sounding strong{ color:var(--accent); }
+@media(max-width:760px){
+  .charhead{ padding:0 12px 14px; }
+  .charhead .characts{ margin-left:0; width:100%; }
+  /* scoped to the header portrait — .charav.sm is used inline in the
+     Relationships tab and must not be dragged upwards */
+  .charhead > .charid > .charav{ margin-top:-38px !important; }
+}
 
 /* ======================= SOCIAL BOOK PROFILE ============================= */
 .prof-cover{ position:relative; width:100%; overflow:hidden; border:1px solid var(--line); background:var(--void); }
@@ -3310,6 +3361,7 @@ ACTIONS.bannerRestore = function () {
 /* Drag the banner picture to reframe it — the same gesture as a cover. */
 document.addEventListener('pointerdown', (e) => {
   const frame = e.target.closest && e.target.closest('.banner.draggable-banner');
+  if (e.pointerType === 'touch' || (e.button !== undefined && e.button !== 0) || FRAME_DRAGGING) return;
   if (!frame) return;
   if (e.target.closest('button, a, input, select, textarea, .banner-tools')) return;
   const media = frame.querySelector('.banner-media');
@@ -5161,11 +5213,78 @@ ACTIONS.coverArtReset = function (el) {
   a.artX = 50; a.artY = 50; a.artZoom = 100;
   markDirty(); render();
 };
+/* One drag core for every reframable picture in the app — cover art, page
+   banners and character covers all slide the same way under the same hand. */
+let FRAME_DRAGGING = false;
+function frameDrag(e, frame, media, get, set, done) {
+  /* A touch belongs to the page: claiming it would stop the reader scrolling
+     and would re-crop the picture on every attempted swipe. Touch users get the
+     across / up-and-down sliders instead. */
+  if (e.pointerType === 'touch') return;
+  if (e.button !== undefined && e.button !== 0) return;   /* left button only */
+  if (FRAME_DRAGGING) return;                              /* one drag at a time */
+  const box = frame.getBoundingClientRect();
+  if (!box.width || !box.height) return;
+  e.preventDefault();
+  FRAME_DRAGGING = true;
+  let moved = false;
+  const sx = e.clientX, sy = e.clientY;
+  const start = get();
+  const x0 = clamp(Number(start.x == null ? 50 : start.x), 0, 100);
+  const y0 = clamp(Number(start.y == null ? 50 : start.y), 0, 100);
+  frame.classList.add('dragging');
+  const move = (ev) => {
+    /* moving the picture left shows more of its right side, hence the inverted
+       sign — it should feel like sliding the photo under the frame */
+    const x = clamp(Math.round(x0 - ((ev.clientX - sx) / box.width) * 100), 0, 100);
+    const y = clamp(Math.round(y0 - ((ev.clientY - sy) / box.height) * 100), 0, 100);
+    if (x !== x0 || y !== y0) moved = true;
+    set(x, y);
+    if (media) media.style.objectPosition = x + '% ' + y + '%';
+  };
+  const up = () => {
+    FRAME_DRAGGING = false;
+    frame.classList.remove('dragging');
+    window.removeEventListener('pointermove', move);
+    window.removeEventListener('pointerup', up);
+    window.removeEventListener('pointercancel', up);
+    /* a plain click moved nothing, so it must not mark the project unsaved */
+    if (moved) markDirty();
+    if (done) done();
+  };
+  window.addEventListener('pointermove', move);
+  window.addEventListener('pointerup', up);
+  window.addEventListener('pointercancel', up);
+}
+/* Slide a character's cover picture around inside its frame. */
+document.addEventListener('pointerdown', (e) => {
+  const frame = e.target.closest && e.target.closest('.charcover.grabbable');
+  if (!frame) return;
+  if (e.target.closest('button, a, input, select, textarea, .charcover-tools')) return;
+  const hit = charById(frame.getAttribute('data-charcover'));
+  if (!hit) return;
+  const img = frame.querySelector('img.cvr');
+  if (!img) return;
+  const c = hit.c;
+  frameDrag(e, frame, img,
+    () => ({ x: c.coverX, y: c.coverY }),
+    (x, y) => {
+      c.coverX = x; c.coverY = y;
+      const lx = document.getElementById('cvCharX'), ly = document.getElementById('cvCharY');
+      if (lx) lx.textContent = x;
+      if (ly) ly.textContent = y;
+      const sx2 = document.querySelector('[data-model="coverX"]'), sy2 = document.querySelector('[data-model="coverY"]');
+      if (sx2) sx2.value = x;
+      if (sy2) sy2.value = y;
+    });
+});
+
 /* Drag the artwork inside its frame. Works with a mouse, a finger or a pen. */
 document.addEventListener('pointerdown', (e) => {
   /* the scrim and the title block sit over the picture, so the drag has to be
      picked up from the frame rather than from the <img> itself */
   const frame = e.target.closest && e.target.closest('.cover-preview.draggable-art');
+  if (e.pointerType === 'touch' || (e.button !== undefined && e.button !== 0) || FRAME_DRAGGING) return;
   if (!frame) return;
   if (e.target.closest('button, a, input, select, textarea')) return;
   const img = frame.querySelector('img[data-artdrag]');
@@ -5630,7 +5749,8 @@ function newCharacter(tier) {
     origin: '', wound: '', lie: '', arcStart: '', arcBreak: '', arcEnd: '',
     skills: '', weakness: '', possessions: '', habits: '', catchphrase: '', antiVoice: '',
     continuity: '', todo: '', quotes: [], gallery: [],
-    cover: '', coverH: 220, coverY: 50, avatarSize: 150, avatarPos: 'left', avatarShape: 'round',
+    cover: '', coverH: 220, coverY: 50, coverX: 50, avatarSize: 150, avatarPos: 'left', avatarShape: 'round',
+    clips: [],                  /* voice samples — what they actually sound like */
     x: 0, y: 0, chat: [], created: nowISO()
   };
 }
@@ -5837,6 +5957,7 @@ const CHAR_TABS = [
   ['ties', 'Relationships', 'network'],
   ['appear', 'Appearances', 'files'],
   ['gallery', 'Gallery', 'image'],
+  ['clips', 'Voice Clips', 'volume-2'],
   ['notes', 'Notes', 'sticky-note']
 ];
 
@@ -5909,26 +6030,36 @@ VIEWS.character = {
     const shape = { circle: '50%', round: '18px', square: '0', hex: '0' }[c.avatarShape || 'round'] || '18px';
 
     const head = '' +
-      '<div class="panel clip mb14" style="overflow:hidden;padding:0">' +
-        '<div class="charcover" style="height:' + coverH + 'px;' +
-          (c.cover ? 'background-image:url(' + JSON.stringify(c.cover).replace(/"/g, '&quot;') + ');background-size:cover;background-position:center ' + (Number(c.coverY) || 50) + '%' : '') + '">' +
-          (!c.cover ? '<div class="charcover-empty"><i data-lucide="image"></i><span>No cover picture yet</span></div>' : '') +
+      '<div class="panel clip mb14 charblock pos-' + esc(pos) + '" style="overflow:hidden;padding:0">' +
+        '<div class="charcover' + (c.cover ? ' grabbable' : '') + '" data-charcover="' + c.id + '" style="height:' + coverH + 'px">' +
+          (c.cover
+            ? '<img class="cvr" data-coverdrag="' + c.id + '" src="' + attr(c.cover) + '" alt="" style="object-position:' +
+                (Number(c.coverX == null ? 50 : c.coverX)) + '% ' + (Number(c.coverY == null ? 50 : c.coverY)) + '%">'
+            : '<div class="charcover-empty"><i data-lucide="image"></i><span>No cover picture yet</span></div>') +
           '<div class="charcover-tools">' +
             '<button class="btn xs" data-act="charCoverPick" data-id="' + c.id + '"><i data-lucide="upload"></i>COVER PICTURE / GIF</button>' +
-            (c.cover ? '<button class="btn xs ghost red" data-act="charCoverClear" data-id="' + c.id + '"><i data-lucide="x"></i></button>' : '') +
+            '<button class="btn xs" data-act="charLook" data-id="' + c.id + '"><i data-lucide="sliders-horizontal"></i>COVER &amp; PORTRAIT SIZE</button>' +
+            (c.cover ? '<button class="btn xs ghost red" data-act="charCoverClear" data-id="' + c.id + '" title="Remove the cover picture"><i data-lucide="x"></i></button>' : '') +
           '</div>' +
         '</div>' +
-        '<div class="charhead" style="justify-content:' + (pos === 'middle' ? 'center' : pos === 'right' ? 'flex-end' : 'flex-start') + '">' +
+        '<div class="charhead pos-' + esc(pos) + '">' +
+          '<div class="charid">' +
           /* never pull the portrait up further than the cover is tall, or it
              rides out of the panel and collides with whatever is above it */
           '<div class="charav" style="width:' + av + 'px;height:' + av + 'px;border-radius:' + shape + ';margin-top:-' +
             Math.min(Math.round(av / 2.6), Math.max(0, Math.round(coverH * 0.42))) + 'px;' +
             ((c.avatarShape || 'round') === 'hex' ? 'clip-path:polygon(25% 5%,75% 5%,100% 50%,75% 95%,25% 95%,0 50%);' : '') +
             'border-color:' + attr(c.color || 'var(--accent)') + '">' + charPortrait(c, Math.round(av / 2.6)) + '</div>' +
-          '<div style="flex:1;min-width:0;padding:6px 0">' +
+          '<div style="min-width:0;padding:6px 0">' +
             '<div class="flex center gap8 wrap"><h2 class="charname">' + esc(c.name || 'Unnamed') + '</h2>' +
               '<span class="chip ' + tier.chip + '">' + esc(tier.label) + '</span>' +
-              (c.pronouns ? '<span class="chip">' + esc(c.pronouns) + '</span>' : '') + '</div>' +
+              (c.pronouns ? '<span class="chip">' + esc(c.pronouns) + '</span>' : '') +
+              ((c.clips || []).length
+                ? '<button class="btn xs solid" data-act="charHear" data-id="' + c.id + '" title="Play one of their voice clips at random">' +
+                  '<i data-lucide="volume-2"></i>HEAR THEM</button>'
+                : '<button class="btn xs ghost" data-act="charTab" data-arg="clips" title="Add voice clips so you can hear them">' +
+                  '<i data-lucide="volume-2"></i>ADD A VOICE</button>') +
+            '</div>' +
             '<div class="fs13 muted mt6">' + esc([c.role, c.occupation, c.age ? 'age ' + c.age : ''].filter(Boolean).join(' · ') || 'No role set yet') + '</div>' +
             '<div class="flex gap6 mt10 wrap">' +
               '<span class="chip">' + rels.length + ' TIES</span>' +
@@ -5937,10 +6068,10 @@ VIEWS.character = {
               '<span class="chip cy">' + esc(b.title) + '</span>' +
             '</div>' +
           '</div>' +
-          '<div class="flex gap6 wrap" style="align-items:flex-start;padding-top:10px">' +
+          '</div>' +
+          '<div class="characts">' +
             '<button class="btn sm" data-act="charTalk" data-id="' + c.id + '"><i data-lucide="message-square"></i>TALK TO THEM</button>' +
             '<button class="btn sm ghost" data-act="charInterview" data-id="' + c.id + '"><i data-lucide="help-circle"></i>INTERVIEW</button>' +
-            '<button class="btn sm ghost" data-act="charLook" data-id="' + c.id + '"><i data-lucide="palette"></i>LOOK</button>' +
             '<button class="btn sm ghost" data-go="characters"><i data-lucide="users"></i>ALL CHARACTERS</button>' +
           '</div>' +
         '</div>' +
@@ -5952,6 +6083,7 @@ VIEWS.character = {
       (t[0] === 'ties' && rels.length ? ' <span class="mono fs10">' + rels.length + '</span>' : '') +
       (t[0] === 'appear' && app.length ? ' <span class="mono fs10">' + app.length + '</span>' : '') +
       (t[0] === 'gallery' && (c.gallery || []).length ? ' <span class="mono fs10">' + c.gallery.length + '</span>' : '') +
+      (t[0] === 'clips' && (c.clips || []).length ? ' <span class="mono fs10">' + c.clips.length + '</span>' : '') +
       '</button>').join('') + '</div>';
 
     return '<div data-root="char:' + c.id + '">' + head + tabs +
@@ -6158,7 +6290,11 @@ VIEWS.character = {
     '</div></div>';
   },
 
-  mount() { }
+  mount() {
+    /* a re-render rebuilds the rows, so the clip still sounding has to be
+       re-marked or it shows PLAY while you can hear it */
+    try { paintClipButtons(); } catch (e) { }
+  }
 };
 
 function charSide(c, b, depth, app) {
@@ -6217,13 +6353,16 @@ ACTIONS.charLook = function (el) {
   const h = charById(el.getAttribute('data-id')); if (!h) return;
   const c = h.c;
   openModal({
-    title: 'HOW THIS PAGE LOOKS', icon: 'palette', size: 'narrow',
+    title: 'COVER & PORTRAIT SIZE', icon: 'sliders-horizontal', size: 'narrow',
     body: '<div data-root="char:' + c.id + '">' +
       '<div class="helpbox mb14"><b>THE SAME CONTROLS AS A BOOK PROFILE</b>Cover height, where the portrait sits, how big it is and what shape it takes.</div>' +
       '<label class="fld"><span class="lb">Cover height — <b class="t-cy">' + (Number(c.coverH) || 220) + 'px</b></span>' +
         '<input type="range" min="90" max="620" data-model="coverH" data-rerender value="' + (Number(c.coverH) || 220) + '"></label>' +
-      '<label class="fld"><span class="lb">Reframe the cover up or down</span>' +
-        '<input type="range" min="0" max="100" data-model="coverY" data-rerender value="' + (Number(c.coverY) || 50) + '"></label>' +
+      '<label class="fld"><span class="lb">Cover up and down — <b id="cvCharY" class="t-cy">' + (Number(c.coverY == null ? 50 : c.coverY)) + '</b>%</span>' +
+        '<input type="range" min="0" max="100" data-model="coverY" data-rerender value="' + (Number(c.coverY == null ? 50 : c.coverY)) + '"></label>' +
+      '<label class="fld"><span class="lb">Cover left and right — <b id="cvCharX" class="t-cy">' + (Number(c.coverX == null ? 50 : c.coverX)) + '</b>%</span>' +
+        '<input type="range" min="0" max="100" data-model="coverX" data-rerender value="' + (Number(c.coverX == null ? 50 : c.coverX)) + '">' +
+        '<span class="hint">You can also just drag the cover picture itself — the pointer turns into a hand over it.</span></label>' +
       '<label class="fld"><span class="lb">Portrait size — <b class="t-cy">' + (Number(c.avatarSize) || 150) + 'px</b></span>' +
         '<input type="range" min="70" max="300" data-model="avatarSize" data-rerender value="' + (Number(c.avatarSize) || 150) + '"></label>' +
       '<label class="fld"><span class="lb">Portrait position</span><select class="sel" data-model="avatarPos" data-rerender>' +
@@ -6371,6 +6510,363 @@ function localCharIdeas(kind, c, b) {
     '· HOW THEY EAT. It is the fastest way to show class, upbringing and self-control without saying any of those words.\n' +
     '· WHAT THEY ARE WRONG ABOUT, and who has already told them so. Given ' + flaw + ', they did not listen.';
 }
+
+
+/* ===========================================================================
+   v10 · VOICE CLIPS
+   What a character actually sounds like. Upload samples you made anywhere —
+   ElevenLabs, a phone recording, an actor's read — or record one here, then
+   press play to hear them. The button beside their name picks one at random,
+   so you can hear the character while you are looking at them.
+   ========================================================================= */
+const CLIP_MAX_BYTES = 12 * 1024 * 1024;     /* a sane ceiling per clip */
+let VOICE_AUDIO = null;                       /* one shared player */
+let VOICE_PLAYING = '';                       /* id of the clip sounding now */
+let VOICE_REC = null;                         /* the recording in progress, if any */
+
+function charClips(c) { if (!c.clips) c.clips = []; return c.clips; }
+function newClip(o) {
+  return Object.assign({ id: uid('vc'), src: '', name: 'Voice clip', note: '',
+    kind: 'upload', bytes: 0, added: nowISO() }, o || {});
+}
+function voicePlayer() {
+  if (VOICE_AUDIO && document.body.contains(VOICE_AUDIO)) return VOICE_AUDIO;
+  const a = document.createElement('audio');
+  a.id = 'voicePlayer';
+  a.preload = 'none';
+  a.addEventListener('ended', () => { VOICE_PLAYING = ''; paintClipButtons(); });
+  a.addEventListener('pause', () => { if (a.currentTime === 0 || a.ended) { VOICE_PLAYING = ''; paintClipButtons(); } });
+  a.addEventListener('error', () => {
+    VOICE_PLAYING = ''; paintClipButtons();
+    toast('That clip could not be played. The file may be a format this browser does not support.', 'err');
+  });
+  document.body.appendChild(a);
+  VOICE_AUDIO = a;
+  return a;
+}
+function paintClipButtons() {
+  document.querySelectorAll('[data-clipbtn]').forEach(btn => {
+    const on = btn.getAttribute('data-clipbtn') === VOICE_PLAYING;
+    btn.classList.toggle('solid', on);
+    const i = btn.querySelector('i,svg');
+    if (i) i.setAttribute('data-lucide', on ? 'square' : 'play');
+    const lab = btn.querySelector('.cliplab');
+    if (lab) lab.textContent = on ? 'STOP' : 'PLAY';
+  });
+  document.querySelectorAll('.clip-row').forEach(r => {
+    r.classList.toggle('sounding', r.getAttribute('data-clip') === VOICE_PLAYING);
+  });
+  icons();
+}
+function playClip(clip, restart) {
+  const a = voicePlayer();
+  if (VOICE_PLAYING === clip.id && !restart) { a.pause(); a.currentTime = 0; VOICE_PLAYING = ''; paintClipButtons(); return; }
+  a.src = clip.src;
+  a.currentTime = 0;
+  VOICE_PLAYING = clip.id;
+  paintClipButtons();
+  const mine = clip.id;
+  a.play().catch(() => {
+    /* a rejection from the clip we just replaced must not clear the new one */
+    if (VOICE_PLAYING !== mine) return;
+    VOICE_PLAYING = ''; paintClipButtons();
+    toast('The browser would not start playback. Click the page once, then try again.', 'warn');
+  });
+}
+function clipById(c, id) { return charClips(c).find(x => x.id === id) || null; }
+
+/* --------------------------------- the tab -------------------------------- */
+VIEWS.character.clips = function (c) {
+  const clips = charClips(c);
+  const total = clips.reduce((n, x) => n + (x.bytes || 0), 0);
+  return '' +
+  '<div class="panel clip mb14"><div class="panel-hd"><i data-lucide="volume-2"></i><h3>WHAT THEY SOUND LIKE</h3>' +
+    '<span style="flex:1"></span>' +
+    (clips.length ? '<button class="btn xs solid" data-act="charHear" data-id="' + c.id + '"><i data-lucide="shuffle"></i>PLAY ONE AT RANDOM</button>' : '') +
+  '</div><div class="panel-bd">' +
+    '<div class="helpbox mb14"><b>A VOICE YOU CAN ACTUALLY HEAR</b>' +
+      'The <em>Voice &amp; Dialogue</em> tab is where you write down how ' + esc(c.name || 'they') + ' speaks. This is where you keep proof. ' +
+      'Make a sample anywhere you like — an AI voice tool such as ElevenLabs, a phone recording, an actor reading a line — and drop it in here. ' +
+      'Then press play, or use <strong>Hear them</strong> beside their name, and listen before you write their next line of dialogue.</div>' +
+
+    '<div class="flex gap6 wrap mb14">' +
+      '<button class="btn solid" data-act="clipAdd" data-id="' + c.id + '"><i data-lucide="upload"></i>UPLOAD VOICE CLIPS</button>' +
+      '<button class="btn" data-act="clipRecord" data-id="' + c.id + '"><i data-lucide="mic"></i>RECORD ONE NOW</button>' +
+      '<button class="btn ghost" data-act="clipUrl" data-id="' + c.id + '"><i data-lucide="link"></i>FROM A LINK</button>' +
+      '<span style="flex:1"></span>' +
+      (clips.length ? '<span class="chip">' + clips.length + ' CLIP' + (clips.length === 1 ? '' : 'S') + ' · ' + bytesHuman(total) + '</span>' : '') +
+    '</div>' +
+
+    (clips.length
+      ? '<div id="clipRows">' + clips.map((x, i) => clipRowHTML(c, x, i)).join('') + '</div>'
+      : '<div class="dropzone" data-act="clipAdd" data-id="' + c.id + '"><i data-lucide="mic"></i>' +
+        '<div><strong>No voice clips yet</strong></div>' +
+        '<div class="fs12">MP3, WAV, OGG, M4A or WEBM — upload as many as you like, or drop one here</div></div>') +
+  '</div></div>' +
+
+  '<div class="panel clip"><div class="panel-hd"><i data-lucide="lightbulb"></i><h3>GETTING A SAMPLE</h3></div>' +
+    '<div class="panel-bd prose-c fs13">' +
+      '<p>Whatever you already use is fine — this only stores the finished audio file.</p>' +
+      '<ul>' +
+        '<li><strong>An AI voice tool</strong> such as ElevenLabs: paste a line of ' + esc(c.name || 'their') + ' dialogue, pick a voice, download the result and upload it here. ' +
+          (String(c.voice || '').trim()
+            ? 'You already wrote down how they speak — press <em>Copy their voice notes</em> below and paste that into the tool as direction.'
+            : 'Fill in the <em>Voice</em> tab first so you know what you are asking for.') + '</li>' +
+        '<li><strong>Record it yourself.</strong> Press <em>Record one now</em> and read a line the way you hear it. A rough human take is often more use than a polished wrong one.</li>' +
+        '<li><strong>Keep several.</strong> Calm, furious, lying, the one line everybody quotes. The random button then gives you a different side of them each time.</li>' +
+      '</ul>' +
+      '<div class="flex gap6 wrap mt10">' +
+        '<button class="btn sm ghost" data-act="clipCopyVoice" data-id="' + c.id + '"><i data-lucide="copy"></i>COPY THEIR VOICE NOTES</button>' +
+        '<button class="btn sm ghost" data-act="charTab" data-arg="voice"><i data-lucide="mic"></i>WRITE HOW THEY SPEAK</button>' +
+      '</div>' +
+      '<div class="hint mt10">Clips are stored with the book, so they travel in your backups and your vault file. ' +
+        'That also means every rolling snapshot carries a copy — audio is far heavier than text, so a few short samples per character ' +
+        'is the happy size. If storage gets tight, keep fewer snapshots in <strong>Storage &amp; Backups</strong>, or delete the takes you are not using.</div>' +
+    '</div></div>';
+};
+
+function clipRowHTML(c, x, i) {
+  return '<div class="clip-row" data-clip="' + x.id + '">' +
+    '<button class="btn sm" data-act="clipPlay" data-id="' + c.id + '" data-c="' + x.id + '" data-clipbtn="' + x.id + '">' +
+      '<i data-lucide="play"></i><span class="cliplab">PLAY</span></button>' +
+    '<div style="flex:1;min-width:0">' +
+      '<div class="flex center gap6 wrap">' +
+        '<strong class="fs13" style="color:var(--txt);word-break:break-word">' + esc(x.name || 'Voice clip ' + (i + 1)) + '</strong>' +
+        '<span class="chip">' + esc((x.kind || 'upload').toUpperCase()) + '</span>' +
+        (x.bytes ? '<span class="mono fs10 faint">' + bytesHuman(x.bytes) + '</span>' : '') +
+      '</div>' +
+      (x.note ? '<div class="fs12 muted mt6">' + esc(x.note) + '</div>' : '') +
+    '</div>' +
+    '<div class="flex gap4 wrap">' +
+      '<button class="btn xs ghost" data-act="clipRename" data-id="' + c.id + '" data-c="' + x.id + '" title="Name it"><i data-lucide="pencil"></i></button>' +
+      '<button class="btn xs ghost" data-act="clipNote" data-id="' + c.id + '" data-c="' + x.id + '" title="Describe it"><i data-lucide="message-square"></i></button>' +
+      '<button class="btn xs ghost" data-act="clipMove" data-id="' + c.id + '" data-c="' + x.id + '" data-d="-1" title="Move up">▴</button>' +
+      '<button class="btn xs ghost" data-act="clipMove" data-id="' + c.id + '" data-c="' + x.id + '" data-d="1" title="Move down">▾</button>' +
+      '<button class="btn xs ghost" data-act="clipSave" data-id="' + c.id + '" data-c="' + x.id + '" title="Save it back to your computer"><i data-lucide="download"></i></button>' +
+      '<button class="btn xs ghost red" data-act="clipDel" data-id="' + c.id + '" data-c="' + x.id + '" title="Delete"><i data-lucide="trash-2"></i></button>' +
+    '</div>' +
+  '</div>';
+}
+
+/* --------------------------------- actions -------------------------------- */
+ACTIONS.clipPlay = function (el) {
+  const hit = charById(el.getAttribute('data-id')); if (!hit) return;
+  const x = clipById(hit.c, el.getAttribute('data-c')); if (!x) return;
+  playClip(x);
+};
+/** Beside the name: pick one of their clips at random and play it. */
+ACTIONS.charHear = function (el) {
+  const hit = charById(el.getAttribute('data-id')); if (!hit) return;
+  const clips = charClips(hit.c);
+  if (!clips.length) { state.ui.charTab = 'clips'; markDirty(true); render(); toast('Add a voice clip first.', 'warn'); return; }
+  /* avoid repeating the clip that just played, when there is a choice */
+  const pool = clips.length > 1 ? clips.filter(x => x.id !== VOICE_PLAYING) : clips;
+  const pick = pool[Math.floor(Math.random() * pool.length)];
+  /* with a single clip, "play one at random" must play it — not toggle it off */
+  playClip(pick, true);
+  toast('▶ ' + (pick.name || 'Voice clip'), 'ok', (hit.c.name || 'THEM').toUpperCase());
+};
+ACTIONS.clipAdd = async function (el) {
+  const hit = charById(el.getAttribute('data-id')); if (!hit) return;
+  const files = await pickFilesRaw('audio/*,.mp3,.wav,.ogg,.m4a,.webm,.aac,.flac');
+  if (!files || !files.length) return;
+  let added = 0, skipped = 0;
+  for (const f of files) {
+    if (f.size > CLIP_MAX_BYTES) { skipped++; continue; }
+    try {
+      charClips(hit.c).push(newClip({
+        src: await readFileAsDataURL(f),
+        name: f.name.replace(/\.[^.]+$/, ''),
+        bytes: f.size, kind: 'upload'
+      }));
+      added++;
+    } catch (e) { skipped++; }
+  }
+  markDirty(); render();
+  if (added) toast(added + ' voice clip' + (added === 1 ? '' : 's') + ' added.', 'ok');
+  if (skipped) toast(skipped + ' file(s) were skipped — over ' + bytesHuman(CLIP_MAX_BYTES) + ' or unreadable.', 'warn');
+};
+ACTIONS.clipUrl = async function (el) {
+  const hit = charById(el.getAttribute('data-id')); if (!hit) return;
+  const v = await promptDlg('VOICE CLIP FROM A LINK', 'A direct address ending .mp3, .wav, .ogg or .m4a', '');
+  if (!v || !v.trim()) return;
+  charClips(hit.c).push(newClip({ src: v.trim(), name: (v.split('/').pop() || 'Voice clip').replace(/\.[^.]+$/, ''), kind: 'link' }));
+  markDirty(); render();
+  toast('Linked. It plays whenever that address is reachable.', 'ok');
+};
+/** Record straight from the microphone — no tool, no account, works offline. */
+ACTIONS.clipRecord = async function (el) {
+  const id = el.getAttribute('data-id');
+  const hit = charById(id); if (!hit) return;
+  if (!navigator.mediaDevices || !window.MediaRecorder) {
+    toast('This browser cannot record audio. Upload a file instead.', 'warn', 'NOT SUPPORTED');
+    return;
+  }
+  let stream;
+  try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
+  catch (e) { toast('The microphone was not allowed. Check the permission in your browser address bar.', 'err'); return; }
+
+  let rec, tick = null;
+  /* the flag lives on the session object, so a thrown-away take can never
+     poison the next recording the way a window-level one could */
+  const session = { stream: stream, charId: id, t0: Date.now(), keep: false, closed: false };
+  const finish = () => {
+    if (tick) { clearInterval(tick); tick = null; }
+    stopMic(session);
+    if (!session.closed) { session.closed = true; closeAllModals(); }
+  };
+  try {
+    rec = new MediaRecorder(stream);
+  } catch (e) {
+    stopMic(session);
+    toast('This browser could not start a recording. Upload a file instead.', 'err');
+    return;
+  }
+  session.rec = rec;
+  VOICE_REC = session;
+  const chunks = [];
+  rec.ondataavailable = (ev) => { if (ev.data && ev.data.size) chunks.push(ev.data); };
+
+  rec.onstop = async () => {
+    /* read the length BEFORE the session is torn down, or every take is "1s" */
+    const secs = Math.max(1, Math.round((Date.now() - session.t0) / 1000));
+    const keep = session.keep;
+    finish();
+    VOICE_REC = null;
+    if (!keep) return;                                  /* thrown away on purpose */
+    if (!chunks.length) { toast('Nothing was recorded.', 'warn'); return; }
+    const blob = new Blob(chunks, { type: rec.mimeType || 'audio/webm' });
+    if (blob.size > CLIP_MAX_BYTES) {
+      toast('That recording is too long to store. Keep it under ' + bytesHuman(CLIP_MAX_BYTES) + '.', 'warn');
+      return;
+    }
+    const src = await readFileAsDataURL(blob);
+    const mm = Math.floor(secs / 60), ss = secs % 60;
+    charClips(hit.c).push(newClip({
+      src: src, name: 'Recording · ' + (mm ? mm + 'm ' + ss + 's' : secs + 's'),
+      bytes: blob.size, kind: 'recorded'
+    }));
+    markDirty(); render();
+    toast('Recording kept.', 'ok');
+  };
+
+  openModal({
+    title: 'RECORDING — ' + ((hit.c.name || 'CHARACTER').toUpperCase()), icon: 'mic', size: 'narrow', closeOnScrim: false,
+    body: '<div class="helpbox mb14"><b>READ A LINE THE WAY YOU HEAR IT</b>' +
+      (String(hit.c.voice || '').trim()
+        ? 'Your notes say: <em>' + esc(excerptOf(hit.c.voice, 180)) + '</em>'
+        : 'A single line of their dialogue is plenty — you are capturing the sound, not performing the book.') + '</div>' +
+      '<div style="text-align:center;padding:14px 0">' +
+        '<div class="lpdot" style="width:16px;height:16px;margin:0 auto 10px"></div>' +
+        '<div class="mono" id="recTime" style="font-size:26px;color:var(--accent)">0:00</div>' +
+        '<div class="fs12 muted mt6">Recording. Press <strong>Stop &amp; keep</strong> to save it — closing this window throws it away.</div>' +
+      '</div>',
+    footer: '<button class="btn ghost" data-act="clipRecCancel">THROW IT AWAY</button>' +
+      '<button class="btn solid red" data-act="clipRecStop"><i data-lucide="square"></i>STOP &amp; KEEP</button>',
+    /* Escape and the ✕ mean "I did not want this take" — only the Stop & keep
+       button sets session.keep, so closing any other way discards it */
+    onClose: () => {
+      session.closed = true;
+      if (tick) { clearInterval(tick); tick = null; }
+      if (rec.state === 'recording') { try { rec.stop(); } catch (e) { } }
+      else { stopMic(session); VOICE_REC = null; }
+    }
+  });
+
+  try { rec.start(); }
+  catch (e) { finish(); VOICE_REC = null; toast('The recording would not start.', 'err'); return; }
+
+  tick = setInterval(() => {
+    const el2 = document.getElementById('recTime');
+    if (!el2 || rec.state !== 'recording') { clearInterval(tick); tick = null; return; }
+    const sec = Math.round((Date.now() - session.t0) / 1000);
+    el2.textContent = Math.floor(sec / 60) + ':' + String(sec % 60).padStart(2, '0');
+  }, 500);
+};
+function stopMic(session) {
+  const r = session || VOICE_REC;
+  if (r && r.stream) { try { r.stream.getTracks().forEach(t => t.stop()); } catch (e) { } }
+  if (!session) VOICE_REC = null;
+}
+ACTIONS.clipRecStop = function () {
+  const r = VOICE_REC; if (!r) { closeModal(); return; }
+  r.keep = true;
+  try { r.rec.stop(); } catch (e) { stopMic(r); VOICE_REC = null; closeModal(); }
+};
+ACTIONS.clipRecCancel = function () {
+  const r = VOICE_REC;
+  if (r) { r.keep = false; try { r.rec.stop(); } catch (e) { stopMic(r); VOICE_REC = null; } }
+  closeModal();
+  toast('Recording thrown away.', 'warn');
+};
+ACTIONS.clipRename = async function (el) {
+  const hit = charById(el.getAttribute('data-id')); if (!hit) return;
+  const x = clipById(hit.c, el.getAttribute('data-c')); if (!x) return;
+  const v = await promptDlg('NAME THIS CLIP', 'What is it? — “Calm”, “Furious”, “The line in chapter nine”', x.name || '');
+  if (v == null) return;
+  x.name = v.trim() || x.name;
+  markDirty(); render();
+};
+ACTIONS.clipNote = async function (el) {
+  const hit = charById(el.getAttribute('data-id')); if (!hit) return;
+  const x = clipById(hit.c, el.getAttribute('data-c')); if (!x) return;
+  const v = await promptDlg('ABOUT THIS CLIP', 'Where it came from, the direction you gave, the line being read', x.note || '', true);
+  if (v == null) return;
+  x.note = v.trim();
+  markDirty(); render();
+};
+ACTIONS.clipMove = function (el) {
+  const hit = charById(el.getAttribute('data-id')); if (!hit) return;
+  const list = charClips(hit.c);
+  const i = list.findIndex(x => x.id === el.getAttribute('data-c'));
+  const j = i + Number(el.getAttribute('data-d'));
+  if (i < 0 || j < 0 || j >= list.length) return;
+  const t = list[i]; list[i] = list[j]; list[j] = t;
+  markDirty(); render();
+};
+ACTIONS.clipSave = function (el) {
+  const hit = charById(el.getAttribute('data-id')); if (!hit) return;
+  const x = clipById(hit.c, el.getAttribute('data-c')); if (!x) return;
+  /* a clip that lives at someone else's address cannot be downloaded by us —
+     browsers ignore the download attribute across origins — so open it instead */
+  if (!/^data:/i.test(x.src)) {
+    if (!/^https?:\/\//i.test(x.src)) { toast('That clip has no address this app will open.', 'warn'); return; }
+    window.open(x.src, '_blank', 'noopener');
+    return;
+  }
+  const m = /^data:audio\/([a-z0-9.+-]+)/i.exec(x.src);
+  const ext = m ? m[1].toLowerCase().replace('mpeg', 'mp3').replace('x-wav', 'wav').replace(/;.*$/, '') : 'webm';
+  const a = document.createElement('a');
+  a.href = x.src;
+  a.download = slug(x.name || 'voice-clip') + '.' + ext;
+  document.body.appendChild(a); a.click(); a.remove();
+};
+ACTIONS.clipDel = async function (el) {
+  const hit = charById(el.getAttribute('data-id')); if (!hit) return;
+  const x = clipById(hit.c, el.getAttribute('data-c')); if (!x) return;
+  const ok = await confirmDlg('DELETE THIS CLIP', '<p>Remove <strong>' + esc(x.name || 'this clip') + '</strong>?</p>');
+  if (!ok) return;
+  if (VOICE_PLAYING === x.id) { const a = voicePlayer(); a.pause(); VOICE_PLAYING = ''; }
+  hit.c.clips = charClips(hit.c).filter(y => y.id !== x.id);
+  markDirty(); render();
+};
+ACTIONS.clipCopyVoice = function (el) {
+  const hit = charById(el.getAttribute('data-id')); if (!hit) return;
+  const c = hit.c;
+  const lines = [
+    'Character: ' + (c.name || 'Unnamed') + (c.age ? ', age ' + c.age : ''),
+    c.role ? 'Role: ' + c.role : '',
+    c.pronouns ? 'Pronouns: ' + c.pronouns : '',
+    c.origin ? 'From: ' + c.origin : '',
+    c.voice ? 'How they speak: ' + c.voice : '',
+    c.catchphrase ? 'Words they use: ' + c.catchphrase : '',
+    c.antiVoice ? 'Words they would never use: ' + c.antiVoice : '',
+    c.mannerisms ? 'Manner: ' + c.mannerisms : '',
+    (c.quotes || []).length ? 'Lines to read:\n' + c.quotes.map(q => '  “' + q.text + '”').join('\n') : ''
+  ].filter(Boolean);
+  copyText(lines.join('\n'));
+  toast('Voice direction copied. Paste it into your voice tool as the prompt.', 'ok');
+};
 
 /* ======================= RELATIONSHIP NETWORK ============================ */
 VIEWS.network = {
@@ -14991,7 +15487,22 @@ async function boot() {
     const z = e.target.closest('.dropzone'); if (!z) return;
     e.preventDefault(); z.classList.remove('over');
     const f = e.dataTransfer.files && e.dataTransfer.files[0];
-    if (!f || !/^image\//.test(f.type)) return;
+    if (!f) return;
+    const act0 = z.getAttribute('data-act');
+    /* the voice-clip dropzone takes audio, not pictures */
+    if (act0 === 'clipAdd') {
+      if (!/^audio\//.test(f.type)) { toast('That is not an audio file.', 'warn'); return; }
+      if (f.size > CLIP_MAX_BYTES) { toast('That clip is over ' + bytesHuman(CLIP_MAX_BYTES) + '.', 'warn'); return; }
+      const hit = charById(z.getAttribute('data-id'));
+      if (!hit) return;
+      charClips(hit.c).push(newClip({
+        src: await readFileAsDataURL(f), name: f.name.replace(/\.[^.]+$/, ''), bytes: f.size, kind: 'upload'
+      }));
+      markDirty(); render();
+      toast('Voice clip added.', 'ok');
+      return;
+    }
+    if (!/^image\//.test(f.type)) return;
     const data = await readFileAsDataURL(f);
     const act = z.getAttribute('data-act');
     const arg = z.getAttribute('data-arg');
