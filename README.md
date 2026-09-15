@@ -126,6 +126,48 @@ replaces it.
 WordPad, Google Docs and LibreOffice, with real chapter page breaks and your typeface),
 `.rtf`, `.txt`, `.html`, `.md`, or a designed PDF.
 
+### Actually talking to your characters
+
+The **Dialogue Sandbox** is a real conversation. Everything on a character's sheet —
+what they want, what they need, their flaws, fears, the secret they will not volunteer,
+the wound underneath it, how they speak, words they would never use, who they know and
+how, the lines you have kept, the chapters they appear in, and the world the book is set
+in — is assembled into who they believe they are before every single reply. Press
+**Persona** to read exactly what is sent; if they are not answering the way you expect,
+the missing piece is almost always a blank field on their sheet.
+
+Set **the scene** — who they think you are, where and when this is happening, anything
+they are holding in mind. A character speaks very differently to a stranger than to the
+brother they have not seen in nine years, and that one field changes more than anything
+else. Replies stream in as they are written. You can ask for another take, edit what you
+said and have them answer the new version, or keep a line they gave you straight onto
+their sheet as one of their quotes.
+
+They stay in character: they only know what they would know, they can refuse, lie,
+deflect or get angry, and if you ask whether they are an AI they react like a person
+being asked something bizarre. With no API key at all it still works — an offline
+simulator answers from the same sheet.
+
+### Letting them speak back
+
+Three engines, chosen per character, because the quiet one and the one who shouts do not
+have to share a voice:
+
+| | What it needs | What it sounds like |
+| --- | --- | --- |
+| **Built in** | Nothing at all | Your computer's own voice — free, instant, offline, and audibly a computer |
+| **Gemini** | The Gemini key you already have | Thirty studio voices |
+| **ElevenLabs** | An ElevenLabs key | The most lifelike, and the only one that can be taught a new voice |
+
+**ElevenLabs can learn a character's voice from one recording.** Put about thirty seconds
+of clean speech on their Voice Clips tab — your own read, an actor, anything you have the
+right to use — and one button turns it into a voice only that character has. From then on
+every reply is spoken in it.
+
+> Character.AI does not publish a developer API, so nothing can connect to it. What this
+> does instead is run the same idea against a model you control: your character sheet
+> becomes the persona, and the voice comes from one of the three engines above.
+
 ### Hearing your characters
 
 Every character page has a **Voice Clips** tab. The *Voice & Dialogue* tab is where you
@@ -251,7 +293,7 @@ guide for whatever page you are on.
 | **The Book** | Cover Studio (front, back, spine, full-wrap, trim/barcode guides), Title & Dedication suite with a font selector, Prologue Master Editor with an attached moodboard drawer, and a focused Draft Chapter desk with scene images and per-scene breakdown notes. |
 | **Architecture** | Guided story builder (seven prompted questions) that expands into multi-act beat sheets across five structural templates, and turns them into chapter stubs. |
 | **AI Co-Pilot** | The Unstuck Engine — reads your last 500 words and returns three distinct next moves (Logical / Twist / Wildcard), inserted with a glowing diff and one-click Keep or Undo. Plus an atmosphere & sensory enhancer and a cliché / repetition / filter-word scanner. |
-| **Cast System** | Four-tier character matrix with full dossiers, a draggable relationship node map (plus matrix and list views), and a dialogue sandbox for talking to your characters in their own voice. |
+| **Cast System** | Four-tier character matrix with full dossiers, a draggable relationship node map (plus matrix and list views), and a dialogue sandbox where characters answer from their whole sheet and can speak back in a voice of their own. |
 | **Workspaces** | Twelve genre dossiers, a comic studio with ten panel layouts and script export, and a children's-book studio with age-tier layouts and exportable AI art prompts. |
 | **Vault** | Draggable moodboard canvas, external reference library, and six in-depth masterclass craft lessons. |
 | **Book Designer** | Your book typeset on real pages — eight print templates, trim sizes, margins, drop caps, running heads, page numbers — previewed live and exported as a proper PDF. |
@@ -266,6 +308,8 @@ guide for whatever page you are on.
 ## AI providers
 
 The app ships with a local simulator that works offline. To connect a real model, open
-**AI Engine Settings** and add a key for OpenAI, Anthropic or Google Gemini. Requests go
-directly from your browser to the provider; keys never leave the local database. Prompt
-templates for every AI feature are editable in the Co-Pilot module.
+**AI Engine Settings** and add a key for OpenAI, Anthropic or Google Gemini. For speech,
+add an optional ElevenLabs key in the same place. Requests go directly from your browser
+to the provider; keys never leave the local database and are never sent anywhere else.
+Prompt templates for every AI feature are editable in the Co-Pilot module — except a
+character's persona, which is built from their sheet rather than a template.
