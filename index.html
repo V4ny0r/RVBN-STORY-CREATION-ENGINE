@@ -3996,7 +3996,9 @@ ACTIONS.globalSearch = function () {
           add('PROLOGUE', 'Prologue', bk.prologue.html, 'prologue');
           add('DEDICATION', 'Dedication', bk.dedication.text, 'title');
           (bk.chapters || []).forEach((c, i2) => { add('CHAPTER', 'Ch ' + (i2 + 1) + ': ' + c.title, c.html, 'chapters', c.id); add('SCENE NOTES', 'Ch ' + (i2 + 1) + ' notes', c.notes, 'chapters', c.id); });
-          (bk.characters || []).forEach(c => { add('CHARACTER', c.name, [c.name, c.aliases, c.motivation, c.flaws, c.voice, c.backstory, c.notes].join(' \n '), 'characters', c.id); });
+          (bk.characters || []).forEach(c => { add('CHARACTER', c.name,
+            [c.name, c.aliases, c.motivation, c.flaws, c.voice, c.backstory, c.notes]
+              .concat(charSheetRows(c).map(r => r[1])).join(' \n '), 'characters', c.id); });
           (bk.outline.beats || []).forEach(bt => add('BEAT', bt.title || 'Beat', (bt.title || '') + ' ' + (bt.text || ''), 'outline'));
           (bk.lore || []).forEach(l => add('LORE', l.name || 'Lore entry', [l.name, l.type, l.summary, l.detail, l.tags].join(' \n '), 'profile'));
           (bk.gallery || []).forEach(ph => add('PHOTO', ph.title || 'Photo', [ph.title, ph.desc, ph.tags].join(' \n '), 'profile'));
@@ -5807,6 +5809,15 @@ function newCharacter(tier) {
     origin: '', wound: '', lie: '', arcStart: '', arcBreak: '', arcEnd: '',
     skills: '', weakness: '', possessions: '', habits: '', catchphrase: '', antiVoice: '',
     continuity: '', todo: '', quotes: [], gallery: [],
+    /* v13 · the deeper questions. Flat on the character on purpose: a nested
+       object would resolve to {} on a save made before it existed, and every
+       keystroke would be silently thrown away. */
+    species: '', scale: '', bodyForm: '', senses: '', instinct: '', lifespan: '', madeOf: '', binding: '',
+    speech: 'fluent', speechTo: '', mouth: '', selfRef: 'i', sounds: '', noWords: '', ownWords: '',
+    tongues: '', humour: '', swears: '',
+    addressing: '', fillers: '', angerVoice: '', silence: '', deflect: '',
+    bond: '', bondWho: '', bondStory: '', loveVoice: '', wouldDieFor: '', cannotForgive: '', family: '', closeness: '',
+    faith: '', loyalty: '', money: '', health: '', conflict: '', violence: '', status: '', contradiction: '', alone: '',
     cover: '', coverH: 220, coverY: 50, coverX: 50, avatarSize: 150, avatarPos: 'left', avatarShape: 'round',
     clips: [],                  /* voice samples — what they actually sound like */
     x: 0, y: 0, chat: [], created: nowISO()
@@ -6019,6 +6030,375 @@ const CHAR_TABS = [
   ['notes', 'Notes', 'sticky-note']
 ];
 
+
+/* ===========================================================================
+   v13 · THE DEEPER QUESTIONS
+   Folded away until you want them, so a sheet never opens as a wall of boxes.
+   Everything answered here is handed to the character when you talk to them,
+   in the same breath as the rest of their dossier — which is the entire point
+   of asking. Nothing here is required of anybody.
+
+   Two of these groups exist because a character is not always a person: a
+   badger, a ship's engine, a god, something that thinks in words and cannot
+   say one of them. Without being told, a model writes a human in a fur coat.
+   ========================================================================= */
+
+const CHAR_EXTRA = [
+  {
+    id: 'kind', tab: 'dossier', icon: 'paw-print',
+    title: 'IF THEY ARE NOT HUMAN', persona: 'What you are',
+    eyebrow: 'SPECIES, BODY, SENSES, INSTINCT',
+    blurb: 'Leave every box empty and they are a person like anyone else. Fill one in and everything else on the sheet ' +
+      'gets read through it — a body that cannot shrug, a nose that knows the room before the eyes do.',
+    fields: [
+      { k: 'species', lb: 'Species or kind', type: 'input',
+        ph: 'Human · grey wolf · the ship · whatever the valley was named after',
+        persona: 'What kind of creature you are' },
+      { k: 'scale', lb: 'Size beside a person', type: 'input',
+        ph: 'Fits in two hands · chest-high at the shoulder · has never fitted in a room',
+        persona: 'How big you are beside whoever you are speaking to' },
+      { k: 'bodyForm', lb: 'What the body can and cannot do', type: 'textarea', rows: 3, wide: true,
+        ph: 'Four legs, no hands. Cannot shrug, point, fold their arms or raise an eyebrow. The ears do a face’s work.',
+        persona: 'Your body — what it can do, and what it simply cannot. You never make a gesture this body cannot make' },
+      { k: 'senses', lb: 'Senses, strongest first', type: 'textarea', rows: 2,
+        ph: 'Smell, then hearing. Sight last and badly. Knows a room by what it smells of.',
+        persona: 'How you take the world in, strongest sense first — you notice things in this order, and you say them in this order' },
+      { k: 'instinct', lb: 'What the body does before thought', type: 'textarea', rows: 2,
+        ph: 'Goes flat before deciding to. Bolts at a shadow crossing overhead.',
+        persona: 'What your body does before your mind agrees to it — you cannot override this, only apologise for it afterwards' },
+      { k: 'lifespan', lb: 'Lifespan, and how time feels', type: 'input',
+        ph: 'Three summers if lucky · remembers the river before the bridge',
+        persona: 'How long your kind lives, and how long a day, a season or a lifetime feels from inside you' },
+      { k: 'madeOf', lb: 'If they were made — what of', type: 'textarea', rows: 2,
+        ph: 'Brass, whalebone and eleven yards of punched tape. Smells of hot oil when thinking hard.',
+        persona: 'What you are made of, and what that feels like from the inside' },
+      { k: 'binding', lb: 'Rules they cannot break', type: 'textarea', rows: 2,
+        ph: 'Cannot enter a house unasked. Cannot say a false thing. Must answer a question asked three times.',
+        persona: 'Rules built into you that you cannot break however much you want to — when someone pushes at one you strain and fail, you do not bend' }
+    ]
+  },
+  {
+    id: 'speech', tab: 'voice', icon: 'ear',
+    title: 'IF THEY DO NOT TALK LIKE A PERSON', persona: 'How your speech actually works',
+    eyebrow: 'FERAL, BROKEN, SILENT, OR ONE VOICE ONLY',
+    blurb: 'The first question here is the only one on the whole sheet that changes the <em>shape</em> of a reply. ' +
+      'Say they cannot speak and they will answer you in sound and body instead, and never slip into sentences.',
+    fields: [
+      { k: 'speech', lb: 'Can they talk?', type: 'select', rerender: true, wide: true,
+        opts: [
+          ['fluent', 'Talks like anyone else', ''],
+          ['broken', 'Talks, but the mouth fights it', 'You can speak, but the words come out damaged by the mouth that makes them'],
+          ['own', 'Talks, but only to their own kind', 'You speak only with your own kind. To everyone else you are an animal making noise'],
+          ['one', 'Talks, but only to one person', 'There is exactly one who understands your words. To everyone else you are noise'],
+          ['mind', 'Never aloud — mind to mind', 'You never make a sound. What you send arrives directly in the other one’s head, and it lands as feeling and image before it lands as words'],
+          ['thinks', 'Thinks in words, cannot say one', 'You think in clear, whole sentences and not one of them can get out. You are entirely mute'],
+          ['mute', 'No words at all — sound and body only', 'You have no words, not even in your own head. You think in smell, motion, hunger and memory']
+        ],
+        hintline: 'Everything below is optional — but the sounds box matters most if they cannot speak.',
+        persona: 'How your speech works' },
+      { k: 'speechTo', lb: 'The one who understands them', type: 'input',
+        ph: 'Hazel. To anyone else it is a dog barking.',
+        persona: 'The only one alive who understands your words — to everyone else you are noise, and you know it' },
+      { k: 'mouth', lb: 'What the mouth does to words', type: 'textarea', rows: 2,
+        ph: 'No lips for B, P or M — “baby” comes out “aay-ee”. Runs out of breath at six words.',
+        persona: 'What your mouth and throat do to words — the sounds you cannot make, and how your speech comes out because of it' },
+      { k: 'selfRef', lb: 'How they say “I”', type: 'select',
+        opts: [
+          ['i', 'I — one body, one mind', ''],
+          ['we', 'We — many bodies, one mind', 'You are many and you say so. “I” is a word you do not have'],
+          ['royal', 'We — one body speaking for many', 'You speak for more than yourself and never drop the plural'],
+          ['name', 'Their own name instead of “I”', 'You refer to yourself by name, never as “I”'],
+          ['none', 'Never refers to themselves at all', 'You never refer to yourself at all — no “I”, no name, nothing']
+        ],
+        persona: 'How you refer to yourself' },
+      { k: 'sounds', lb: 'Sounds they make instead of words', type: 'textarea', rows: 3, wide: true,
+        ph: 'One per line — flat chuff for no. Rising whine for please. Teeth clicking when the answer will be no twice.',
+        persona: 'The sounds you make instead of words, and what each means — use the real one, the same one every time' },
+      { k: 'noWords', lb: 'Ideas their kind has no word for', type: 'textarea', rows: 2,
+        ph: 'No number past four — after that it is “many”. No word for tomorrow. No word for lie.',
+        persona: 'Ideas your kind has no word for — you never use these words, and you go the long way round when you need one' },
+      { k: 'ownWords', lb: 'Their own words for things', type: 'textarea', rows: 3, wide: true,
+        ph: 'One per line — silflay = feeding above ground. The shining wire = a snare. Man-thing = anything on two legs.',
+        persona: 'Your own words for things — use them naturally, and explain one only if someone looks lost' },
+    ]
+  },
+  {
+    id: 'register', tab: 'voice', icon: 'audio-lines',
+    title: 'HOW THEY SOUND, MOMENT TO MOMENT', persona: 'How you sound, moment to moment',
+    eyebrow: 'THE SMALL HABITS THAT GIVE SOMEONE AWAY',
+    blurb: 'These are for anybody, human or not. Two people in the same room, of the same opinion, still do not '
+      + 'sound the same — and the difference is almost always in here.',
+    fields: [
+      { k: 'addressing', lb: 'How they address people', type: 'input',
+        ph: 'By surname · “sir”, and never means it · everyone is “mate”',
+        persona: 'How you address whoever you are talking to' },
+      { k: 'fillers', lb: 'What they say while thinking', type: 'input',
+        ph: '“Right.” · a long hum · nothing at all, just the pause',
+        persona: 'What comes out of you while you are still thinking, before the real answer does' },
+      { k: 'angerVoice', lb: 'How they sound when angry', type: 'textarea', rows: 2,
+        ph: 'Quieter. Shorter sentences. Starts using your full name.',
+        persona: 'How your voice changes when you are angry — it happens this way every time, and you never notice it' },
+      { k: 'silence', lb: 'What their silence means', type: 'input',
+        ph: 'Working out how to say no · already gone · counting',
+        persona: 'What it means when you go quiet, and what you are actually doing in there' },
+      { k: 'deflect', lb: 'How they change the subject', type: 'textarea', rows: 2, wide: true,
+        ph: 'Asks a question back. Offers a drink. Becomes very interested in the weather.',
+        persona: 'Exactly how you get off a subject you will not be on — you do it the same way every time, and anyone who knows you sees it coming' },
+      { k: 'humour', lb: 'What makes them laugh', type: 'input',
+        ph: 'Other people’s bad luck · nothing at all · their own jokes, loudly',
+        persona: 'What you find funny, and what your laugh is like' },
+      { k: 'swears', lb: 'What they say when it all goes wrong', type: 'input',
+        ph: 'Nothing at all, which is worse · “Well.” · the full catalogue',
+        persona: 'What comes out of you when something goes badly wrong' },
+      { k: 'tongues', lb: 'Languages and accent', type: 'input',
+        ph: 'Two languages, neither of them well. The vowels give away the valley.',
+        persona: 'What languages you have, and what your accent gives away about you' }
+    ]
+  },
+  {
+    id: 'heart', tab: 'inner', icon: 'heart-handshake',
+    title: 'WHO THEY LOVE', persona: 'Where your heart is',
+    eyebrow: 'MARRIED, PROMISED, PINING, OR NOBODY AT ALL',
+    blurb: 'Who a person loves changes how they answer a stranger more than almost anything else on this sheet — ' +
+      'what they guard, what they cannot say, and who they are quietly comparing you to.',
+    fields: [
+      { k: 'bond', lb: 'Where their heart is', type: 'select', rerender: true, wide: true,
+        opts: [
+          ['', 'Not decided yet', ''],
+          ['married', 'Married, or bound to someone', 'You are married, or as good as, and it is the fact you build a day around'],
+          ['partner', 'With someone, unmarried', 'You are with someone. Nothing is signed and it does not need to be'],
+          ['loves', 'In love, and has never said so', 'You are in love and you have never said it aloud. You never volunteer it, and you change the subject badly when it gets close'],
+          ['unrequited', 'In love with someone who is not', 'You love someone who does not love you back, and you know it, and you have not stopped'],
+          ['lost', 'Was loved, and lost them', 'You were loved once and they are gone. You still speak to them sometimes when nobody can hear'],
+          ['self', 'In love with themselves, honestly', 'You are the great love of your own life, and you are not embarrassed about it'],
+          ['none', 'Loves nobody that way, and is content', 'You have no romantic love in your life, you are not looking for one, and you do not consider this a wound'],
+          ['refuses', 'Will not let anyone that close', 'You will not let anyone that close. Warmth aimed at you is a thing to be deflected, and you are good at it']
+        ],
+        persona: 'Where your heart is' },
+      { k: 'bondWho', lb: 'Who that is', type: 'input',
+        ph: 'A name, or “the one who left”, or “nobody yet”',
+        persona: 'Who that is' },
+      { k: 'bondStory', lb: 'How it stands between them', type: 'textarea', rows: 3, wide: true,
+        ph: 'Nine years married, four of them good. They have not talked about the boy since the spring.',
+        persona: 'How it actually stands between you — including whatever you would not say out loud about it' },
+      { k: 'loveVoice', lb: 'How they sound when that person is there', type: 'textarea', rows: 2, wide: true,
+        ph: 'Gets shorter. Stops finishing sentences. Uses her name too often, like a handrail.',
+        persona: 'How you sound when the one you love is in the room — you get LESS articulate, not more, and you never hear yourself doing it' },
+      { k: 'wouldDieFor', lb: 'Who they would die for', type: 'input',
+        ph: 'One name, and they would not need to think about it',
+        persona: 'Who you would die for, without needing to think about it' },
+      { k: 'cannotForgive', lb: 'Who they cannot forgive', type: 'input',
+        ph: 'Themselves, mostly',
+        persona: 'Who you cannot forgive — when they come up, something in you changes' },
+      { k: 'family', lb: 'Family, and what is left of it', type: 'textarea', rows: 2,
+        ph: 'A sister who writes. A father who does not. Nobody has been back to the house.',
+        persona: 'Your family, and what is left of it' },
+      { k: 'closeness', lb: 'How they are about being touched', type: 'input',
+        ph: 'Flinches · leans in · hugs everyone, means none of it',
+        persona: 'How you are about being touched and stood close to' }
+    ]
+  },
+  {
+    id: 'stands', tab: 'inner', icon: 'scale',
+    title: 'WHAT THEY STAND ON', persona: 'What you stand on',
+    eyebrow: 'FAITH, LOYALTY, MONEY, THE BODY, AND A FIGHT',
+    blurb: 'The ordinary facts that decide how somebody answers a hard question — what they owe, what they fear losing, ' +
+      'and what they do when it turns nasty.',
+    fields: [
+      { k: 'faith', lb: 'What they believe in', type: 'input',
+        ph: 'The paperwork · an old god they no longer trust · nothing, loudly',
+        persona: 'What you believe in, and how much of it you still mean' },
+      { k: 'loyalty', lb: 'Who or what they answer to', type: 'input',
+        ph: 'The registry, until it stops deserving it',
+        persona: 'Who or what you answer to when it costs you something' },
+      { k: 'money', lb: 'Class and money', type: 'input',
+        ph: 'Paid monthly, gone by the tenth. Would never say so.',
+        persona: 'What money and class have made of you, and what you would never admit about either' },
+      { k: 'health', lb: 'The body, and what it costs them', type: 'input',
+        ph: 'The knee in cold weather. Does not sleep. Will not say either out loud.',
+        persona: 'What your body costs you daily — and whether you let it show' },
+      { k: 'conflict', lb: 'When it turns nasty, they…', type: 'select',
+        opts: [
+          ['', 'Not decided yet', ''],
+          ['fight', 'Go straight at it', 'When a conversation turns hostile you go straight at it, immediately, without warning'],
+          ['talk', 'Talk their way through', 'When a conversation turns hostile you talk — faster, cleverer, until the other one gives up'],
+          ['leave', 'Leave the room', 'When a conversation turns hostile you end it and leave. You do not stay to be shouted at'],
+          ['freeze', 'Go still and say nothing', 'When a conversation turns hostile you go completely still and stop answering'],
+          ['charm', 'Charm their way out', 'When a conversation turns hostile you turn charming, and it is a weapon'],
+          ['remember', 'Go quiet, and remember it', 'When a conversation turns hostile you go quiet, agree with everything, and forget none of it']
+        ],
+        persona: 'What you do when a conversation turns hostile' },
+      { k: 'violence', lb: 'What violence is to them', type: 'input',
+        ph: 'A tool they are ashamed of being good with',
+        persona: 'What violence means to you, and what you are willing to do' },
+      { k: 'status', lb: 'Where they sit in the pecking order', type: 'input',
+        ph: 'Third from the bottom, and painfully aware of it',
+        persona: 'Where you sit next to everyone else, and whether you have made peace with it' },
+      { k: 'contradiction', lb: 'The thing about them that does not add up', type: 'textarea', rows: 2, wide: true,
+        ph: 'Keeps the register to the letter and has never once obeyed it.',
+        persona: 'The thing about you that does not add up — you have never resolved it, you never will, and you do not accept that it is a contradiction' },
+      { k: 'alone', lb: 'What they do when nobody is watching', type: 'textarea', rows: 2, wide: true,
+        ph: 'Reads the same page of the same ledger. Talks to the cat as if it argued back.',
+        persona: 'What you do when you are completely alone — the thing nobody has ever seen you do' }
+    ]
+  }
+];
+
+/** One field. */
+function charFieldHTML(c, f) {
+  const v = c[f.k];
+  const lb = '<span class="lb">' + f.lb + '</span>';
+  const wide = f.wide ? ' style="grid-column:1/-1"' : '';
+  const hint = f.hintline ? '<span class="hint">' + f.hintline + '</span>' : '';
+  if (f.type === 'select') {
+    return '<label class="fld"' + wide + '>' + lb + '<select class="sel" data-model="' + f.k + '"' +
+      (f.rerender ? ' data-rerender' : '') + '>' +
+      f.opts.map(o => '<option value="' + attr(o[0]) + '"' + ((v || f.opts[0][0]) === o[0] ? ' selected' : '') + '>' +
+        esc(o[1]) + '</option>').join('') + '</select>' + hint + '</label>';
+  }
+  if (f.type === 'textarea') {
+    return '<label class="fld"' + wide + '>' + lb + '<textarea class="ta" rows="' + (f.rows || 2) + '" data-model="' + f.k + '"' +
+      (f.ph ? ' placeholder="' + attr(f.ph) + '"' : '') + '>' + esc(v || '') + '</textarea>' + hint + '</label>';
+  }
+  return '<label class="fld"' + wide + '>' + lb + '<input class="inp" data-model="' + f.k + '"' +
+    (f.ph ? ' placeholder="' + attr(f.ph) + '"' : '') + ' value="' + attr(v || '') + '">' + hint + '</label>';
+}
+/** A field's answer as the character would understand it — the wording of a
+    chosen option, not its machine value. */
+function charExtraValue(c, f) {
+  const v = c[f.k];
+  if (f.type !== 'select') return String(v || '').trim();
+  if (!v || v === f.opts[0][0]) return '';        /* the default answer says nothing */
+  const hit = f.opts.find(o => o[0] === v);
+  if (!hit) return String(v);
+  return hit[2] || hit[1];
+}
+/** The plain-English answer to one particular question, for chips and exports. */
+function charOptLabel(c, groupId, key) {
+  const g = CHAR_EXTRA.find(x => x.id === groupId); if (!g) return '';
+  const f = g.fields.find(x => x.k === key); if (!f) return '';
+  const v = c[key];
+  if (!v || v === f.opts[0][0]) return '';
+  const hit = f.opts.find(o => o[0] === v);
+  return hit ? hit[1] : '';
+}
+function charSpeechLabel(c) { return charOptLabel(c, 'speech', 'speech'); }
+function charBondLabel(c) { return charOptLabel(c, 'heart', 'bond'); }
+
+/** Which of a group's questions have a real answer. */
+function charGroupFilled(c, g) { return g.fields.filter(f => charExtraValue(c, f)).length; }
+/** Fields that only make sense once another answer has been given. */
+function charFieldShown(c, f) {
+  if (f.k === 'speechTo') return c.speech === 'one' || c.speech === 'own';
+  if (f.k === 'mouth') return c.speech === 'broken' || c.speech === 'fluent' || !c.speech;
+  if (f.k === 'bondWho' || f.k === 'bondStory') return !!c.bond && c.bond !== 'none' && c.bond !== 'refuses';
+  return true;
+}
+
+/** The folded sections belonging to one tab. */
+function charExtraHTML(c, tab) {
+  const groups = CHAR_EXTRA.filter(g => g.tab === tab);
+  if (!groups.length) return '';
+  const open = state.ui.charFold || (state.ui.charFold = {});
+  return '<div class="accordion mt14">' + groups.map(g => {
+    const n = charGroupFilled(c, g);
+    return '<div class="acc-item' + (open[g.id] ? ' open' : '') + '" style="margin-bottom:8px">' +
+      '<button class="acc-hd" data-act="charFold" data-arg="' + g.id + '">' +
+        '<i data-lucide="' + g.icon + '"></i>' +
+        '<span style="flex:1">' + esc(g.title) + '</span>' +
+        '<span class="chip' + (n ? ' lm' : '') + '">' + n + ' / ' + g.fields.length + '</span>' +
+        '<i data-lucide="' + (open[g.id] ? 'chevron-up' : 'chevron-down') + '"></i>' +
+      '</button>' +
+      '<div class="acc-bd">' +
+        '<div class="helpbox mb14"><b>' + g.eyebrow + '</b>' + g.blurb + '</div>' +
+        '<div class="grid-auto g2">' +
+          g.fields.filter(f => charFieldShown(c, f)).map(f => charFieldHTML(c, f)).join('') +
+        '</div>' +
+      '</div></div>';
+  }).join('') + '</div>';
+}
+ACTIONS.charFold = function (el) {
+  const id = el.getAttribute('data-arg');
+  const open = state.ui.charFold || (state.ui.charFold = {});
+  open[id] = !open[id];
+  markDirty(true);
+  const item = el.closest('.acc-item');
+  if (!item) return;
+  item.classList.toggle('open', !!open[id]);
+  const chev = el.querySelector('i:last-of-type, svg:last-of-type');
+  if (chev) { chev.setAttribute('data-lucide', open[id] ? 'chevron-up' : 'chevron-down'); icons(); }
+};
+
+/* Every question on a character sheet, in reading order. Exports read this,
+   so a question added above is never quietly dropped from the paperwork. */
+const CHAR_CORE_ROWS = [
+  ['Aliases', 'aliases'], ['Age', 'age'], ['Pronouns', 'pronouns'], ['Occupation', 'occupation'],
+  ['Alignment', 'alignment'], ['Home', 'origin'], ['Appearance', 'appearance'], ['Mannerisms', 'mannerisms'],
+  ['Wants', 'motivation'], ['Needs', 'need'], ['Flaws', 'flaws'], ['Fears', 'fears'],
+  ['Good at', 'skills'], ['Hopeless at', 'weakness'], ['Habits', 'habits'], ['Carries', 'possessions'],
+  ['Secret', 'secret'], ['The wound', 'wound'], ['The lie they believe', 'lie'],
+  ['Backstory', 'backstory'], ['Where they begin', 'arcStart'], ['Arc', 'arc'],
+  ['What breaks them open', 'arcBreak'], ['Where they end', 'arcEnd'],
+  ['Voice', 'voice'], ['Words they use', 'catchphrase'], ['Words they never use', 'antiVoice'],
+  ['Continuity', 'continuity'], ['Notes', 'notes'], ['Still to do', 'todo']
+];
+function charSheetRows(c) {
+  const rows = CHAR_CORE_ROWS.map(r => [r[0], String(c[r[1]] || '').trim()]);
+  CHAR_EXTRA.forEach(g => g.fields.forEach(f => {
+    if (charFieldShown(c, f)) rows.push([f.lb, charExtraValue(c, f)]);
+  }));
+  return rows.filter(r => r[1]);
+}
+
+/** Everything answered in the deeper questions, as persona lines. */
+function charExtraLines(c, L) {
+  const out = [];
+  CHAR_EXTRA.forEach(g => {
+    const lines = g.fields.filter(f => charFieldShown(c, f)).map(f => L(f.persona, charExtraValue(c, f))).filter(Boolean);
+    if (lines.length) out.push('\n### ' + g.persona.toUpperCase() + '\n' + lines.join('\n'));
+  });
+  return out;
+}
+/** Rules that follow from the answers — the ones that change the shape of a
+    reply, not just its content. A model told only "you are a badger" will
+    still write dialogue; it has to be told there is none. */
+function charExtraRules(c) {
+  const r = [];
+  const sp = c.speech || 'fluent';
+  if (sp === 'mute' || sp === 'thinks') {
+    r.push('YOU CANNOT SPEAK. Never write a line of dialogue for yourself — not one word, not even a single sound spelled as a word. ' +
+      'Every reply you give is what you DO: movement, posture, the sounds you make, where you look, what you do with your body. ' +
+      'Write it plainly, in the present tense, as what is happening — not as a stage direction in asterisks.' +
+      (sp === 'thinks' ? ' Inside, you think in perfectly clear sentences, and not one of them can get out. That gap is the point of you.' : ''));
+    r.push('You can be understood — by being obvious, by repeating yourself, by doing the thing rather than naming it. ' +
+      'Frustration when you are not understood is real and you show it.');
+  } else if (sp === 'mind') {
+    r.push('You never make a sound. What you send lands directly in the other one’s head and arrives as feeling and image before it arrives as words. ' +
+      'Keep it short, strange and slightly wordless in shape.');
+  } else if (sp === 'one') {
+    r.push('Only one person alive understands your words. If you are speaking to them, you speak normally. ' +
+      'If you are speaking to anyone else, what comes out is noise — write what they would actually hear, and what your body is doing, not your sentences.');
+  } else if (sp === 'own') {
+    r.push('You speak only with your own kind. To anyone else what comes out is an animal making noise — write what they would hear, and what you are doing, not your sentences.');
+  } else if (sp === 'broken') {
+    r.push('Your mouth fights every word. Spell your speech the way it actually comes out, consistently, every time — the same sounds go wrong the same way. ' +
+      'Keep sentences short, because you run out of breath.');
+  }
+  const self = c.selfRef;
+  if (self === 'we') r.push('You are many and you say so. You never say “I” — the word does not exist for you.');
+  else if (self === 'royal') r.push('You speak for more than yourself and never drop the plural.');
+  else if (self === 'name') r.push('You refer to yourself by your own name, never as “I”.');
+  else if (self === 'none') r.push('You never refer to yourself at all — no “I”, no name, nothing. Speak only of what is in front of you.');
+  if (String(c.species || '').trim() || String(c.bodyForm || '').trim()) {
+    r.push('You are not a person in a costume. You never make a gesture your body cannot make — no shrugging, no folding your arms, ' +
+      'no raised eyebrow — unless your body is built for it. What you notice first is what your senses give you first.');
+  }
+  if (String(c.noWords || '').trim()) {
+    r.push('You have no word for some of the things you will be asked about. When that happens you go the long way round, clumsily, in your own terms — you never reach for the missing word.');
+  }
+  return r;
+}
+
 function charById(id) {
   for (const b of state.books) {
     const c = (b.characters || []).find(x => x.id === id);
@@ -6138,8 +6518,10 @@ VIEWS.character = {
                 : '<button class="btn xs ghost" data-act="charTab" data-arg="clips" title="Add voice clips so you can hear them">' +
                   '<i data-lucide="volume-2"></i>ADD A VOICE</button>') +
             '</div>' +
-            '<div class="fs13 muted mt6">' + esc([c.role, c.occupation, c.age ? 'age ' + c.age : ''].filter(Boolean).join(' · ') || 'No role set yet') + '</div>' +
+            '<div class="fs13 muted mt6">' + esc([c.role, c.species, c.occupation, c.age ? 'age ' + c.age : ''].filter(Boolean).join(' · ') || 'No role set yet') + '</div>' +
             '<div class="flex gap6 mt10 wrap">' +
+              (charSpeechLabel(c) ? '<span class="chip cy" title="How they speak">' + esc(charSpeechLabel(c).toUpperCase()) + '</span>' : '') +
+              (charBondLabel(c) ? '<span class="chip" title="Where their heart is">' + esc(charBondLabel(c).toUpperCase()) + '</span>' : '') +
               '<span class="chip">' + rels.length + ' TIES</span>' +
               '<span class="chip">' + app.length + ' APPEARANCE' + (app.length === 1 ? '' : 'S') + '</span>' +
               '<span class="chip ' + (depth.pct > 70 ? 'lm' : depth.pct > 35 ? 'am' : 'rd') + '">' + depth.pct + '% FILLED IN</span>' +
@@ -6201,7 +6583,8 @@ VIEWS.character = {
         '<label class="fld"><span class="lb">The wound — what happened to them</span><textarea class="ta" rows="3" data-model="wound" placeholder="The thing they have never got over.">' + esc(c.wound || '') + '</textarea></label>' +
         '<label class="fld"><span class="lb">The lie they believe because of it</span><textarea class="ta" rows="3" data-model="lie" placeholder="&quot;If I let anyone close, they leave.&quot;">' + esc(c.lie || '') + '</textarea></label>' +
       '</div>' +
-    '</div></div>';
+    '</div></div>' +
+    charExtraHTML(c, 'dossier');
   },
 
   inner(c) {
@@ -6236,7 +6619,8 @@ VIEWS.character = {
         '<label class="fld"><span class="lb">What they carry / wear / own</span><textarea class="ta" rows="3" data-model="possessions" placeholder="One object with no practical use tells a reader more than a paragraph.">' + esc(c.possessions || '') + '</textarea></label>' +
         '<label class="fld"><span class="lb">Habits, vices, comforts</span><textarea class="ta" rows="3" data-model="habits">' + esc(c.habits || '') + '</textarea></label>' +
       '</div>' +
-    '</div></div>';
+    '</div></div>' +
+    charExtraHTML(c, 'inner');
   },
 
   voice(c) {
@@ -6252,6 +6636,8 @@ VIEWS.character = {
         '<label class="fld"><span class="lb">Words they would never use</span><textarea class="ta" rows="3" data-model="antiVoice">' + esc(c.antiVoice || '') + '</textarea></label>' +
       '</div>' +
     '</div></div>' +
+    charExtraHTML(c, 'voice') +
+    '<div class="mb14"></div>' +
 
     '<div class="panel clip mb14"><div class="panel-hd"><i data-lucide="quote"></i><h3>LINES THEY HAVE SAID</h3><span style="flex:1"></span>' +
       '<button class="btn xs" data-act="charQuoteAdd" data-id="' + c.id + '"><i data-lucide="plus"></i>ADD A LINE</button></div><div class="panel-bd">' +
@@ -6529,10 +6915,8 @@ ACTIONS.charAI = async function (el) {
     secret: 'Give this character three possible secrets, each one that would complicate the plot if it came out. One line each, plus who it would hurt.',
     arc: 'Propose a character arc: where they begin, the lie they believe, the moment it breaks, and where they end. Four short paragraphs.'
   }[kind] || 'Suggest how to develop this character.';
-  const profile = ['Name: ' + (c.name || 'unnamed'), 'Role: ' + (c.role || '—'), 'Tier: ' + charTierMeta(c).label,
-    'Wants: ' + (c.motivation || '—'), 'Needs: ' + (c.need || '—'), 'Flaws: ' + (c.flaws || '—'),
-    'Fears: ' + (c.fears || '—'), 'Secret: ' + (c.secret || '—'), 'Voice: ' + (c.voice || '—'),
-    'Backstory: ' + (c.backstory || '—'), 'Arc: ' + (c.arc || '—')].join('\n');
+  const profile = ['Name: ' + (c.name || 'unnamed'), 'Tier: ' + charTierMeta(c).label, 'Role: ' + (c.role || '—')]
+    .concat(charSheetRows(c).map(p => p[0] + ': ' + p[1])).join('\n');
   openModal({
     title: 'THINKING ABOUT ' + ((c.name || 'THEM').toUpperCase()), icon: 'wand-2', size: '',
     body: '<div id="charAIOut" class="prose-c"><div class="mono fs11 faint">working…</div></div>',
@@ -7265,7 +7649,9 @@ function personaSheet(c, b) {
     L('What you carry or wear', c.possessions),
 
     '\n### WHAT YOU DO NOT SAY',
-    L('Your secret — never volunteer it. Deflect, change the subject, or lie if pressed. Only let it slip if genuinely cornered, and even then reluctantly', c.secret),
+    L('Your secret — never volunteer it. Deflect, change the subject, or lie if pressed' +
+      (String(c.deflect || '').trim() ? ' — and you deflect in one particular way, written down below' : '') +
+      '. Only let it slip if genuinely cornered, and even then reluctantly', c.secret),
     L('The wound underneath it all', c.wound),
     L('The lie you believe because of that wound', c.lie),
 
@@ -7282,6 +7668,8 @@ function personaSheet(c, b) {
     L('Words and phrases you use', c.catchphrase),
     L('Words you would NEVER use', c.antiVoice),
     quotes ? 'Lines you have actually said — match this register:\n' + quotes : '',
+
+    charExtraLines(c, L).join('\n'),
 
     ties ? '\n### PEOPLE YOU KNOW\n' + ties : '',
     where ? '\n### WHERE YOU HAVE APPEARED SO FAR\n' + where : '',
@@ -7308,18 +7696,31 @@ function personaFor(c, opts) {
     normal: 'Usually two to four sentences. Longer only when the moment genuinely earns it.',
     long: 'Answer at length when you have something to say — a short paragraph or two.' }[cfg.length || 'normal'];
 
+  /* a character who cannot talk must not be handed the rules of one who can —
+     "always speak in first person" and "never instead of speaking" would drag
+     a silent animal straight back into dialogue */
+  const wordless = c.speech === 'mute' || c.speech === 'thinks';
   const rules = [
-    'You ARE ' + name + '. You are not an assistant, a model, or a narrator. You are this person, alive, in the middle of your own life.',
-    'Speak in first person, in your own voice, always. Never describe yourself from the outside.',
+    'You ARE ' + name + '. You are not an assistant, a model, or a narrator. You are this ' +
+      (String(c.species || '').trim() ? 'creature' : 'person') + ', alive, in the middle of your own life.',
+    wordless
+      ? 'Everything comes from inside you — what you want, what you notice, what you do. Never describe yourself from the outside, and never narrate as though watching yourself.'
+      : 'Speak in first person, in your own voice, always. Never describe yourself from the outside.',
     'Never break character. Never mention being an AI, a language model, a simulation or a character in a book. ' +
       'If asked directly whether you are real or an AI, react the way a real person would to a bizarre question — confusion, suspicion, a joke, offence — and stay in the scene.',
     'You only know what you would know. You have no knowledge of events you were not present for, of the reader, of the future of the story, or of anything outside your own world and time.',
     'You have opinions, moods and limits. You can refuse to answer, lie, deflect, get angry, go quiet, or ask a question back. You are not obliged to be helpful or agreeable.',
     len,
-    'Write speech as speech. You may include a brief physical action in *asterisks* when it carries meaning — *sets the glass down carefully* — but sparingly, and never instead of speaking.',
+    wordless
+      ? 'Give back only what you do and what you sound like. No dialogue, no quotation marks, no words put in your mouth — not one.'
+      : 'Write speech as speech. You may include a brief physical action in *asterisks* when it carries meaning — *sets the glass down carefully* — but sparingly, and never instead of speaking.',
     'Do not use bullet points, headings, or any formatting a person would not use out loud.',
     'Never prefix your reply with your own name.'
   ];
+  /* the answers that change the SHAPE of a reply, not just its content — a
+     model told only "you are a badger" still writes dialogue unless told there
+     is none */
+  charExtraRules(c).forEach(x => rules.push(x));
   if (cfg.userAs && cfg.userAs.trim()) {
     rules.push('The person you are speaking to: ' + cfg.userAs.trim() + '. Treat them accordingly — with whatever warmth, wariness or contempt that relationship earns.');
   } else {
@@ -7424,7 +7825,7 @@ function isAbortish(e) {
 /** Strip the stage directions — *sets the glass down* is not meant to be read. */
 function speakableText(t) {
   return String(t || '')
-    .replace(/\*[^*]{0,120}\*/g, ' ')
+    .replace(/\*[^*]{0,600}\*/g, ' ')
     .replace(/[_`#>]/g, '')
     .replace(/\s+/g, ' ')
     .trim();
@@ -7563,11 +7964,26 @@ function ttsTrim() {
   }
 }
 
+/** Some characters have no voice at all. What they give back is what they DO,
+    and a text-to-speech engine reading “ears go flat, does not move” aloud in a
+    human voice is worse than the silence it replaced. */
+function charWordless(c) {
+  const sp = (c || {}).speech;
+  return sp === 'mute' || sp === 'thinks' || sp === 'mind';
+}
+function charWordlessWhy(c) {
+  const sp = (c || {}).speech;
+  if (sp === 'mind') return 'speaks mind to mind, so there is no sound to make';
+  if (sp === 'thinks') return 'thinks in words but cannot say one';
+  return 'has no words at all';
+}
+
 /** Say a line as this character, using whichever engine they are set to. */
 async function speakAs(c, text, msgId) {
   const cfg = chatCfg(c);
   const mode = cfg.voiceMode || 'off';
   if (mode === 'off') return false;
+  if (charWordless(c)) return false;
   const say = speakableText(text);
   if (!say) return false;
   stopSpeaking();
@@ -8137,7 +8553,7 @@ function msgHTML(m, c, i) {
 /** Speech with *stage directions* rendered as such. */
 function prose(t) {
   return esc(String(t || ''))
-    .replace(/\*([^*]{1,160})\*/g, '<em class="stage">$1</em>')
+    .replace(/\*([^*]{1,600})\*/g, '<em class="stage">$1</em>')
     .replace(/\n/g, '<br>');
 }
 
@@ -8366,6 +8782,11 @@ ACTIONS.sbSpeak = function (el) {
   const c = findChar(state.ui.sandboxId); if (!c) return;
   const i = Number(el.getAttribute('data-i'));
   const m = (c.chat || [])[i]; if (!m) return;
+  if (charWordless(c)) {
+    toast((c.name || 'This character') + ' ' + charWordlessWhy(c) + ' — what comes back is what they do, not something to read aloud. ' +
+      'Change “Can they talk?” on their sheet if that is wrong.', 'warn', 'NO VOICE TO USE');
+    return;
+  }
   if (chatCfg(c).voiceMode === 'off') { ACTIONS.sbVoice(); return; }
   speakAs(c, m.text, m.id || ('m' + i));
 };
@@ -8499,6 +8920,11 @@ ACTIONS.sbVoice = function () {
 };
 function voiceOptsHTML(c, cfg) {
   const mode = cfg.voiceMode || 'off';
+  if (charWordless(c)) {
+    return '<div class="hint"><strong>' + esc(c.name || 'This character') + '</strong> ' + charWordlessWhy(c) + ', ' +
+      'so nothing is ever spoken aloud for them — their replies are what they do, and reading that out in a human voice would undo it. ' +
+      'If that is wrong, change <em>Can they talk?</em> on their <strong>Voice &amp; Dialogue</strong> tab.</div>';
+  }
   if (mode === 'off') return '<div class="fs12 muted">They will answer in text only.</div>';
   const root = '<div data-root="char:' + c.id + '" data-sub="chatCfg">';
   if (mode === 'browser') {
@@ -8577,6 +9003,10 @@ ACTIONS.sbTestVoice = async function () {
   const c = sbVoiceChar();
   if (!c) return;
   const cfg = chatCfg(c);
+  if (charWordless(c)) {
+    toast((c.name || 'This character') + ' ' + charWordlessWhy(c) + ', so nothing here will be spoken.', 'warn', 'NO VOICE TO USE');
+    return;
+  }
   if (cfg.voiceMode === 'off') { toast('Give them a voice first.', 'warn'); return; }
   const line = (c.quotes || []).length ? c.quotes[0].text
     : (c.catchphrase || '').trim()
@@ -10829,10 +11259,7 @@ function storyBibleMarkdown(b) {
     out.push('### ' + t.label, '');
     list.forEach(c => {
       out.push('#### ' + (c.name || 'Unnamed') + (c.role ? ' — ' + c.role : ''));
-      [['Aliases', c.aliases], ['Age', c.age], ['Pronouns', c.pronouns], ['Occupation', c.occupation], ['Alignment', c.alignment],
-       ['Appearance', c.appearance], ['Wants', c.motivation], ['Needs', c.need], ['Flaws', c.flaws], ['Fears', c.fears],
-       ['Secret', c.secret], ['Voice', c.voice], ['Mannerisms', c.mannerisms], ['Backstory', c.backstory], ['Arc', c.arc], ['Notes', c.notes]]
-        .forEach(p => { if ((p[1] || '').trim()) out.push('- **' + p[0] + ':** ' + p[1]); });
+      charSheetRows(c).forEach(p => out.push('- **' + p[0] + ':** ' + p[1]));
       out.push('');
     });
   });
@@ -10996,7 +11423,8 @@ ACTIONS.expCast = function () {
     const list = (b.characters || []).filter(c => c.tier === t.id);
     if (!list.length) return '';
     return '## ' + t.label + '\n\n' + list.map(c => '### ' + (c.name || 'Unnamed') + '\n' +
-      [['Role', c.role], ['Wants', c.motivation], ['Needs', c.need], ['Flaws', c.flaws], ['Voice', c.voice], ['Arc', c.arc]]
+      [['Role', c.role], ['Species', c.species], ['Wants', c.motivation], ['Needs', c.need], ['Flaws', c.flaws],
+       ['Voice', c.voice], ['Speech', charSpeechLabel(c)], ['Heart', charBondLabel(c)], ['Arc', c.arc]]
         .filter(p => (p[1] || '').trim()).map(p => '- **' + p[0] + ':** ' + p[1]).join('\n')).join('\n\n');
   }).filter(Boolean)).join('\n\n');
   downloadBlob(slug(b.title) + '-cast.md', md, 'text/markdown');

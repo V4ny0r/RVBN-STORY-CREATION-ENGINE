@@ -95,6 +95,45 @@ read the character *and* the book before suggesting anything (and work offline),
 **Appearances** finds them in your actual prologue and chapters by name, updating
 itself as you write.
 
+#### The deeper questions
+
+Under the ordinary fields, each tab carries folded sections you can open when you want
+more — forty optional questions, none of them required, every answer handed to the
+character when you talk to them.
+
+Three of the folds are for anybody: **How they sound, moment to moment** (how they
+address people, what they say while thinking, how their voice changes when they are
+angry, what their silence means, and — the one the chat needed most — *exactly how they
+change the subject*), **Who they love**, and **What they stand on**.
+
+Two of them exist because a character is not always a person. **If they are not human**
+asks for species, size beside a person, what the body can and cannot do, which sense
+comes first, what the body does before thought, how long their kind lives, and — for a
+construct or a bound thing — what they are made of and which rules they cannot break.
+**If they do not talk like a person** starts with the only question on the whole sheet
+that changes the *shape* of a reply:
+
+| Can they talk? | What you get back |
+| --- | --- |
+| Talks like anyone else | Ordinary dialogue |
+| Talks, but the mouth fights it | Speech spelled the way it actually comes out, the same way every time |
+| Talks, but only to their own kind | Dialogue to their own; to anyone else, the noise a listener would really hear |
+| Talks, but only to one person | The same, but for one named person |
+| Never aloud — mind to mind | Short, strange, arriving as feeling before words |
+| Thinks in words, cannot say one | Clear thought inside, nothing out — the gap is the point |
+| No words at all | Movement, posture and sound. Not one word of dialogue, ever |
+
+Underneath sit the things that make a non-human stay non-human: the sounds they make
+instead of words, the ideas their kind has no word for, their own private vocabulary,
+what their mouth does to a word, and how they say "I" — including a hive that has no
+such word.
+
+Answer any of these and the instructions the model is given change, not just the facts:
+a character who cannot speak is told outright that there is no dialogue, and the rules
+about speaking in first person are *replaced* rather than piled on top. A character with
+no voice is also never read aloud — the app will not let a text-to-speech engine narrate
+a badger.
+
 ### Writing the way a word processor works
 
 Writing pages open with **nothing but the writing**. The chapter list, the feed options,
@@ -147,6 +186,14 @@ They stay in character: they only know what they would know, they can refuse, li
 deflect or get angry, and if you ask whether they are an AI they react like a person
 being asked something bizarre. With no API key at all it still works — an offline
 simulator answers from the same sheet.
+
+**The engine is on this page too.** The header names whoever is answering and turns
+amber when nothing can. Next to it, **ENGINE** opens the whole control — four engines,
+the key, the model, a test — and the same control sits beside the conversation. When the
+engine you picked has no key, a strip above the chat says so and takes the key right
+there, with a link to where that provider hands them out. Whatever you choose applies to
+the entire app from then on; there is nothing else to set up, and nothing is rebuilt
+while you are still pasting.
 
 ### Letting them speak back
 
@@ -307,8 +354,9 @@ guide for whatever page you are on.
 
 ## AI providers
 
-The app ships with a local simulator that works offline. To connect a real model, open
-**AI Engine Settings** and add a key for OpenAI, Anthropic or Google Gemini. For speech,
+The app ships with a local simulator that works offline. To connect a real model, either
+press **ENGINE** on the Dialogue Sandbox or open **AI Engine Settings** — they are the
+same setting — and add a key for OpenAI, Anthropic or Google Gemini. For speech,
 add an optional ElevenLabs key in the same place. Requests go directly from your browser
 to the provider; keys never leave the local database and are never sent anywhere else.
 Prompt templates for every AI feature are editable in the Co-Pilot module — except a
