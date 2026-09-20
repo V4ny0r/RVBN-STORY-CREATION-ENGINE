@@ -304,6 +304,10 @@ body.no-fx::before,body.no-fx::after{ display:none; }
   background:color-mix(in srgb, var(--c-amber) 12%, transparent); }
 .btn.amber:hover{ background:color-mix(in srgb, var(--c-amber) 22%, transparent); }
 .chat-warn a{ color:var(--accent); text-decoration:underline; }
+.segs{ display:inline-flex; gap:0; }
+.segs .btn{ border-radius:0; }
+.segs .btn:first-child{ border-radius:var(--radius) 0 0 var(--radius); }
+.segs .btn:last-child{ border-radius:0 var(--radius) var(--radius) 0; margin-left:-1px; }
 .chip{
   display:inline-flex; align-items:center; gap:5px; padding:2px 8px; font-family:var(--font-mono); font-size:10px;
   letter-spacing:1.3px; text-transform:uppercase; border:1px solid var(--line); color:var(--txt-dim);
@@ -5834,6 +5838,7 @@ function newCharacter(tier) {
     faith: '', loyalty: '', money: '', health: '', conflict: '', violence: '', status: '', contradiction: '', alone: '',
     cover: '', coverH: 220, coverY: 50, coverX: 50, avatarSize: 150, avatarPos: 'left', avatarShape: 'round',
     clips: [],                  /* voice samples — what they actually sound like */
+    caiUrl: '',                /* their page on Character.AI, if they have one */
     x: 0, y: 0, chat: [], created: nowISO()
   };
 }
@@ -7374,7 +7379,7 @@ function clipFor(c, text) {
   clips.forEach(x => {
     const tags = ((x.name || '') + ' ' + (x.note || '')).toLowerCase().match(/[a-z']{4,}/g) || [];
     let s = 0;
-    tags.forEach(t => { if (words.indexOf(t) >= 0) s += 2; else if (words.some(w => w.indexOf(t) === 0 || t.indexOf(w) === 0)) s += 1; });
+    tags.forEach(t => { if (words.indexOf(t) >= 0) s += 2; else if (words.some(w => w.slice(0, 5) === t.slice(0, 5))) s += 1; });
     if (s > bestScore) { bestScore = s; best = x; }
   });
   if (best) return best;
@@ -8099,6 +8104,7 @@ function personaFor(c, opts) {
 /** Per-character conversation settings — scene, who the user is, voice. */
 const CHAT_CFG_DEFAULT = {
   scene: '', userAs: '', length: 'normal', temp: 0.9, spoilers: true, extra: '',
+  mode: 'app',                /* 'app' = talk to them here · 'cai' = on Character.AI */
   voiceMode: 'off', browserVoice: '', rate: 1, pitch: 1,
   geminiVoice: 'Charon', elevenVoice: '', elevenVoiceName: '', autoSpeak: true,
   stability: 0.45, similarity: 0.8, style: 0
@@ -8707,6 +8713,75 @@ ACTIONS.sbEngineTest = async function () {
   repaintEngine();
 };
 
+/* ===========================================================================
+   v15 · TALKING TO THEM ON CHARACTER.AI INSTEAD
+   Character.AI sends X-Frame-Options: SAMEORIGIN, which tells every browser
+   to refuse their pages inside anyone else's frame — so their chat cannot be
+   drawn into this pane. What can be done: remember which of their characters
+   is this one, and open that conversation in its own window beside the app.
+   ========================================================================= */
+let CAI_WIN = null;
+function caiPaneHTML(c) {
+  const url = String(c.caiUrl || '').trim();
+  /* inside the desktop shell there is no frame rule to obey: their chat sits
+     right here in the pane, login, voice and all */
+  if (window.RVBN_DESKTOP && url) {
+    return '<div class="chatlog" id="chatLog" style="padding:0;height:min(72vh,760px)" data-root="char:' + c.id + '">' +
+      '<webview src="' + attr(url) + '" partition="persist:characterai" allowpopups style="width:100%;height:100%;border:0;display:block"></webview></div>' +
+      '<div class="chat-compose"><div class="flex gap6 wrap center">' +
+        '<input class="inp mono" style="flex:1;min-width:200px" data-model="caiUrl" data-rerender value="' + attr(url) + '">' +
+        '<button class="btn sm ghost" data-act="sbMode" data-m="app"><i data-lucide="message-square"></i>TALK TO THEM HERE INSTEAD</button>' +
+      '</div></div>';
+  }
+  return '<div class="chatlog" id="chatLog" style="display:flex;align-items:center;justify-content:center">' +
+    '<div style="max-width:560px;width:100%;padding:18px" data-root="char:' + c.id + '">' +
+      '<div class="helpbox mb14"><b>THEIR CONVERSATION ON CHARACTER.AI</b>' +
+        'Character.AI refuses to be shown inside another site — that is a rule their servers send, not this app — so the chat opens in its own ' +
+        'window next to this one, with their login and their voice exactly as on the site. This page remembers which character is ' +
+        esc(c.name || 'this one') + ', so it is one click every time after.</div>' +
+      '<label class="fld"><span class="lb">Their page on Character.AI</span>' +
+        '<input class="inp mono" data-model="caiUrl" data-live="caiLive" value="' + attr(url) + '" placeholder="https://character.ai/chat/… — paste the link from their chat"></label>' +
+      '<div class="flex gap6 wrap">' +
+        '<button class="btn solid" data-act="caiOpen" data-id="' + c.id + '"' + (url ? '' : ' disabled') + '><i data-lucide="external-link"></i>OPEN THEIR CHAT</button>' +
+        '<button class="btn" data-act="caiFind" data-id="' + c.id + '"><i data-lucide="search"></i>FIND THEM ON CHARACTER.AI</button>' +
+        '<button class="btn ghost" data-act="sbMode" data-m="app"><i data-lucide="message-square"></i>TALK TO THEM HERE INSTEAD</button>' +
+      '</div>' +
+      '<div class="hint mt10">Once their chat is open, this window and that one sit side by side. Nothing from Character.AI is stored here except the link.</div>' +
+    '</div></div>';
+}
+ACTIONS.sbMode = function (el) {
+  const c = findChar(state.ui.sandboxId); if (!c) return;
+  chatCfg(c).mode = el.getAttribute('data-m') === 'cai' ? 'cai' : 'app';
+  if (chatCfg(c).mode === 'cai') stopSpeaking();
+  markDirty(); render();
+};
+ACTIONS.caiLive = function (el) {
+  const btn = document.querySelector('[data-act="caiOpen"]');
+  if (btn) btn.disabled = !/^https?:\/\/(www\.|beta\.|old\.)?character\.ai\//i.test(el.value.trim());
+};
+function caiWindow(url) {
+  /* one window, reused — a second click brings it back rather than opening another */
+  const w = Math.min(520, screen.availWidth - 40), h = Math.min(860, screen.availHeight - 60);
+  const left = Math.max(0, screen.availWidth - w - 24), top = Math.max(0, (screen.availHeight - h) / 2);
+  try {
+    if (CAI_WIN && !CAI_WIN.closed) { CAI_WIN.location.href = url; CAI_WIN.focus(); return true; }
+    CAI_WIN = window.open(url, 'ravenbane_cai', 'popup=yes,width=' + w + ',height=' + h + ',left=' + left + ',top=' + top);
+    if (!CAI_WIN) { toast('Your browser blocked the window — allow pop-ups for this page and try again.', 'warn'); return false; }
+    return true;
+  } catch (e) { window.open(url, '_blank', 'noopener'); return true; }
+}
+ACTIONS.caiOpen = function (el) {
+  const hit = charById(el.getAttribute('data-id')); if (!hit) return;
+  const url = String(hit.c.caiUrl || '').trim();
+  if (!/^https?:\/\/(www\.|beta\.|old\.)?character\.ai\//i.test(url)) { toast('Paste the link to their Character.AI chat first.', 'warn'); return; }
+  caiWindow(url);
+};
+ACTIONS.caiFind = function (el) {
+  const hit = charById(el.getAttribute('data-id')); if (!hit) return;
+  caiWindow('https://character.ai/search?q=' + encodeURIComponent(hit.c.name || ''));
+  toast('When you have found them, copy the address of their chat and paste it here.', 'ok', 'THEN COME BACK');
+};
+
 /* ------------------------------ the chat page ----------------------------- */
 let SB_BUSY = false;
 
@@ -8757,6 +8832,9 @@ VIEWS.sandbox = {
             '</div>' +
             '<div class="chat-acts">' +
               '<span class="chip ' + (live ? 'lm' : 'am') + '" data-engine-chip>' + esc(engineChipText()) + '</span>' +
+              '<span class="segs" title="Talk to them here, or on Character.AI">' +
+                '<button class="btn sm ' + (cfg.mode === 'cai' ? 'ghost' : 'solid') + '" data-act="sbMode" data-m="app">HERE</button>' +
+                '<button class="btn sm ' + (cfg.mode === 'cai' ? 'solid' : 'ghost') + '" data-act="sbMode" data-m="cai">CHARACTER.AI</button></span>' +
               '<button class="btn sm ' + (live ? 'ghost' : 'amber') + '" data-act="sbEngine" ' +
                 'title="Choose which AI answers as them, and paste its key — without leaving this page">' +
                 '<i data-lucide="brain"></i>ENGINE</button>' +
@@ -8777,7 +8855,7 @@ VIEWS.sandbox = {
               '<button class="btn xs" data-go="character" data-arg="' + c.id + '">OPEN THEIR SHEET</button></div>'
             : '') +
 
-          '<div class="chatlog" id="chatLog">' + chatLogHTML(c) + '</div>' +
+          (cfg.mode === 'cai' ? caiPaneHTML(c) : '<div class="chatlog" id="chatLog">' + chatLogHTML(c) + '</div>' +
 
           '<div class="chat-compose">' +
             '<div class="flex gap6 wrap mb6" id="sbQuicks">' +
@@ -8795,7 +8873,7 @@ VIEWS.sandbox = {
             '</div>' +
             '<div class="mono fs10 faint mt6">Enter sends · Shift+Enter starts a new line' +
               (cfg.userAs ? ' · they think you are <strong>' + esc(excerptOf(cfg.userAs, 40)) + '</strong>' : '') + '</div>' +
-          '</div>' +
+          '</div>') +
         '</div>' +
       '</div>' +
 
