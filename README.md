@@ -234,6 +234,28 @@ free, offline, and in their real voice, with the honest limit that a browser can
 a recording say new words; that still takes ElevenLabs behind it. Character.AI publishes
 no way in, so nothing can be brought across from there.
 
+### Talking to them on Character.AI instead
+
+The chat header has a switch: **HERE** or **CHARACTER.AI**. In Character.AI mode the
+conversation pane becomes theirs — the character remembers the link to their Character.AI
+chat, *Find them* opens the site's search with their name, and their conversation opens
+with the site's own login and voice.
+
+In a browser it opens in one window beside the app. That is Character.AI's rule, not
+this app's: their servers send `X-Frame-Options: SAMEORIGIN`, which tells every browser
+to refuse their pages inside anyone else's, and nothing in a web page can override it.
+
+**To have it inside the app**, run the desktop version. It is the same `index.html` in a
+window of its own — the story app is not rebuilt or changed — and the only thing the
+window adds is the ability to draw Character.AI's chat right in the pane, login kept
+between sessions. From the `desktop` folder:
+
+```
+npm install        # once
+npm start          # run it
+npm run build:win  # or build:mac / build:linux — makes an installer in desktop/dist
+```
+
 ### Hearing your characters
 
 Every character page has a **Voice Clips** tab. The *Voice & Dialogue* tab is where you

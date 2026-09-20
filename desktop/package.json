@@ -1,0 +1,28 @@
+{
+  "name": "ravenbane-architect-desktop",
+  "productName": "Ravenbane Architect",
+  "version": "1.0.0",
+  "description": "The same index.html, in a window of its own — so the Character.AI pane can sit inside the app.",
+  "main": "main.js",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "prebuild": "node -e \"const f=require('fs');f.mkdirSync('app',{recursive:true});f.copyFileSync('../index.html','app/index.html')\"",
+    "build": "electron-builder",
+    "build:win": "electron-builder --win",
+    "build:mac": "electron-builder --mac",
+    "build:linux": "electron-builder --linux"
+  },
+  "devDependencies": {
+    "electron": "^31.0.0",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.ravenbane.architect",
+    "files": ["main.js", "preload.js", "app/**/*"],
+    "directories": { "output": "dist" },
+    "win": { "target": "nsis" },
+    "mac": { "target": "dmg" },
+    "linux": { "target": "AppImage" }
+  }
+}
