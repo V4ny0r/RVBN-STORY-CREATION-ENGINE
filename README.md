@@ -88,7 +88,7 @@ Every book gets its own social-media style page, second in the menu:
 ### The cast, one page each
 
 A **CHARACTERS** group in the menu lists everyone in the open book, portrait and all.
-Click any of them for their own page: a cover picture, a portrait you can size, shape
+Only the open book's characters are listed — each book keeps its own cast, its own album and its own music. Click any of them for their own page: a cover picture, a portrait you can size, shape
 and position, and seven tabs — Dossier, Inner Life, Voice & Dialogue, Relationships,
 Appearances, Gallery, Notes. A gauge tells you what is still blank, four AI buttons
 read the character *and* the book before suggesting anything (and work offline), and
@@ -214,6 +214,25 @@ every reply is spoken in it.
 > Character.AI does not publish a developer API, so nothing can connect to it. What this
 > does instead is run the same idea against a model you control: your character sheet
 > becomes the persona, and the voice comes from one of the three engines above.
+
+### Music that follows you
+
+Every character's **Voice Clips** tab carries a music player, and the small dock in the
+bottom corner can add one to any page. Drop in your songs — SUNO exports, MP3s, anything —
+and each player decides for itself where it belongs: this page only, one character's pages
+(their sheet and the chat with them), every page of a book, or the whole app. Turn on
+*start playing as soon as I arrive* and it begins by itself whenever you land somewhere
+it belongs, keeps going while you move between pages it belongs to, and goes quiet when
+you leave them. Loop, shuffle and volume are per player.
+
+### Their own clips as their voice
+
+The voice dialog has a fourth option: **Their own clips**. Each reply plays one of the
+recordings on their Voice Clips tab — the one whose name or note best fits what they just
+said (a clip called *angry* is picked for an angry line), otherwise one at random. It is
+free, offline, and in their real voice, with the honest limit that a browser cannot make
+a recording say new words; that still takes ElevenLabs behind it. Character.AI publishes
+no way in, so nothing can be brought across from there.
 
 ### Hearing your characters
 

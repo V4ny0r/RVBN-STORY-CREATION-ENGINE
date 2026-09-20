@@ -391,7 +391,19 @@ input[type=checkbox]{ accent-color:#23e0ff; width:15px; height:15px; cursor:poin
 .xclose:hover{ color:#fff; border-color:var(--accent-2); background:color-mix(in srgb, var(--accent-2) 15%, transparent); }
 
 /* -------------------------------- TOASTS -------------------------------- */
-#toasts{ position:fixed; right:16px; bottom:16px; z-index:9500; display:flex; flex-direction:column; gap:8px; max-width:380px; }
+#musicDock{ position:fixed; right:16px; bottom:16px; z-index:9400; }
+.mdock{ display:flex; align-items:center; gap:6px; padding:6px 8px 6px 11px; background:var(--chrome); border:1px solid var(--line-hard);
+  border-radius:999px; backdrop-filter:blur(12px); box-shadow:0 10px 30px rgba(0,0,0,.6); max-width:min(440px,calc(100vw - 28px)); }
+.mdock.on{ border-color:color-mix(in srgb, var(--accent) 55%, transparent); box-shadow:0 0 22px color-mix(in srgb, var(--accent) 25%, transparent),0 10px 30px rgba(0,0,0,.6); }
+.mdock-ic{ width:15px; height:15px; color:var(--accent); flex:0 0 15px; }
+.mdock-txt{ min-width:0; max-width:200px; }
+.mdock-name{ font-size:12.5px; color:var(--txt); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.mplayer{ border:1px solid var(--line); background:var(--bg-panel); padding:12px; margin-bottom:10px; }
+.post-grip{ cursor:grab; color:var(--txt-faint); font-size:17px; padding:0 4px; user-select:none; align-self:center; }
+.post-grip:active{ cursor:grabbing; }
+.post.dragover{ outline:2px dashed var(--accent-3); outline-offset:3px; }
+@media print{ #musicDock{ display:none; } }
+#toasts{ position:fixed; right:16px; bottom:70px; z-index:9500; display:flex; flex-direction:column; gap:8px; max-width:380px; }
 .toast{
   display:flex; gap:10px; align-items:flex-start; padding:10px 13px; background:var(--surface-2);
   border:1px solid var(--line-hard); border-left:3px solid var(--accent); box-shadow:0 14px 36px rgba(0,0,0,.7),var(--glow);
@@ -2374,6 +2386,7 @@ function defaultState() {
       theme: null,
       pageThemes: {},
       showGuides: true,
+      music: { players: [] },
       ai: {
         provider: 'simulated',
         keys: { openai: '', anthropic: '', gemini: '', elevenlabs: '' },
@@ -2690,6 +2703,7 @@ function render() {
   renderRail();
   icons();
   if (v.mount) { try { v.mount(); } catch (err) { console.error(err); } }
+  try { musicSync(); } catch (err) { console.error(err); }
 }
 
 /* ===========================================================================
@@ -7037,6 +7051,337 @@ function playClip(clip, restart) {
 }
 function clipById(c, id) { return charClips(c).find(x => x.id === id) || null; }
 
+
+/* ===========================================================================
+   v14 · MUSIC
+   A soundtrack that follows you. Each player decides for itself where it
+   belongs — this one page, one character's pages, every page of a book, or
+   the whole app — and whether it starts the moment you arrive. One <audio>
+   element carries it across navigation, so a song does not restart every
+   time you click something.
+   ========================================================================= */
+let MUSIC_AUDIO = null;
+const MUSIC = { pid: '', tid: '', playing: false, blocked: false, left: false };
+
+function musicStore() {
+  const a = state.app;
+  if (!a.music) a.music = { players: [] };
+  if (!a.music.players) a.music.players = [];
+  return a.music;
+}
+function newPlayer(o) {
+  return Object.assign({ id: uid('mp'), name: 'Soundtrack', tracks: [], scope: 'page',
+    bookId: '', charId: '', view: '', autoplay: false, loop: true, shuffle: false, volume: 0.8 }, o || {});
+}
+ROOTS.mplayer = (id) => musicPlayerById(id) || {};
+function musicPlayerById(id) { return musicStore().players.find(p => p.id === id) || null; }
+
+/** Where we are standing right now. */
+function musicCtx() {
+  /* the library, settings and the like belong to no book, whichever is open */
+  const b = BOOKLESS_VIEWS.indexOf(CURRENT_VIEW) >= 0 ? null : currentBook();
+  let charId = '';
+  if (CURRENT_VIEW === 'character') charId = state.ui.viewArg || '';
+  else if (CURRENT_VIEW === 'sandbox') charId = state.ui.sandboxId || '';
+  return { view: CURRENT_VIEW, bookId: b ? b.id : '', charId: charId };
+}
+/** Does this player belong here, and how specifically? 0 = no. */
+function musicMatch(p, ctx) {
+  if (p.scope === 'app') return 1;
+  if (p.scope === 'book') return p.bookId && p.bookId === ctx.bookId ? 2 : 0;
+  if (p.scope === 'char') return p.charId && p.charId === ctx.charId ? 3 : 0;
+  return p.view === ctx.view && (!p.bookId || p.bookId === ctx.bookId) && (!p.charId || p.charId === ctx.charId) ? 4 : 0;
+}
+function musicPlayersHere(ctx) {
+  ctx = ctx || musicCtx();
+  return musicStore().players.map(p => ({ p: p, w: musicMatch(p, ctx) }))
+    .filter(x => x.w).sort((a, b) => b.w - a.w).map(x => x.p);
+}
+function musicScopeLabel(p) {
+  return { app: 'EVERYWHERE', book: 'THIS BOOK', char: 'THIS CHARACTER', page: 'THIS PAGE' }[p.scope] || 'THIS PAGE';
+}
+
+/* ------------------------------- playback -------------------------------- */
+function musicEl() {
+  if (MUSIC_AUDIO && document.body.contains(MUSIC_AUDIO)) return MUSIC_AUDIO;
+  const a = document.createElement('audio');
+  a.id = 'musicPlayer'; a.preload = 'auto';
+  a.addEventListener('ended', () => musicNext(true, 1));
+  a.addEventListener('play', () => { MUSIC.playing = true; MUSIC.blocked = false; paintMusic(); });
+  a.addEventListener('pause', () => { MUSIC.playing = false; paintMusic(); });
+  a.addEventListener('error', () => {
+    MUSIC.playing = false; paintMusic();
+    toast('That track could not be played — the file may be a format this browser does not support.', 'err');
+  });
+  document.body.appendChild(a);
+  MUSIC_AUDIO = a;
+  return a;
+}
+function musicPlay(p, track) {
+  if (!p || !p.tracks.length) return;
+  track = track || (MUSIC.pid === p.id && p.tracks.find(t => t.id === MUSIC.tid)) || p.tracks[0];
+  const a = musicEl();
+  if (MUSIC.pid !== p.id || MUSIC.tid !== track.id || !a.src) {
+    a.src = track.src; MUSIC.pid = p.id; MUSIC.tid = track.id;
+  }
+  a.volume = clamp(Number(p.volume == null ? 0.8 : p.volume), 0, 1);
+  a.play().then(() => { MUSIC.blocked = false; paintMusic(); }).catch(() => {
+    /* a browser refuses sound until the page has been clicked once */
+    MUSIC.blocked = true; MUSIC.playing = false; paintMusic();
+  });
+  paintMusic();
+}
+function musicPause() { if (MUSIC_AUDIO) MUSIC_AUDIO.pause(); MUSIC.playing = false; paintMusic(); }
+function musicStop() {
+  if (MUSIC_AUDIO) { MUSIC_AUDIO.pause(); try { MUSIC_AUDIO.removeAttribute('src'); MUSIC_AUDIO.load(); } catch (e) { } }
+  MUSIC.playing = false; MUSIC.pid = ''; MUSIC.tid = ''; paintMusic();
+}
+function musicNext(auto, dir) {
+  const p = musicPlayerById(MUSIC.pid);
+  if (!p || !p.tracks.length) return;
+  /* a song ending on a page this player has left must not start the next one */
+  if (auto && musicPlayersHere().indexOf(p) < 0) { musicPause(); return; }
+  let i = p.tracks.findIndex(t => t.id === MUSIC.tid);
+  if (p.shuffle && p.tracks.length > 1) {
+    let j; do { j = Math.floor(Math.random() * p.tracks.length); } while (j === i);
+    i = j;
+  } else {
+    i += (dir || 1);
+    if (i >= p.tracks.length) { if (auto && !p.loop) { musicPause(); return; } i = 0; }
+    if (i < 0) i = p.tracks.length - 1;
+  }
+  musicPlay(p, p.tracks[i]);
+}
+/** Called after every render: keep what belongs here, start what asked to,
+    quieten what does not belong on this page. */
+function musicSync() {
+  const ctx = musicCtx();
+  const here = musicPlayersHere(ctx);
+  const cur = musicPlayerById(MUSIC.pid);
+  const want = here.find(p => p.autoplay && p.tracks.length);
+  if (want && cur !== want && (!cur || here.indexOf(cur) < 0 || musicMatch(want, ctx) > musicMatch(cur, ctx))) {
+    musicPlay(want); return;
+  }
+  /* back where it belongs, after the app itself hushed it on leaving */
+  if (want && cur === want && !MUSIC.playing && MUSIC.left) { musicPlay(want); return; }
+  if (cur && here.indexOf(cur) >= 0) { paintMusic(); return; }
+  if (cur && MUSIC.playing) { musicPause(); MUSIC.left = true; return; }
+  paintMusic();
+}
+
+/* --------------------------------- the dock ------------------------------- */
+function paintMusic() {
+  let d = $('#musicDock');
+  if (!d) { d = document.createElement('div'); d.id = 'musicDock'; document.body.appendChild(d); }
+  const p = musicPlayerById(MUSIC.pid);
+  const here = musicPlayersHere();
+  const cand = (p && here.indexOf(p) >= 0) ? p : (here[0] || p);
+  if (!cand) {
+    d.innerHTML = '<button class="btn xs ghost" data-act="musicAddHere" title="Add a music player to this page"><i data-lucide="music"></i></button>';
+    icons(); return;
+  }
+  const t = cand.tracks.find(x => x.id === MUSIC.tid && MUSIC.pid === cand.id) || cand.tracks[0];
+  const on = MUSIC.playing && MUSIC.pid === cand.id;
+  d.innerHTML = '<div class="mdock' + (on ? ' on' : '') + '">' +
+    '<i data-lucide="music" class="mdock-ic"></i>' +
+    '<div class="mdock-txt"><div class="mdock-name">' + esc(t ? t.name : 'No songs yet') + '</div>' +
+      '<div class="mono fs10 faint">' + esc(cand.name || 'Soundtrack') + ' · ' + musicScopeLabel(cand) +
+      (MUSIC.blocked && MUSIC.pid === cand.id ? ' · PRESS PLAY' : '') + '</div></div>' +
+    '<button class="btn xs ghost" data-act="musicPrev" title="Previous"><i data-lucide="skip-back"></i></button>' +
+    '<button class="btn xs ' + (on ? 'solid' : 'ghost') + '" data-act="musicToggle" data-id="' + cand.id + '"><i data-lucide="' + (on ? 'pause' : 'play') + '"></i></button>' +
+    '<button class="btn xs ghost" data-act="musicNext" title="Next"><i data-lucide="skip-forward"></i></button>' +
+    '<button class="btn xs ghost" data-act="musicOpen" data-id="' + cand.id + '" title="Songs and settings"><i data-lucide="sliders-horizontal"></i></button>' +
+  '</div>';
+  document.querySelectorAll('[data-mtrack]').forEach(r => r.classList.toggle('sounding', r.getAttribute('data-mtrack') === MUSIC.tid && on));
+  icons();
+}
+
+/* ------------------------------ on the page ------------------------------- */
+/** A music panel for wherever it is placed. */
+function musicPanelHTML(ctx, opts) {
+  ctx = ctx || musicCtx(); opts = opts || {};
+  const players = musicPlayersHere(ctx);
+  return '<div class="panel clip mb14"><div class="panel-hd"><i data-lucide="music"></i><h3>' + esc(opts.title || 'MUSIC') + '</h3>' +
+    '<span style="flex:1"></span>' +
+    '<button class="btn xs" data-act="musicNew" data-scope="' + attr(opts.scope || 'page') + '"><i data-lucide="plus"></i>NEW PLAYER</button></div>' +
+    '<div class="panel-bd">' +
+    (opts.blurb ? '<div class="helpbox mb14">' + opts.blurb + '</div>' : '') +
+    (players.length ? players.map(p => musicPlayerHTML(p)).join('')
+      : '<div class="empty" style="padding:18px"><i data-lucide="music"></i><h4>NO MUSIC HERE YET</h4>' +
+        '<div class="fs12">Add a player, drop your songs in — SUNO exports, MP3s, anything — and choose whether it plays on this page, ' +
+        'for this character, for this whole book, or everywhere.</div></div>') +
+    '</div></div>';
+}
+function musicPlayerHTML(p) {
+  const on = MUSIC.pid === p.id && MUSIC.playing;
+  const scopes = [['page', 'Plays on this page only'], ['char', 'This character’s pages'], ['book', 'Every page of this book'], ['app', 'Everywhere in the app']];
+  return '<div class="mplayer" data-root="mplayer:' + p.id + '">' +
+    '<div class="flex gap8 wrap center mb10">' +
+      '<button class="btn sm ' + (on ? 'solid' : '') + '" data-act="musicToggle" data-id="' + p.id + '"><i data-lucide="' + (on ? 'pause' : 'play') + '"></i>' + (on ? 'PAUSE' : 'PLAY') + '</button>' +
+      '<input class="inp" style="flex:1;min-width:140px" data-model="name" value="' + attr(p.name) + '" placeholder="Name this player">' +
+      '<select class="sel" style="width:200px" data-model="scope" data-live="musicScopeLive">' +
+        scopes.map(o => '<option value="' + o[0] + '"' + (p.scope === o[0] ? ' selected' : '') +
+          (o[0] === 'char' && !p.charId ? ' disabled' : '') + (o[0] === 'book' && !p.bookId ? ' disabled' : '') + '>' + o[1] + '</option>').join('') +
+      '</select>' +
+      '<button class="btn sm ghost red" data-act="musicDel" data-id="' + p.id + '" title="Remove this player"><i data-lucide="trash-2"></i></button>' +
+    '</div>' +
+    '<div class="flex gap8 wrap center mb10 fs12">' +
+      '<label class="flex center gap6"><input type="checkbox" data-model="autoplay"' + (p.autoplay ? ' checked' : '') + '> Start playing as soon as I arrive</label>' +
+      '<label class="flex center gap6"><input type="checkbox" data-model="loop"' + (p.loop ? ' checked' : '') + '> Loop</label>' +
+      '<label class="flex center gap6"><input type="checkbox" data-model="shuffle"' + (p.shuffle ? ' checked' : '') + '> Shuffle</label>' +
+      '<label class="flex center gap6" style="min-width:160px">Volume <input type="range" min="0" max="1" step="0.05" data-model="volume" data-live="musicVolLive" value="' + (p.volume == null ? 0.8 : p.volume) + '"></label>' +
+    '</div>' +
+    p.tracks.map(t => '<div class="clip-row' + (MUSIC.pid === p.id && MUSIC.tid === t.id && on ? ' sounding' : '') + '" data-mtrack="' + t.id + '">' +
+      '<button class="btn xs ghost" data-act="musicTrack" data-id="' + p.id + '" data-t="' + t.id + '"><i data-lucide="play"></i></button>' +
+      '<span class="fs13" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(t.name) +
+        ' <span class="mono fs10 faint">' + bytesHuman(t.bytes || 0) + '</span></span>' +
+      '<button class="btn xs ghost" data-act="musicTrackMove" data-id="' + p.id + '" data-t="' + t.id + '" data-d="-1"><i data-lucide="arrow-up"></i></button>' +
+      '<button class="btn xs ghost" data-act="musicTrackMove" data-id="' + p.id + '" data-t="' + t.id + '" data-d="1"><i data-lucide="arrow-down"></i></button>' +
+      '<button class="btn xs ghost red" data-act="musicTrackDel" data-id="' + p.id + '" data-t="' + t.id + '"><i data-lucide="x"></i></button>' +
+    '</div>').join('') +
+    '<div class="flex gap6 wrap mt10 center">' +
+      '<button class="btn sm solid" data-act="musicAdd" data-id="' + p.id + '"><i data-lucide="upload"></i>ADD SONGS</button>' +
+      '<button class="btn sm ghost" data-act="musicAddUrl" data-id="' + p.id + '"><i data-lucide="link"></i>FROM A LINK</button>' +
+      '<span class="hint" style="margin:0">Songs live inside this app’s own database, so a long album makes your save bigger.</span>' +
+    '</div></div>';
+}
+
+/* --------------------------------- actions -------------------------------- */
+function musicMake(scope) {
+  const ctx = musicCtx();
+  if (scope === 'char' && !ctx.charId) scope = 'page';
+  if (scope === 'book' && !ctx.bookId) scope = 'page';
+  const p = newPlayer({ scope: scope, bookId: ctx.bookId, charId: ctx.charId, view: ctx.view });
+  if (scope === 'char') { const h = charById(ctx.charId); p.name = (h && h.c.name ? h.c.name + '’s' : 'Their') + ' theme'; }
+  else if (scope === 'book') { const b = currentBook(); p.name = (b ? b.title : 'Book') + ' soundtrack'; }
+  else if (scope === 'app') p.name = 'Everywhere';
+  musicStore().players.push(p);
+  markDirty();
+  return p;
+}
+ACTIONS.musicNew = function (el) { musicMake(el.getAttribute('data-scope') || 'page'); render(); };
+ACTIONS.musicAddHere = function () {
+  const p = musicMake('page');
+  render();
+  ACTIONS.musicOpen({ getAttribute: () => p.id });
+};
+ACTIONS.musicOpen = function (el) {
+  const p = musicPlayerById(el.getAttribute('data-id')); if (!p) return;
+  openModal({
+    title: 'MUSIC — ' + (p.name || 'SOUNDTRACK').toUpperCase(), icon: 'music', size: 'wide',
+    body: '<div class="helpbox mb14"><b>WHERE IT PLAYS IS UP TO YOU</b>' +
+      'Choose whether this player belongs to this page, to one character’s pages, to every page of the book, or to the whole app. ' +
+      'Turn on <em>start playing as soon as I arrive</em> and it begins by itself whenever you land somewhere it belongs.</div>' +
+      musicPlayerHTML(p),
+    footer: '<button class="btn solid" data-modal-close>DONE</button>',
+    onClose: () => render()
+  });
+};
+ACTIONS.musicDel = async function (el) {
+  const p = musicPlayerById(el.getAttribute('data-id')); if (!p) return;
+  const ok = await confirmDlg('REMOVE THIS PLAYER', '<p>Remove <strong>' + esc(p.name || 'this player') + '</strong> and its ' + p.tracks.length + ' song(s)?</p>', true);
+  if (!ok) return;
+  if (MUSIC.pid === p.id) musicStop();
+  const m = musicStore(); m.players = m.players.filter(x => x.id !== p.id);
+  markDirty(); closeAllModals(); render();
+};
+ACTIONS.musicAdd = async function (el) {
+  const p = musicPlayerById(el.getAttribute('data-id')); if (!p) return;
+  const files = await pickFilesRaw('audio/*,.mp3,.wav,.ogg,.m4a,.webm,.aac,.flac');
+  if (!files || !files.length) return;
+  let n = 0;
+  for (const f of files) {
+    try {
+      const data = await readFileAsDataURL(f);
+      p.tracks.push({ id: uid('tr'), name: f.name.replace(/\.[a-z0-9]+$/i, ''), src: data, bytes: f.size || 0 });
+      n++;
+    } catch (e) { toast('Could not read “' + f.name + '”.', 'err'); }
+  }
+  markDirty();
+  const dlg = document.querySelector('.modal-scrim [data-root="mplayer:' + p.id + '"]');
+  if (dlg) { dlg.outerHTML = musicPlayerHTML(p); icons(); } else render();
+  if (n) toast(n + ' song' + (n === 1 ? '' : 's') + ' added.', 'ok');
+};
+ACTIONS.musicAddUrl = async function (el) {
+  const p = musicPlayerById(el.getAttribute('data-id')); if (!p) return;
+  const url = await promptDlg('A SONG FROM A LINK', 'A direct link to an audio file — it must end in .mp3, .wav, .ogg or similar', '');
+  if (!url || !/^https?:\/\//i.test(url.trim())) return;
+  p.tracks.push({ id: uid('tr'), name: url.trim().split('/').pop().replace(/\.[a-z0-9]+(\?.*)?$/i, '') || 'Song', src: url.trim(), bytes: 0 });
+  markDirty();
+  const dlg = document.querySelector('.modal-scrim [data-root="mplayer:' + p.id + '"]');
+  if (dlg) { dlg.outerHTML = musicPlayerHTML(p); icons(); } else render();
+};
+ACTIONS.musicTrack = function (el) {
+  const p = musicPlayerById(el.getAttribute('data-id')); if (!p) return;
+  const t = p.tracks.find(x => x.id === el.getAttribute('data-t')); if (!t) return;
+  if (MUSIC.pid === p.id && MUSIC.tid === t.id && MUSIC.playing) { musicPause(); return; }
+  musicPlay(p, t);
+};
+ACTIONS.musicToggle = function (el) {
+  const p = musicPlayerById(el.getAttribute('data-id')); if (!p) return;
+  if (!p.tracks.length) { toast('Add a song to this player first.', 'warn'); return; }
+  if (MUSIC.pid === p.id && MUSIC.playing) musicPause(); else musicPlay(p);
+  MUSIC.left = false;
+};
+ACTIONS.musicPrev = function () { musicNext(false, -1); };
+ACTIONS.musicNext = function () { musicNext(false, 1); };
+ACTIONS.musicTrackMove = function (el) {
+  const p = musicPlayerById(el.getAttribute('data-id')); if (!p) return;
+  const i = p.tracks.findIndex(x => x.id === el.getAttribute('data-t'));
+  const j = i + Number(el.getAttribute('data-d'));
+  if (i < 0 || j < 0 || j >= p.tracks.length) return;
+  const [m] = p.tracks.splice(i, 1); p.tracks.splice(j, 0, m);
+  markDirty();
+  const host = el.closest('[data-root]');
+  if (host) { host.outerHTML = musicPlayerHTML(p); icons(); }
+};
+ACTIONS.musicTrackDel = function (el) {
+  const p = musicPlayerById(el.getAttribute('data-id')); if (!p) return;
+  const id = el.getAttribute('data-t');
+  if (MUSIC.pid === p.id && MUSIC.tid === id) musicStop();
+  p.tracks = p.tracks.filter(x => x.id !== id);
+  markDirty();
+  const host = el.closest('[data-root]');
+  if (host) { host.outerHTML = musicPlayerHTML(p); icons(); }
+};
+/** Changing where a player belongs re-anchors it to where you are standing. */
+ACTIONS.musicScopeLive = function (el) {
+  const host = el.closest('[data-root]'); if (!host) return;
+  const p = musicPlayerById(host.getAttribute('data-root').split(':')[1]); if (!p) return;
+  const ctx = musicCtx();
+  if (p.scope === 'char' && ctx.charId) p.charId = ctx.charId;
+  if ((p.scope === 'book' || p.scope === 'char' || p.scope === 'page') && ctx.bookId) p.bookId = ctx.bookId;
+  if (p.scope === 'page') p.view = ctx.view;
+  markDirty(); paintMusic();
+};
+ACTIONS.musicVolLive = function (el) {
+  const host = el.closest('[data-root]'); if (!host) return;
+  const p = musicPlayerById(host.getAttribute('data-root').split(':')[1]); if (!p) return;
+  if (MUSIC.pid === p.id && MUSIC_AUDIO) MUSIC_AUDIO.volume = clamp(Number(el.value) || 0, 0, 1);
+};
+
+/* ===========================================================================
+   v14 · THEIR OWN CLIPS AS THEIR VOICE
+   Free, offline, and in their real voice — with the honest limit that a
+   browser cannot make a recording say new words. So each reply plays the
+   clip whose name best fits what was just said, else one at random.
+   ========================================================================= */
+function clipFor(c, text) {
+  const clips = charClips(c);
+  if (!clips.length) return null;
+  const words = String(text || '').toLowerCase().match(/[a-z']{4,}/g) || [];
+  let best = null, bestScore = 0;
+  clips.forEach(x => {
+    const tags = ((x.name || '') + ' ' + (x.note || '')).toLowerCase().match(/[a-z']{4,}/g) || [];
+    let s = 0;
+    tags.forEach(t => { if (words.indexOf(t) >= 0) s += 2; else if (words.some(w => w.indexOf(t) === 0 || t.indexOf(w) === 0)) s += 1; });
+    if (s > bestScore) { bestScore = s; best = x; }
+  });
+  if (best) return best;
+  const pool = clips.length > 1 ? clips.filter(x => x.id !== VOICE_PLAYING) : clips;
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
 /* --------------------------------- the tab -------------------------------- */
 VIEWS.character.clips = function (c) {
   const clips = charClips(c);
@@ -7111,6 +7456,17 @@ function clipRowHTML(c, x, i) {
 }
 
 /* --------------------------------- actions -------------------------------- */
+/* the music for one character lives under their voice clips */
+const _clipsTabPlain = VIEWS.character.clips;
+VIEWS.character.clips = function (c) {
+  const b = currentBook();
+  return _clipsTabPlain(c) + musicPanelHTML({ view: 'character', bookId: b ? b.id : '', charId: c.id }, {
+    title: 'MUSIC FOR ' + (c.name || 'THEM').toUpperCase(), scope: 'char',
+    blurb: '<b>A SOUNDTRACK THAT FOLLOWS THEM</b>Drop in the songs that belong to ' + esc(c.name || 'this character') +
+      ' \u2014 SUNO exports, MP3s, anything. A player set to <em>this character\u2019s pages</em> plays on their sheet and whenever you are talking to them, ' +
+      'and can start by itself the moment you arrive. Set it to <em>every page of this book</em> or <em>everywhere</em> and it follows you further.'
+  });
+};
 ACTIONS.clipPlay = function (el) {
   const hit = charById(el.getAttribute('data-id')); if (!hit) return;
   const x = clipById(hit.c, el.getAttribute('data-c')); if (!x) return;
@@ -7806,6 +8162,7 @@ function stopSpeaking() {
   try { if (window.speechSynthesis) window.speechSynthesis.cancel(); } catch (e) { }
   const a = SPEAK_AUDIO;
   if (a) { try { a.pause(); a.currentTime = 0; } catch (e) { } }
+  if (VOICE_PLAYING && VOICE_AUDIO) { try { VOICE_AUDIO.pause(); VOICE_AUDIO.currentTime = 0; } catch (e) { } VOICE_PLAYING = ''; try { paintClipButtons(); } catch (e) { } }
   paintSpeaking('');
 }
 /** Silence everything this app can make a sound with. */
@@ -7993,6 +8350,16 @@ async function speakAs(c, text, msgId) {
     const ok = speakBrowser(c, say, gen);
     if (!ok) paintSpeaking('');
     return ok;
+  }
+  if (mode === 'clips') {
+    const pick = clipFor(c, say);
+    if (!pick) { paintSpeaking(''); return false; }
+    const a = voicePlayer();
+    const done = () => { if (gen === SPEAK_GEN) paintSpeaking(''); };
+    a.addEventListener('ended', done, { once: true });
+    a.addEventListener('error', done, { once: true });
+    playClip(pick, true);
+    return true;
   }
   const cacheKey = ttsKey(c, mode, say);
   try {
@@ -8893,6 +9260,9 @@ ACTIONS.sbVoice = function () {
       '<div class="grid-auto g2 mb14">' +
         card('off', 'SILENT', 'Text only. Nothing is spoken and nothing is sent anywhere.', true) +
         card('browser', 'BUILT IN', 'A voice your computer already has. Free, instant, works with no internet and no key — but it does sound like a computer.', true) +
+        card('clips', 'THEIR OWN CLIPS', 'Plays one of the recordings on their Voice Clips tab each time they answer — free, offline, and in their real voice. ' +
+          'It cannot make a recording say new words, so name the clips by mood and the closest one is chosen.', true,
+          clips ? clips + ' clip' + (clips === 1 ? '' : 's') + ' ready' : 'Put a clip on their Voice Clips tab first.') +
         card('gemini', 'GEMINI VOICES', 'Thirty studio voices, using the Gemini key you already have. A big step up, and nothing new to sign up for.', hasGem, hasGem ? '' : 'Add a Gemini key in AI Engine Settings.') +
         card('elevenlabs', 'ELEVENLABS', 'The most lifelike of the three, and the only one that can be taught a brand-new voice from a short recording.', hasEleven, hasEleven ? '' : 'Needs an ElevenLabs key — free tier available.') +
       '</div>' +
@@ -8926,6 +9296,13 @@ function voiceOptsHTML(c, cfg) {
       'If that is wrong, change <em>Can they talk?</em> on their <strong>Voice &amp; Dialogue</strong> tab.</div>';
   }
   if (mode === 'off') return '<div class="fs12 muted">They will answer in text only.</div>';
+  if (mode === 'clips') {
+    const n = charClips(c).length;
+    return '<div class="hint">' + n + ' clip' + (n === 1 ? '' : 's') + ' on their Voice Clips tab. Each reply plays the one whose <strong>name or note</strong> best matches what they just said ' +
+      '\u2014 a clip called <em>angry</em> or <em>laughing</em> gets picked when the reply sounds like that \u2014 otherwise one at random, never the same twice running.<br><br>' +
+      'This is the honest limit of doing it free and offline: a browser cannot make a voice say new words. Cloning that voice so it can speak any line needs ElevenLabs behind it, ' +
+      'and Character.AI publishes no way in at all, so nothing can be funnelled from there.</div>';
+  }
   const root = '<div data-root="char:' + c.id + '" data-sub="chatCfg">';
   if (mode === 'browser') {
     const voices = browserVoices();
@@ -8980,6 +9357,7 @@ ACTIONS.sbVoiceMode = function (el) {
   const ai = state.app.ai;
   if (m === 'gemini' && !(ai.keys.gemini || '').trim()) { toast('Add a Gemini key in AI Engine Settings first.', 'warn'); return; }
   if (m === 'elevenlabs' && !(ai.keys.elevenlabs || '').trim()) { toast('Add an ElevenLabs key in AI Engine Settings first.', 'warn'); return; }
+  if (m === 'clips' && !charClips(c).length) { toast('Put a recording on their Voice Clips tab first.', 'warn'); return; }
   chatCfg(c).voiceMode = m;
   markDirty();
   closeModal(); ACTIONS.sbVoice();
@@ -13319,6 +13697,7 @@ VIEWS.profile = {
       const isOpen = openId === ch.id;
       return '<article class="post' + (isOpen ? ' open' : '') + '" id="post-' + ch.id + '" data-post="' + ch.id + '" style="--pc:' + pc + '">' +
         '<div class="post-hd">' +
+          '<span class="post-grip" draggable="true" data-grip="' + ch.id + '" title="Drag to move this chapter">\u283f</span>' +
           '<span class="post-num">' + String(i + 1).padStart(2, '0') + '</span>' +
           '<div class="post-meta">' +
             '<input class="post-title" data-act="feedTitle" data-id="' + ch.id + '" value="' + attr(ch.title || '') + '" placeholder="Untitled chapter — click to name it">' +
@@ -13680,6 +14059,26 @@ VIEWS.profile = {
 
   mount() {
     const b = currentBook(); if (!b) return;
+    /* drag a chapter by its grip and drop it on another to reorder */
+    let gripId = null;
+    document.querySelectorAll('[data-grip]').forEach(g => {
+      g.addEventListener('dragstart', (e) => { gripId = g.getAttribute('data-grip'); e.dataTransfer.effectAllowed = 'move'; try { e.dataTransfer.setData('text/plain', gripId); } catch (_) { } });
+      g.addEventListener('dragend', () => { gripId = null; document.querySelectorAll('.post.dragover').forEach(x => x.classList.remove('dragover')); });
+    });
+    document.querySelectorAll('article[data-post]').forEach(art => {
+      art.addEventListener('dragover', (e) => { if (!gripId) return; e.preventDefault(); art.classList.add('dragover'); });
+      art.addEventListener('dragleave', () => art.classList.remove('dragover'));
+      art.addEventListener('drop', (e) => {
+        if (!gripId) return;
+        e.preventDefault(); art.classList.remove('dragover');
+        const to = b.chapters.findIndex(c => c.id === art.getAttribute('data-post'));
+        const from = b.chapters.findIndex(c => c.id === gripId);
+        gripId = null;
+        if (from < 0 || to < 0 || from === to) return;
+        const [m] = b.chapters.splice(from, 1); b.chapters.splice(to, 0, m);
+        markDirty(); render(); toast('Chapter order updated.', 'ok');
+      });
+    });
     const openId = state.ui.feedOpen;
     if (openId) {
       const ch = b.chapters.find(c => c.id === openId);
