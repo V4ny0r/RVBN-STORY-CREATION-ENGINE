@@ -1,0 +1,37 @@
+{
+  "manifest_version": 3,
+  "name": "Ravenbane Architect \u2014 Character.AI helper",
+  "version": "1.0.0",
+  "description": "Lets the Ravenbane Architect story app show your Character.AI chats inside its own character pages. Touches nothing except character.ai.",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAkH/4q3YrZdzD580SVA7ViV5H+r1C2rk+f+6AcggKYSeOlM/zLz7CDPqUyrb92GreUPvgGIqJcM6LgTtB04dP3XIrQqtG/Z+btar4hD0P3SSFxJAlzUSJVNJ3SsFm9/MJOe6Tj2npTdLMLW4dbB5CRG7+wsP5mRdCoTqNO4tCSidjAu5x9ijOpvyR7WpsV+ZxvKt+D0RZtLRaw7QOR1UbwszIBulLqxqTkutI3Jf6ppqDe/3YczHsvxa/2GRkYI6M3hGGF+ZvRZ+ptg0yEql0CN5Q7nRH5VuBI/pznxTdG8BPZjmTs4CaTw8dzqkEDKPcwmGK7Mqb7WFDtG6qwqrNVwIDAQAB",
+  "permissions": [
+    "declarativeNetRequest",
+    "cookies"
+  ],
+  "host_permissions": [
+    "*://*.character.ai/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "declarative_net_request": {
+    "rule_resources": [
+      {
+        "id": "frame",
+        "enabled": true,
+        "path": "rules.json"
+      }
+    ]
+  },
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "ping.js"
+      ],
+      "matches": [
+        "<all_urls>",
+        "file:///*"
+      ]
+    }
+  ]
+}

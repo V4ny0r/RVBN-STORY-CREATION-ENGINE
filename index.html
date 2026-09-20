@@ -8721,29 +8721,58 @@ ACTIONS.sbEngineTest = async function () {
    is this one, and open that conversation in its own window beside the app.
    ========================================================================= */
 let CAI_WIN = null;
+/* Where the chat can be drawn in place:
+     · inside the desktop shell, a <webview> — no frame rule to obey;
+     · in Chrome or Edge with the little helper loaded, an <iframe> — the
+       helper lifts character.ai's frame refusal, for that site only;
+     · otherwise nothing can, and the pane says how to get either. */
+const CAI_EXT_ID = 'jojdgnlpflhklemblbmmdagncbmpefhk';
+let CAI_EXT = null;              /* null = not checked yet · true / false */
+function caiHelperCheck(cb) {
+  if (CAI_EXT !== null) { cb(CAI_EXT); return; }
+  if (!/^(https?|file):/.test(location.protocol) || !/Chrome\//.test(navigator.userAgent)) { CAI_EXT = false; cb(false); return; }
+  const sc = document.createElement('script');
+  sc.src = 'chrome-extension://' + CAI_EXT_ID + '/ping.js';
+  let settled = false;
+  const done = (ok) => { if (settled) return; settled = true; sc.remove(); CAI_EXT = !!ok; cb(CAI_EXT); };
+  sc.onload = () => done(!!window.RVBN_CAI_HELPER);
+  sc.onerror = () => done(false);
+  setTimeout(() => done(!!window.RVBN_CAI_HELPER), 2500);
+  document.head.appendChild(sc);
+}
+function caiEmbedKind() {
+  if (window.RVBN_DESKTOP) return 'webview';
+  if (CAI_EXT === true) return 'iframe';
+  return '';
+}
 function caiPaneHTML(c) {
   const url = String(c.caiUrl || '').trim();
-  /* inside the desktop shell there is no frame rule to obey: their chat sits
-     right here in the pane, login, voice and all */
-  if (window.RVBN_DESKTOP && url) {
+  const kind = caiEmbedKind();
+  const root = 'data-root="char:' + c.id + '"';
+  const linkRow = (label) =>
+    '<div class="chat-compose"><div class="flex gap6 wrap center">' +
+      '<span class="mono fs10 faint">' + label + '</span>' +
+      '<input class="inp mono" style="flex:1;min-width:200px" data-model="caiUrl" value="' + attr(url) + '" placeholder="https://character.ai/chat/…">' +
+      '<button class="btn sm ghost" data-act="caiReload" title="Load the page above"><i data-lucide="refresh-cw"></i></button>' +
+      '<button class="btn sm ghost" data-act="caiFind" data-id="' + c.id + '"><i data-lucide="search"></i>FIND</button>' +
+      '<button class="btn sm ghost" data-act="sbMode" data-m="app"><i data-lucide="message-square"></i>TALK TO THEM HERE INSTEAD</button>' +
+    '</div></div>';
+
+  if (kind && url) {
     /* Google refuses to sign in inside anything that announces itself as an
-       embedded window, so the pane introduces itself as the plain browser it is */
+       embedded window, so the desktop pane presents as the browser it is built on */
     const ua = navigator.userAgent.replace(/\s?Electron\/[\d.]+/i, '').replace(/\s?ravenbane[^\s]*\/[\d.]+/i, '');
-    return '<div class="chatlog" id="chatLog" style="padding:0;height:min(74vh,800px)" data-root="char:' + c.id + '">' +
-      '<webview src="' + attr(url) + '" partition="persist:characterai" allowpopups useragent="' + attr(ua) + '" ' +
-        'style="width:100%;height:100%;border:0;display:block"></webview></div>' +
-      '<div class="chat-compose"><div class="flex gap6 wrap center">' +
-        '<span class="mono fs10 faint">THEIR PAGE</span>' +
-        '<input class="inp mono" style="flex:1;min-width:200px" data-model="caiUrl" value="' + attr(url) + '">' +
-        '<button class="btn sm ghost" data-act="caiReload" title="Load the page above"><i data-lucide="refresh-cw"></i></button>' +
-        '<button class="btn sm ghost" data-act="caiFind" data-id="' + c.id + '"><i data-lucide="search"></i>FIND</button>' +
-        '<button class="btn sm ghost" data-act="sbMode" data-m="app"><i data-lucide="message-square"></i>TALK TO THEM HERE INSTEAD</button>' +
-      '</div></div>';
+    const frame = kind === 'webview'
+      ? '<webview id="caiFrame" src="' + attr(url) + '" partition="persist:characterai" allowpopups useragent="' + attr(ua) + '" style="width:100%;height:100%;border:0;display:block"></webview>'
+      : '<iframe id="caiFrame" src="' + attr(url) + '" allow="microphone; camera; autoplay; clipboard-read; clipboard-write; fullscreen; display-capture" ' +
+          'referrerpolicy="no-referrer" style="width:100%;height:100%;border:0;display:block;background:#0b0d12"></iframe>';
+    return '<div class="chatlog" id="chatLog" style="padding:0;height:min(74vh,800px)" ' + root + '>' + frame + '</div>' + linkRow('THEIR PAGE');
   }
-  if (window.RVBN_DESKTOP) {
+  if (kind) {
     return '<div class="chatlog" id="chatLog" style="display:flex;align-items:center;justify-content:center">' +
-      '<div style="max-width:560px;width:100%;padding:18px" data-root="char:' + c.id + '">' +
-        '<div class="helpbox mb14"><b>THEIR CONVERSATION ON CHARACTER.AI</b>Paste the link to their chat and it appears right here, login and voice included.</div>' +
+      '<div style="max-width:560px;width:100%;padding:18px" ' + root + '>' +
+        '<div class="helpbox mb14"><b>THEIR CONVERSATION ON CHARACTER.AI</b>Paste the link to their chat and it appears right here, login and voice included. ' +
+          'Or press <em>Find them</em> and browse to it.</div>' +
         '<label class="fld"><span class="lb">Their page on Character.AI</span>' +
           '<input class="inp mono" data-model="caiUrl" value="" placeholder="https://character.ai/chat/…"></label>' +
         '<div class="flex gap6 wrap">' +
@@ -8752,23 +8781,37 @@ function caiPaneHTML(c) {
           '<button class="btn ghost" data-act="sbMode" data-m="app">TALK TO THEM HERE INSTEAD</button>' +
         '</div></div></div>';
   }
+  if (CAI_EXT === null) {
+    /* first look: ask whether the helper is there, then draw the real thing */
+    setTimeout(() => caiHelperCheck(() => { if (CURRENT_VIEW === 'sandbox') render(); }), 0);
+    return '<div class="chatlog" id="chatLog" style="display:flex;align-items:center;justify-content:center">' +
+      '<div class="mono fs11 faint">LOOKING FOR THE CHARACTER.AI HELPER…</div></div>';
+  }
+  /* nothing can draw it here yet — say exactly how to change that */
+  const edge = /Edg\//.test(navigator.userAgent);
   return '<div class="chatlog" id="chatLog" style="display:flex;align-items:center;justify-content:center">' +
-    '<div style="max-width:560px;width:100%;padding:18px" data-root="char:' + c.id + '">' +
-      '<div class="helpbox mb14"><b>THEIR CONVERSATION ON CHARACTER.AI</b>' +
-        'You are running the <strong>browser</strong> version. Character.AI refuses to be shown inside another website — a rule their servers send that no web page can override — ' +
-        'so here their chat opens in a window beside this one. <strong>To have it inside this pane</strong>, open the app through its desktop shell instead: ' +
-        'in the <em>desktop</em> folder next to this file, double-click <strong>Run on Windows.cmd</strong> (or <strong>Run on Mac.command</strong>). ' +
-        'Same app, same data — their chat, login and voice then sit right here.</div>' +
-      '<label class="fld"><span class="lb">Their page on Character.AI</span>' +
-        '<input class="inp mono" data-model="caiUrl" data-live="caiLive" value="' + attr(url) + '" placeholder="https://character.ai/chat/… — paste the link from their chat"></label>' +
-      '<div class="flex gap6 wrap">' +
-        '<button class="btn solid" data-act="caiOpen" data-id="' + c.id + '"' + (url ? '' : ' disabled') + '><i data-lucide="external-link"></i>OPEN THEIR CHAT</button>' +
-        '<button class="btn" data-act="caiFind" data-id="' + c.id + '"><i data-lucide="search"></i>FIND THEM ON CHARACTER.AI</button>' +
-        '<button class="btn ghost" data-act="sbMode" data-m="app"><i data-lucide="message-square"></i>TALK TO THEM HERE INSTEAD</button>' +
+    '<div style="max-width:600px;width:100%;padding:18px" ' + root + '>' +
+      '<div class="helpbox mb14"><b>ONE-TIME SETUP, ABOUT THIRTY SECONDS</b>' +
+        'Chrome refuses to show Character.AI inside any other page — a rule their servers send. A tiny helper lifts that one rule, for character.ai only, ' +
+        'and then their chat sits right here: login, voice, everything. It reads nothing and sends nothing anywhere.</div>' +
+      '<ol class="fs13" style="padding-left:1.3em;line-height:1.8;color:var(--txt)">' +
+        '<li>Open a new tab and go to <code class="mono">' + (edge ? 'edge://extensions' : 'chrome://extensions') + '</code></li>' +
+        '<li>Turn on <strong>Developer mode</strong> (top right)</li>' +
+        '<li>Press <strong>Load unpacked</strong> and choose the <strong>chrome-helper</strong> folder that sits next to this app’s file</li>' +
+        '<li>Come back here and press <strong>Check again</strong></li>' +
+      '</ol>' +
+      '<div class="flex gap6 wrap mt10">' +
+        '<button class="btn solid" data-act="caiRecheck"><i data-lucide="refresh-cw"></i>CHECK AGAIN</button>' +
+        '<button class="btn ghost" data-act="caiOpen" data-id="' + c.id + '"' + (url ? '' : ' disabled') + '><i data-lucide="external-link"></i>OPEN BESIDE THE APP FOR NOW</button>' +
+        '<button class="btn ghost" data-act="sbMode" data-m="app">TALK TO THEM HERE INSTEAD</button>' +
       '</div>' +
-      '<div class="hint mt10">Once their chat is open, this window and that one sit side by side. Nothing from Character.AI is stored here except the link.</div>' +
+      '<label class="fld mt10"><span class="lb">Their page on Character.AI</span>' +
+        '<input class="inp mono" data-model="caiUrl" data-live="caiLive" value="' + attr(url) + '" placeholder="https://character.ai/chat/…"></label>' +
+      '<div class="hint">Not on Chrome or Edge? The desktop version in the <em>desktop</em> folder does the same without a helper.</div>' +
     '</div></div>';
 }
+ACTIONS.caiRecheck = function () { CAI_EXT = null; render(); };
+
 ACTIONS.sbMode = function (el) {
   const c = findChar(state.ui.sandboxId); if (!c) return;
   chatCfg(c).mode = el.getAttribute('data-m') === 'cai' ? 'cai' : 'app';
@@ -8800,10 +8843,10 @@ ACTIONS.caiReload = function () { render(); };
 ACTIONS.caiFind = function (el) {
   const hit = charById(el.getAttribute('data-id')); if (!hit) return;
   const q = 'https://character.ai/search?q=' + encodeURIComponent(hit.c.name || '');
-  if (window.RVBN_DESKTOP) {
-    /* inside the shell, the search happens in the pane itself */
-    const wv = document.querySelector('#chatLog webview');
-    if (wv) { wv.setAttribute('src', q); return; }
+  if (caiEmbedKind()) {
+    /* with the chat drawn in place, the search happens in place too */
+    const fr = document.getElementById('caiFrame');
+    if (fr) { fr.setAttribute('src', q); return; }
     hit.c.caiUrl = q; markDirty(); render();
     toast('Once you have found them, put the address of their chat in the box underneath.', 'ok', 'THEN COME BACK');
     return;

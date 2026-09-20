@@ -238,22 +238,18 @@ no way in, so nothing can be brought across from there.
 
 The chat header has a switch: **HERE** or **CHARACTER.AI**. In Character.AI mode the
 conversation pane becomes theirs — the character remembers the link to their Character.AI
-chat, *Find them* opens the site's search with their name, and their conversation opens
-with the site's own login and voice.
+chat, *Find them* searches the site with their name, and their conversation sits **in the
+pane itself**: their login, their voice, the call button, everything as on the site.
 
-In a browser it opens in one window beside the app. That is Character.AI's rule, not
-this app's: their servers send `X-Frame-Options: SAMEORIGIN`, which tells every browser
-to refuse their pages inside anyone else's, and nothing in a web page can override it.
+Chrome refuses to show Character.AI inside any other page (their servers send a header
+that says so, and no web page can override it), so in Chrome or Edge this needs a tiny
+helper, once: open `chrome://extensions`, turn on *Developer mode*, press *Load unpacked*
+and choose the `chrome-helper` folder next to this file. The pane walks you through it
+and checks by itself. The helper lifts that one rule for character.ai only and touches
+nothing else — three small files you can read.
 
-**To have it inside the app**, run the desktop version. It is the same `index.html` in a
-window of its own — the story app is not rebuilt or changed — and the only thing the
-window adds is the ability to draw Character.AI's chat right in the pane, login kept
-between sessions. From the `desktop` folder:
-
-Double-click **Run on Windows.cmd** (or **Run on Mac.command**) in the `desktop` folder. The
-first run fetches the shell once, and it asks you to install Node.js if you don't have it.
-To make a proper installer instead: `npm run build:win` (or `build:mac` / `build:linux`)
-from that folder, and it lands in `desktop/dist`.
+The `desktop` folder does the same without a helper: double-click **Run on Windows.cmd**
+(or **Run on Mac.command**) and the same app opens in its own window.
 
 ### Hearing your characters
 
