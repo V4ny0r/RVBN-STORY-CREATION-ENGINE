@@ -8726,19 +8726,39 @@ function caiPaneHTML(c) {
   /* inside the desktop shell there is no frame rule to obey: their chat sits
      right here in the pane, login, voice and all */
   if (window.RVBN_DESKTOP && url) {
-    return '<div class="chatlog" id="chatLog" style="padding:0;height:min(72vh,760px)" data-root="char:' + c.id + '">' +
-      '<webview src="' + attr(url) + '" partition="persist:characterai" allowpopups style="width:100%;height:100%;border:0;display:block"></webview></div>' +
+    /* Google refuses to sign in inside anything that announces itself as an
+       embedded window, so the pane introduces itself as the plain browser it is */
+    const ua = navigator.userAgent.replace(/\s?Electron\/[\d.]+/i, '').replace(/\s?ravenbane[^\s]*\/[\d.]+/i, '');
+    return '<div class="chatlog" id="chatLog" style="padding:0;height:min(74vh,800px)" data-root="char:' + c.id + '">' +
+      '<webview src="' + attr(url) + '" partition="persist:characterai" allowpopups useragent="' + attr(ua) + '" ' +
+        'style="width:100%;height:100%;border:0;display:block"></webview></div>' +
       '<div class="chat-compose"><div class="flex gap6 wrap center">' +
-        '<input class="inp mono" style="flex:1;min-width:200px" data-model="caiUrl" data-rerender value="' + attr(url) + '">' +
+        '<span class="mono fs10 faint">THEIR PAGE</span>' +
+        '<input class="inp mono" style="flex:1;min-width:200px" data-model="caiUrl" value="' + attr(url) + '">' +
+        '<button class="btn sm ghost" data-act="caiReload" title="Load the page above"><i data-lucide="refresh-cw"></i></button>' +
+        '<button class="btn sm ghost" data-act="caiFind" data-id="' + c.id + '"><i data-lucide="search"></i>FIND</button>' +
         '<button class="btn sm ghost" data-act="sbMode" data-m="app"><i data-lucide="message-square"></i>TALK TO THEM HERE INSTEAD</button>' +
       '</div></div>';
+  }
+  if (window.RVBN_DESKTOP) {
+    return '<div class="chatlog" id="chatLog" style="display:flex;align-items:center;justify-content:center">' +
+      '<div style="max-width:560px;width:100%;padding:18px" data-root="char:' + c.id + '">' +
+        '<div class="helpbox mb14"><b>THEIR CONVERSATION ON CHARACTER.AI</b>Paste the link to their chat and it appears right here, login and voice included.</div>' +
+        '<label class="fld"><span class="lb">Their page on Character.AI</span>' +
+          '<input class="inp mono" data-model="caiUrl" value="" placeholder="https://character.ai/chat/…"></label>' +
+        '<div class="flex gap6 wrap">' +
+          '<button class="btn solid" data-act="caiReload"><i data-lucide="arrow-right"></i>SHOW THEIR CHAT</button>' +
+          '<button class="btn" data-act="caiFind" data-id="' + c.id + '"><i data-lucide="search"></i>FIND THEM ON CHARACTER.AI</button>' +
+          '<button class="btn ghost" data-act="sbMode" data-m="app">TALK TO THEM HERE INSTEAD</button>' +
+        '</div></div></div>';
   }
   return '<div class="chatlog" id="chatLog" style="display:flex;align-items:center;justify-content:center">' +
     '<div style="max-width:560px;width:100%;padding:18px" data-root="char:' + c.id + '">' +
       '<div class="helpbox mb14"><b>THEIR CONVERSATION ON CHARACTER.AI</b>' +
-        'Character.AI refuses to be shown inside another site — that is a rule their servers send, not this app — so the chat opens in its own ' +
-        'window next to this one, with their login and their voice exactly as on the site. This page remembers which character is ' +
-        esc(c.name || 'this one') + ', so it is one click every time after.</div>' +
+        'You are running the <strong>browser</strong> version. Character.AI refuses to be shown inside another website — a rule their servers send that no web page can override — ' +
+        'so here their chat opens in a window beside this one. <strong>To have it inside this pane</strong>, open the app through its desktop shell instead: ' +
+        'in the <em>desktop</em> folder next to this file, double-click <strong>Run on Windows.cmd</strong> (or <strong>Run on Mac.command</strong>). ' +
+        'Same app, same data — their chat, login and voice then sit right here.</div>' +
       '<label class="fld"><span class="lb">Their page on Character.AI</span>' +
         '<input class="inp mono" data-model="caiUrl" data-live="caiLive" value="' + attr(url) + '" placeholder="https://character.ai/chat/… — paste the link from their chat"></label>' +
       '<div class="flex gap6 wrap">' +
@@ -8776,9 +8796,19 @@ ACTIONS.caiOpen = function (el) {
   if (!/^https?:\/\/(www\.|beta\.|old\.)?character\.ai\//i.test(url)) { toast('Paste the link to their Character.AI chat first.', 'warn'); return; }
   caiWindow(url);
 };
+ACTIONS.caiReload = function () { render(); };
 ACTIONS.caiFind = function (el) {
   const hit = charById(el.getAttribute('data-id')); if (!hit) return;
-  caiWindow('https://character.ai/search?q=' + encodeURIComponent(hit.c.name || ''));
+  const q = 'https://character.ai/search?q=' + encodeURIComponent(hit.c.name || '');
+  if (window.RVBN_DESKTOP) {
+    /* inside the shell, the search happens in the pane itself */
+    const wv = document.querySelector('#chatLog webview');
+    if (wv) { wv.setAttribute('src', q); return; }
+    hit.c.caiUrl = q; markDirty(); render();
+    toast('Once you have found them, put the address of their chat in the box underneath.', 'ok', 'THEN COME BACK');
+    return;
+  }
+  caiWindow(q);
   toast('When you have found them, copy the address of their chat and paste it here.', 'ok', 'THEN COME BACK');
 };
 

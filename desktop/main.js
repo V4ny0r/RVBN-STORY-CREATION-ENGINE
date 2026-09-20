@@ -32,7 +32,12 @@ function createWindow() {
   win.webContents.setWindowOpenHandler(({ url }) => { shell.openExternal(url); return { action: 'deny' }; });
   /* Character.AI opens its own popups (login, etc.) — let those be real windows inside the app */
   win.webContents.on('did-attach-webview', (_e, contents) => {
-    contents.setWindowOpenHandler(({ url }) => (/character\.ai/i.test(url) ? { action: 'allow' } : (shell.openExternal(url), { action: 'deny' })));
+    /* sign-in windows (Google, Apple, Character.AI's own) must open as real
+       windows sharing the pane's session, or the login never lands */
+    contents.setWindowOpenHandler(() => ({
+      action: 'allow',
+      overrideBrowserWindowOptions: { width: 520, height: 720, autoHideMenuBar: true, webPreferences: { partition: 'persist:characterai' } }
+    }));
   });
 }
 

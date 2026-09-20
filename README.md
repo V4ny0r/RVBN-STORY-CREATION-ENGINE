@@ -250,11 +250,10 @@ window of its own — the story app is not rebuilt or changed — and the only t
 window adds is the ability to draw Character.AI's chat right in the pane, login kept
 between sessions. From the `desktop` folder:
 
-```
-npm install        # once
-npm start          # run it
-npm run build:win  # or build:mac / build:linux — makes an installer in desktop/dist
-```
+Double-click **Run on Windows.cmd** (or **Run on Mac.command**) in the `desktop` folder. The
+first run fetches the shell once, and it asks you to install Node.js if you don't have it.
+To make a proper installer instead: `npm run build:win` (or `build:mac` / `build:linux`)
+from that folder, and it lands in `desktop/dist`.
 
 ### Hearing your characters
 
